@@ -23,8 +23,8 @@ The system complements, rather than competes with, accelerators such as Y Combin
 
 ## 2. Repository Links
 
-- 🔗 **Current Development**: [Insert current repository URL]
-- 🔗 **Previous Versions**: [Insert legacy repository URL]
+- 🔗 **Current Development**: https://github.com/NiyonshutiDavid/uruti-platform.git
+- 🔗 **Previous Versions**: https://github.com/NiyonshutiDavid/uruti_MLOP.git
 
 ## 3. Technology Stack
 
@@ -122,27 +122,15 @@ Documentation: `ModelCreation.ipynb`
 - Feature scaling & missing value handling
 - Visualizations: Feature importance, correlation heatmaps, training curves
 
-### 6.2 Model Architecture
+### 6.2 Model output
 
 **A. Reinforcement Learning Pitch Coach**
-- State: Founder pitch performance metrics
-- Action: AI-generated structured feedback
-- Reward: Improvement in pitch score
-- Policy Optimization via Q-learning / Policy Gradient
+<img width="850" height="547" alt="image" src="https://github.com/user-attachments/assets/527f24ac-d047-4b23-868e-4b485c595517" />
+
 
 **B. Multi-Layer Perceptron (MLP) – Investor Scoring Engine**
-- Input Layer (startup features) → Hidden Layers (ReLU) → Output Layer
-- Optimizer: Adam | Loss: Binary Cross-Entropy / MSE
-- Outputs: Risk score, Market readiness probability, Ranking position
+<img width="1790" height="490" alt="image" src="https://github.com/user-attachments/assets/d20bef9c-62be-4dec-95d8-0b94d47e75b1" />
 
-### 6.3 Initial Performance Metrics
-- Accuracy
-- Precision
-- Recall
-- F1-Score
-- ROC-AUC
-
-(Insert actual values from notebook)
 
 ## 7. Backend Development Demonstration
 
