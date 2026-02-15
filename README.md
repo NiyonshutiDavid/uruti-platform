@@ -79,22 +79,27 @@ Uruti follows a modular service-oriented architecture:
 - Mobile-first responsive design
 
 ### Figma Prototype
-[Insert Figma Link]
+https://www.figma.com/design/UDNIFsLGHMzDn5EFre4P1O/Uruti-UI-UX-designs?node-id=10213-130944&t=NniDCsG2ZnRrQ8fp-1
 
 ### Screenshots
 - Founder Dashboard
+<img width="1436" height="696" alt="Screenshot 2026-02-15 at 15 35 16" src="https://github.com/user-attachments/assets/c0814007-3486-41c4-8a26-31291846266c" />
 
 
 - Idea Refinement Interface
+<img width="908" height="643" alt="Screenshot 2026-02-15 at 15 35 57" src="https://github.com/user-attachments/assets/c80634ad-3f16-4b77-8b28-808b4e6c304e" />
 
 
 - Pitch Coaching Module
+<img width="1435" height="696" alt="Screenshot 2026-02-15 at 15 36 43" src="https://github.com/user-attachments/assets/bfb4efa2-a7cb-414d-9b1b-bd2c615b7fab" />
 
 
 - Investor Analytics Dashboard
+<img width="1440" height="688" alt="Screenshot 2026-02-15 at 15 38 20" src="https://github.com/user-attachments/assets/cc58b1fd-c003-477a-8b0f-502ecf507884" />
 
 
 - Leaderboard Page
+<img width="1436" height="697" alt="Screenshot 2026-02-15 at 15 37 11" src="https://github.com/user-attachments/assets/35b9ba2e-e918-4a6c-9e4e-9a5aaffb6055" />
 
 ### Example Frontend Code
 ```jsx
