@@ -191,3 +191,6 @@ Runs on: `http://localhost:8000` | Docs: `http://localhost:8000/docs`
 ```bash
 jupyter notebook ModelCreation.ipynb
 ```
+### Video recording
+Access the video recording from here:
+https://drive.google.com/drive/folders/1vv6e5kCKp86Lr4L88cjQwTP7zW4s0TNE?usp=sharing
