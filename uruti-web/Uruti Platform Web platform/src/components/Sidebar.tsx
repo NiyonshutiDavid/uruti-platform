@@ -31,20 +31,20 @@ const founderNavItems = [
   { id: 'messages', label: 'Messages', icon: MessageSquare },
 ];
 
-const investorNavItems = [
+const investorMenuItems = [
   { id: 'investor-dashboard', label: 'Investor Dashboard', icon: Home },
   { id: 'profile', label: 'My Profile', icon: User },
   { id: 'startup-discovery', label: 'Startup Discovery', icon: Target },
   { id: 'mentors', label: 'Network Directory', icon: Users },
   { id: 'ai-chat', label: 'Uruti AI Chat', icon: Sparkles },
-  { id: 'notifications', label: 'Deal Flow', icon: TrendingUp },
+  { id: 'deal-flow', label: 'Deal Flow', icon: TrendingUp },
   { id: 'calendar', label: 'Meeting Calendar', icon: Calendar },
   { id: 'availability', label: 'Availability & Booking', icon: Clock },
   { id: 'messages', label: 'Messages', icon: MessageSquare },
 ];
 
 export function Sidebar({ activeModule, onModuleChange, userType = 'founder', onUserTypeChange, isMobileSidebarOpen, setIsMobileSidebarOpen }: SidebarProps) {
-  const navigationItems = userType === 'founder' ? founderNavItems : investorNavItems;
+  const navigationItems = userType === 'founder' ? founderNavItems : investorMenuItems;
   const [captureDialogOpen, setCaptureDialogOpen] = useState(false);
   const [newIdea, setNewIdea] = useState({
     name: '',
@@ -87,7 +87,7 @@ export function Sidebar({ activeModule, onModuleChange, userType = 'founder', on
         />
       )}
 
-      <aside className={`fixed left-0 top-16 h-[calc(100vh-4rem)] w-64 glass-panel bg-white/95 dark:bg-gray-900/95 border-r border-black/10 dark:border-white/10 p-4 overflow-y-auto z-50 transition-transform duration-300 lg:translate-x-0 ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed left-0 top-16 h-[calc(100vh-4rem)] w-64 glass-panel bg-white/95 dark:bg-gray-900/95 border-r border-black/10 dark:border-white/10 p-4 overflow-y-auto hide-scrollbar z-50 transition-transform duration-300 lg:translate-x-0 ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         {/* Close button for mobile */}
         <Button
           variant="ghost"

@@ -112,8 +112,8 @@ export function LandingAbout({ onNavigate }: LandingAboutProps) {
 
             <Card className="glass-card border-black/5 dark:border-white/10">
               <CardContent className="p-8 sm:p-12">
-                <div className="w-16 h-16 rounded-2xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-6">
-                  <Globe className="h-8 w-8 text-purple-600" />
+                <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-800/50 flex items-center justify-center mb-6">
+                  <Globe className="h-8 w-8 text-[#76B947]" />
                 </div>
                 <h2 className="text-3xl font-bold mb-4 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
                   Our Vision

@@ -4,23 +4,22 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { VentureDetailView } from '../VentureDetailView';
 import { 
   Search, 
-  Filter, 
   TrendingUp, 
   Users, 
   DollarSign,
   MapPin,
-  Rocket,
   Award,
   Eye,
-  Play,
+  Bookmark,
+  Sparkles,
   ArrowLeft
 } from 'lucide-react';
-import { VentureDetailView } from '../VentureDetailView';
 
-// Mock startup/venture data
-const mockVentures = [
+// Mock bookmarked startup/venture data
+const mockBookmarkedVentures = [
   {
     id: '1',
     name: 'AgriConnect Rwanda',
@@ -47,6 +46,7 @@ const mockVentures = [
     fundingRaised: '$250K',
     location: 'Kigali, Rwanda',
     teamSize: '12 members',
+    bookmarked: true,
     milestones: [
       {
         title: 'MVP Launch',
@@ -93,6 +93,7 @@ const mockVentures = [
     fundingRaised: '$500K',
     location: 'Kigali, Rwanda',
     teamSize: '8 members',
+    bookmarked: true,
     milestones: []
   },
   {
@@ -120,53 +121,17 @@ const mockVentures = [
     fundingRaised: '$150K',
     location: 'Kigali, Rwanda',
     teamSize: '6 members',
+    bookmarked: true,
     milestones: []
   },
-  {
-    id: '4',
-    name: 'FinTrack',
-    tagline: 'AI-powered bookkeeping for SMEs',
-    sector: 'FinTech',
-    stage: 'Growth',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&h=400&fit=crop',
-    highlights: [
-      '3,000+ SMEs served',
-      '$2M ARR',
-      'Break-even achieved',
-      'Bank integrations live'
-    ],
-    problem: 'SMEs and microenterprises in Rwanda struggle with financial management and accessing credit due to poor bookkeeping.',
-    solution: 'AI-powered bookkeeping and credit scoring platform that helps SMEs manage finances and access loans.',
-    competitiveEdge: 'Deep integration with Rwandan banks, AI trained on local SME data, mobile-first interface in Kinyarwanda.',
-    teamBackground: 'Founded by fintech veterans from major Rwandan banks with team of 15 engineers and financial experts.',
-    targetMarket: '50,000+ SMEs in Kigali and major urban centers, expanding to rural cooperatives.',
-    fundingPlans: 'Seeking $2M Series A for product expansion, sales team growth, and regional expansion.',
-    urutiScore: 90,
-    activeUsers: 3000,
-    monthlyGrowth: 22,
-    fundingRaised: '$1.2M',
-    location: 'Kigali, Rwanda',
-    teamSize: '15 members',
-    milestones: []
-  }
 ];
 
-export function StartupDiscoveryModule() {
-  const [ventures, setVentures] = useState(mockVentures);
+export function DealFlowModule() {
+  const [ventures, setVentures] = useState(mockBookmarkedVentures);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSector, setFilterSector] = useState('all');
   const [filterStage, setFilterStage] = useState('all');
   const [selectedVenture, setSelectedVenture] = useState<any>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-
-  const filteredVentures = ventures.filter(venture => {
-    const matchesSearch = venture.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         venture.sector.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         venture.tagline.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSector = filterSector === 'all' || venture.sector === filterSector;
-    const matchesStage = filterStage === 'all' || venture.stage === filterStage;
-    return matchesSearch && matchesSector && matchesStage;
-  });
 
   const handleViewVenture = (venture: any) => {
     setSelectedVenture(venture);
@@ -176,15 +141,44 @@ export function StartupDiscoveryModule() {
     setSelectedVenture(null);
   };
 
-  const getStageColor = (stage: string) => {
-    const colors: Record<string, string> = {
-      'MVP': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-      'Pre-Seed': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-      'Seed': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-      'Growth': 'bg-[#76B947]/20 text-[#76B947]'
-    };
-    return colors[stage] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
+  const handleAnalyzeWithAI = (venture: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Navigate to AI chat with full venture context
+    const event = new CustomEvent('open-ai-analysis', {
+      detail: { venture }
+    });
+    window.dispatchEvent(event);
   };
+
+  const toggleBookmark = (ventureId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setVentures(ventures.map(v => 
+      v.id === ventureId ? { ...v, bookmarked: !v.bookmarked } : v
+    ));
+  };
+
+  const getStageColor = (stage: string) => {
+    switch (stage) {
+      case 'MVP':
+        return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300';
+      case 'Pre-Seed':
+        return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
+      case 'Seed':
+        return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+      case 'Growth':
+        return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300';
+      default:
+        return 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300';
+    }
+  };
+
+  const filteredVentures = ventures.filter(venture => {
+    const matchesSearch = venture.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         venture.tagline.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSector = filterSector === 'all' || venture.sector === filterSector;
+    const matchesStage = filterStage === 'all' || venture.stage === filterStage;
+    return matchesSearch && matchesSector && matchesStage && venture.bookmarked;
+  });
 
   // If a venture is selected, show the detail view
   if (selectedVenture) {
@@ -194,10 +188,10 @@ export function StartupDiscoveryModule() {
         <Button
           onClick={handleBackToList}
           variant="outline"
-          className="mb-4 border-black/10 dark:border-white/10 hover:bg-[#76B947]/10 hover:border-[#76B947]"
+          className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Startups
+          Back to Deal Flow
         </Button>
 
         {/* Venture Detail View */}
@@ -210,31 +204,36 @@ export function StartupDiscoveryModule() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl mb-2 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-            Startup Discovery
-          </h1>
-          <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-            Explore investment-ready startups in Rwanda's ecosystem
-          </p>
+      <div className="glass-card rounded-2xl p-8 border border-black/5 dark:border-white/10">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl mb-2 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+              My Deal Flow 📊
+            </h1>
+            <p className="text-lg text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+              Startups you're interested in tracking
+            </p>
+          </div>
+          <div className="glass-button p-6 rounded-2xl">
+            <Bookmark className="h-12 w-12 text-[#76B947]" />
+          </div>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="glass-card border-black/5 dark:border-white/10">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                  Total Startups
+                  Bookmarked Startups
                 </p>
                 <p className="text-3xl mt-1 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                  {ventures.length}
+                  {ventures.filter(v => v.bookmarked).length}
                 </p>
               </div>
-              <Rocket className="h-8 w-8 text-[#76B947]" />
+              <Bookmark className="h-8 w-8 text-[#76B947]" />
             </div>
           </CardContent>
         </Card>
@@ -247,7 +246,7 @@ export function StartupDiscoveryModule() {
                   Avg Uruti Score
                 </p>
                 <p className="text-3xl mt-1 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                  81/100
+                  {Math.round(ventures.reduce((acc, v) => acc + v.urutiScore, 0) / ventures.length)}
                 </p>
               </div>
               <Award className="h-8 w-8 text-[#76B947]" />
@@ -260,13 +259,13 @@ export function StartupDiscoveryModule() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                  Investment Ready
+                  Total Users
                 </p>
                 <p className="text-3xl mt-1 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                  {ventures.filter(v => v.urutiScore >= 75).length}
+                  {(ventures.reduce((acc, v) => acc + v.activeUsers, 0) / 1000).toFixed(0)}K
                 </p>
               </div>
-              <TrendingUp className="h-8 w-8 text-[#76B947]" />
+              <Users className="h-8 w-8 text-[#76B947]" />
             </div>
           </CardContent>
         </Card>
@@ -279,7 +278,7 @@ export function StartupDiscoveryModule() {
                   Total Funding
                 </p>
                 <p className="text-3xl mt-1 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                  $2.1M
+                  $900K
                 </p>
               </div>
               <DollarSign className="h-8 w-8 text-[#76B947]" />
@@ -296,28 +295,27 @@ export function StartupDiscoveryModule() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
-                  placeholder="Search startups by name, sector, or description..."
+                  placeholder="Search bookmarked startups..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 glass-card"
+                  className="pl-10"
                 />
               </div>
             </div>
             <Select value={filterSector} onValueChange={setFilterSector}>
-              <SelectTrigger className="w-full md:w-48 glass-card">
-                <Filter className="h-4 w-4 mr-2" />
+              <SelectTrigger className="w-full md:w-[200px]">
                 <SelectValue placeholder="All Sectors" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Sectors</SelectItem>
-                <SelectItem value="AgriTech">AgriTech</SelectItem>
+                <SelectItem value="AgTech">AgTech</SelectItem>
                 <SelectItem value="FinTech">FinTech</SelectItem>
                 <SelectItem value="HealthTech">HealthTech</SelectItem>
                 <SelectItem value="EdTech">EdTech</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filterStage} onValueChange={setFilterStage}>
-              <SelectTrigger className="w-full md:w-48 glass-card">
+              <SelectTrigger className="w-full md:w-[200px]">
                 <SelectValue placeholder="All Stages" />
               </SelectTrigger>
               <SelectContent>
@@ -333,108 +331,123 @@ export function StartupDiscoveryModule() {
       </Card>
 
       {/* Ventures Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredVentures.map((venture) => (
-          <Card 
-            key={venture.id} 
-            className="glass-card border-black/5 dark:border-white/10 hover:border-[#76B947]/50 transition-all hover:shadow-xl cursor-pointer overflow-hidden group"
-          >
-            {/* Thumbnail */}
-            <div className="relative h-48 bg-gray-200 dark:bg-gray-800 overflow-hidden">
-              <img 
-                src={venture.thumbnailUrl} 
-                alt={venture.name}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-              <div className="absolute top-3 right-3">
-                <Badge className={getStageColor(venture.stage)}>
-                  {venture.stage}
-                </Badge>
-              </div>
-              <div className="absolute bottom-3 left-3 right-3">
-                <Badge className="bg-[#76B947]/10 backdrop-blur-sm text-white border-[#76B947]/30">
-                  {venture.sector}
-                </Badge>
-              </div>
-            </div>
-
-            <CardContent className="pt-4">
-              <div className="space-y-3">
-                <div>
-                  <h3 className="text-xl font-bold mb-1 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                    {venture.name}
-                  </h3>
-                  <p className="text-sm text-muted-foreground line-clamp-2" style={{ fontFamily: 'var(--font-body)' }}>
-                    {venture.tagline}
-                  </p>
+      {filteredVentures.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredVentures.map((venture) => (
+            <Card 
+              key={venture.id} 
+              className="glass-card border-black/5 dark:border-white/10 hover:border-[#76B947]/50 transition-all hover:shadow-xl cursor-pointer overflow-hidden group"
+            >
+              {/* Thumbnail */}
+              <div className="relative h-48 bg-gray-200 dark:bg-gray-800 overflow-hidden">
+                <img 
+                  src={venture.thumbnailUrl} 
+                  alt={venture.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                <div className="absolute top-3 right-3">
+                  <Badge className={getStageColor(venture.stage)}>
+                    {venture.stage}
+                  </Badge>
                 </div>
+                <div className="absolute bottom-3 left-3 right-3">
+                  <Badge className="bg-[#76B947]/10 backdrop-blur-sm text-white border-[#76B947]/30">
+                    {venture.sector}
+                  </Badge>
+                </div>
+              </div>
 
-                {/* Key Metrics */}
-                <div className="grid grid-cols-2 gap-2 py-3 border-y border-black/5 dark:border-white/10">
+              <CardContent className="pt-4">
+                <div className="space-y-3">
                   <div>
-                    <p className="text-xs text-muted-foreground">Uruti Score</p>
-                    <div className="flex items-center gap-1 mt-1">
-                      <Award className="h-4 w-4 text-[#76B947]" />
-                      <span className="font-bold dark:text-white">{venture.urutiScore}/100</span>
+                    <h3 className="text-xl font-bold mb-1 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                      {venture.name}
+                    </h3>
+                    <p className="text-sm text-muted-foreground line-clamp-2" style={{ fontFamily: 'var(--font-body)' }}>
+                      {venture.tagline}
+                    </p>
+                  </div>
+
+                  {/* Key Metrics */}
+                  <div className="grid grid-cols-2 gap-2 py-3 border-y border-black/5 dark:border-white/10">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Uruti Score</p>
+                      <div className="flex items-center gap-1 mt-1">
+                        <Award className="h-4 w-4 text-[#76B947]" />
+                        <span className="font-bold dark:text-white">{venture.urutiScore}/100</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Active Users</p>
+                      <div className="flex items-center gap-1 mt-1">
+                        <Users className="h-4 w-4 text-[#76B947]" />
+                        <span className="font-bold dark:text-white">{venture.activeUsers.toLocaleString()}+</span>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Active Users</p>
-                    <div className="flex items-center gap-1 mt-1">
-                      <Users className="h-4 w-4 text-[#76B947]" />
-                      <span className="font-bold dark:text-white">{venture.activeUsers.toLocaleString()}+</span>
+
+                  {/* Location & Team */}
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      <span>{venture.location}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      <span>{venture.teamSize}</span>
                     </div>
                   </div>
-                </div>
 
-                {/* Location & Team */}
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
-                    <span>{venture.location}</span>
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      className="flex-1 bg-[#76B947] hover:bg-[#5a8f35] text-white"
+                      size="sm"
+                      onClick={() => handleViewVenture(venture)}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View Details
+                    </Button>
+                    <Button
+                      onClick={(e) => toggleBookmark(venture.id, e)}
+                      variant="outline"
+                      size="sm"
+                      className="bg-[#76B947]/10 border-[#76B947] text-[#76B947] hover:bg-[#76B947]/20 transition-all"
+                      title="Remove from Deal Flow"
+                    >
+                      <Bookmark className="h-4 w-4 fill-[#76B947]" />
+                    </Button>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Users className="h-3 w-3" />
-                    <span>{venture.teamSize}</span>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-2 pt-2">
+                  
+                  {/* Analyze Button */}
                   <Button
-                    onClick={() => handleViewVenture(venture)}
-                    className="flex-1 bg-[#76B947] hover:bg-[#5a8f35] text-white"
-                    size="sm"
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    View Details
-                  </Button>
-                  <Button
+                    onClick={(e) => handleAnalyzeWithAI(venture, e)}
                     variant="outline"
                     size="sm"
-                    className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
+                    className="w-full mt-2 border-purple-200 dark:border-purple-500/20 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-400 dark:hover:border-purple-500 text-purple-600 dark:text-purple-400"
                   >
-                    <Play className="h-4 w-4" />
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Analyze with AI
                   </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* No Results */}
-      {filteredVentures.length === 0 && (
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
         <Card className="glass-card border-black/5 dark:border-white/10">
-          <CardContent className="py-12 text-center">
-            <Rocket className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <Bookmark className="h-20 w-20 text-muted-foreground mb-4 opacity-20" />
             <h3 className="text-xl font-bold mb-2 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-              No startups found
+              No bookmarked startups yet
             </h3>
-            <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-              Try adjusting your filters or search terms
+            <p className="text-muted-foreground text-center mb-6" style={{ fontFamily: 'var(--font-body)' }}>
+              Visit Startup Discovery to bookmark interesting opportunities
             </p>
+            <Button className="bg-[#76B947] hover:bg-[#5a8f35] text-white">
+              Explore Startups
+            </Button>
           </CardContent>
         </Card>
       )}

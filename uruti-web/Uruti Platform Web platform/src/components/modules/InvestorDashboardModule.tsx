@@ -8,7 +8,7 @@ import { Input } from '../ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
-import { TrendingUp, Search, Filter, Star, Bookmark, MessageCircle, Eye, Download, DollarSign, Target, Users, Sparkles, Play, FileText, Calendar, ArrowRight, Award } from 'lucide-react';
+import { TrendingUp, Search, Filter, Star, Bookmark, MessageCircle, Eye, Download, DollarSign, Target, Users, Sparkles, Play, FileText, Calendar, ArrowRight, Award, Bell, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 
 interface Startup {
@@ -337,27 +337,167 @@ export function InvestorDashboardModule() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Deal Flow Analytics */}
-        <Card className="glass-card border-black/5">
+        {/* My Deal Flow - Bookmarked Startups */}
+        <Card className="glass-card border-black/5 lg:col-span-2">
           <CardHeader>
-            <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>Deal Flow Pipeline</CardTitle>
-            <CardDescription style={{ fontFamily: 'var(--font-body)' }}>
-              Monthly opportunity tracking
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>My Deal Flow</CardTitle>
+                <CardDescription style={{ fontFamily: 'var(--font-body)' }}>
+                  Startups you're interested in
+                </CardDescription>
+              </div>
+              <Bookmark className="h-5 w-5 text-[#76B947]" />
+            </div>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={dealFlowData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-                <XAxis dataKey="month" style={{ fontFamily: 'var(--font-body)', fontSize: '12px' }} />
-                <YAxis style={{ fontFamily: 'var(--font-body)', fontSize: '12px' }} />
-                <Tooltip contentStyle={{ fontFamily: 'var(--font-body)' }} />
-                <Legend wrapperStyle={{ fontFamily: 'var(--font-body)' }} />
-                <Line type="monotone" dataKey="opportunities" stroke="#76B947" strokeWidth={2} />
-                <Line type="monotone" dataKey="evaluated" stroke="#5A9435" strokeWidth={2} />
-                <Line type="monotone" dataKey="interested" stroke="#9BCF6E" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
+            {startups.filter(s => s.bookmarked).length > 0 ? (
+              <div className="space-y-4">
+                {startups.filter(s => s.bookmarked).map((startup) => (
+                  <div 
+                    key={startup.id}
+                    className="flex items-start gap-4 p-4 rounded-xl glass-button hover:bg-[#76B947]/10 transition-all cursor-pointer border border-black/5"
+                  >
+                    <div className="w-16 h-16 rounded-lg bg-[#76B947]/10 flex items-center justify-center flex-shrink-0">
+                      <Award className="h-8 w-8 text-[#76B947]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div>
+                          <h4 className="font-bold text-base mb-1" style={{ fontFamily: 'var(--font-heading)' }}>
+                            {startup.name}
+                          </h4>
+                          <p className="text-sm text-muted-foreground line-clamp-1" style={{ fontFamily: 'var(--font-body)' }}>
+                            {startup.tagline}
+                          </p>
+                        </div>
+                        <Badge className={getReadinessBadge(startup.readinessBand).props.className}>
+                          {getReadinessBadge(startup.readinessBand).props.children}
+                        </Badge>
+                      </div>
+                      
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
+                        <div className="flex items-center gap-1">
+                          <Award className="h-4 w-4 text-[#76B947]" />
+                          <span className={getScoreColor(startup.urutiScore)}>{startup.urutiScore}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Badge variant="outline" className="text-xs">{startup.sector}</Badge>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Badge variant="outline" className="text-xs">{startup.stage}</Badge>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs border-[#76B947] text-[#76B947] hover:bg-[#76B947]/10"
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View Details
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs border-purple-300 text-purple-600 hover:bg-purple-50"
+                        >
+                          <Sparkles className="h-3 w-3 mr-1" />
+                          Analyze
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-xs"
+                          onClick={() => toggleBookmark(startup.id)}
+                        >
+                          <Bookmark className="h-3 w-3 fill-[#76B947] text-[#76B947]" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Bookmark className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-20" />
+                <h4 className="font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                  No startups in your deal flow yet
+                </h4>
+                <p className="text-sm text-muted-foreground mb-4" style={{ fontFamily: 'var(--font-body)' }}>
+                  Visit Startup Discovery to bookmark interesting opportunities
+                </p>
+                <Button className="bg-[#76B947] hover:bg-[#5a8f35] text-white">
+                  Explore Startups
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Notifications */}
+        <Card className="glass-card border-black/5">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>Notifications</CardTitle>
+                <CardDescription style={{ fontFamily: 'var(--font-body)' }}>
+                  Latest updates
+                </CardDescription>
+              </div>
+              <Bell className="h-5 w-5 text-[#76B947]" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-start space-x-3 p-3 rounded-lg glass-button hover:bg-[#76B947]/10 transition-all cursor-pointer">
+                <div className="w-8 h-8 rounded-full bg-[#76B947]/20 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="h-4 w-4 text-[#76B947]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium" style={{ fontFamily: 'var(--font-heading)' }}>
+                    AgriConnect updated pitch deck
+                  </p>
+                  <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                    New financial projections • 2h ago
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3 p-3 rounded-lg glass-button hover:bg-[#76B947]/10 transition-all cursor-pointer">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <AlertCircle className="h-4 w-4 text-blue-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium" style={{ fontFamily: 'var(--font-heading)' }}>
+                    FinTrack reached 3K customers
+                  </p>
+                  <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                    Milestone achieved • 5h ago
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3 p-3 rounded-lg glass-button hover:bg-[#76B947]/10 transition-all cursor-pointer">
+                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                  <Star className="h-4 w-4 text-purple-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium" style={{ fontFamily: 'var(--font-heading)' }}>
+                    New startup match
+                  </p>
+                  <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                    MotoDeliver • 1d ago
+                  </p>
+                </div>
+              </div>
+
+              <Button variant="ghost" className="w-full text-[#76B947] hover:bg-[#76B947]/10 text-sm">
+                View All
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

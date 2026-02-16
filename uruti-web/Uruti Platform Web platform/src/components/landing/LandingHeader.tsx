@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Button } from '../ui/button';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Moon, Sun } from 'lucide-react';
 import { UrutiLogo, UrutiLogoText } from '../UrutiLogo';
+import { useTheme } from '../../lib/theme-context';
 
 interface LandingHeaderProps {
   onNavigate: (page: string) => void;
@@ -9,6 +10,7 @@ interface LandingHeaderProps {
 
 export function LandingHeader({ onNavigate }: LandingHeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   const navItems = [
     { label: 'Home', value: 'home' },
@@ -26,7 +28,7 @@ export function LandingHeader({ onNavigate }: LandingHeaderProps) {
             onClick={() => onNavigate('home')}
             className="flex items-center space-x-2 group"
           >
-            <UrutiLogo className="w-auto h-10 sm:h-12 group-hover:scale-110 transition-transform" />
+            <UrutiLogo className="w-auto h-14 sm:h-16 group-hover:scale-110 transition-transform" />
           </button>
 
           {/* Desktop Navigation */}
@@ -44,8 +46,23 @@ export function LandingHeader({ onNavigate }: LandingHeaderProps) {
             ))}
           </nav>
 
-          {/* Desktop CTA Buttons */}
+          {/* Desktop CTA Buttons & Theme Toggle */}
           <div className="hidden md:flex items-center space-x-3">
+            {/* Dark Mode Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="hover:bg-[#76B947]/10 dark:text-white"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
+            </Button>
+
             <Button
               variant="outline"
               className="border-[#76B947] text-[#76B947] hover:bg-[#76B947]/10"
@@ -63,17 +80,34 @@ export function LandingHeader({ onNavigate }: LandingHeaderProps) {
             </Button>
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden p-2 rounded-lg hover:bg-[#76B947]/10"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          >
-            {isMobileMenuOpen ? (
-              <X className="h-6 w-6 text-[#76B947]" />
-            ) : (
-              <Menu className="h-6 w-6 text-[#76B947]" />
-            )}
-          </button>
+          {/* Mobile Menu Button & Theme Toggle */}
+          <div className="md:hidden flex items-center space-x-2">
+            {/* Mobile Dark Mode Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="hover:bg-[#76B947]/10 dark:text-white"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-5 w-5 text-[#76B947]" />
+              ) : (
+                <Moon className="h-5 w-5 text-[#76B947]" />
+              )}
+            </Button>
+
+            <button
+              className="p-2 rounded-lg hover:bg-[#76B947]/10"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+              {isMobileMenuOpen ? (
+                <X className="h-6 w-6 text-[#76B947]" />
+              ) : (
+                <Menu className="h-6 w-6 text-[#76B947]" />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Menu */}
