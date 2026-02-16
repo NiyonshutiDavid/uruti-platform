@@ -122,7 +122,7 @@ Documentation: `ModelCreation.ipynb`
 - Feature scaling & missing value handling
 - Visualizations: Feature importance, correlation heatmaps, training curves
 
-### 6.2 Model output
+### 6.2 Model Current Performance
 
 **A. Reinforcement Learning Pitch Coach**
 <img width="850" height="547" alt="image" src="https://github.com/user-attachments/assets/527f24ac-d047-4b23-868e-4b485c595517" />
