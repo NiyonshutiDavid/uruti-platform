@@ -15,6 +15,7 @@ import { ReadinessCalendarModule } from './components/modules/ReadinessCalendarM
 import { PitchCoachModule } from './components/modules/PitchCoachModule';
 import { InvestorDashboardModule } from './components/modules/InvestorDashboardModule';
 import { NotificationsModule } from './components/modules/NotificationsModule';
+import { DealFlowModule } from './components/modules/DealFlowModule';
 import { SettingsModule } from './components/modules/SettingsModule';
 import { MessagesModule } from './components/modules/MessagesModule';
 import { ProfileModule } from './components/modules/ProfileModule';
@@ -32,6 +33,7 @@ function AppContent() {
   const [activeModule, setActiveModule] = useState('dashboard');
   const [userType, setUserType] = useState<'founder' | 'investor'>('founder');
   const [aiChatContext, setAiChatContext] = useState<{ name: string; description: string } | undefined>();
+  const [aiAnalysisContext, setAiAnalysisContext] = useState<any>(undefined);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { callState, endCall } = useCall();
 
@@ -91,12 +93,21 @@ function AppContent() {
       setActiveModule('profile');
     };
 
+    const handleOpenAIAnalysis = (event: any) => {
+      const venture = event.detail.venture;
+      setAiAnalysisContext(venture);
+      setAiChatContext(undefined); // Clear old context
+      setActiveModule('ai-chat');
+    };
+
     window.addEventListener('navigate-to-pitch-coach', handleNavigateToPitchCoach);
     window.addEventListener('navigate-to-profile', handleNavigateToProfile);
+    window.addEventListener('open-ai-analysis', handleOpenAIAnalysis);
 
     return () => {
       window.removeEventListener('navigate-to-pitch-coach', handleNavigateToPitchCoach);
       window.removeEventListener('navigate-to-profile', handleNavigateToProfile);
+      window.removeEventListener('open-ai-analysis', handleOpenAIAnalysis);
     };
   }, []);
 
@@ -113,7 +124,7 @@ function AppContent() {
       case 'pitch-performance':
         return <PitchPerformanceModule />;
       case 'ai-chat':
-        return <AIChatModule userType={userType} startupContext={aiChatContext} />;
+        return <AIChatModule userType={userType} startupContext={aiChatContext} analysisContext={aiAnalysisContext} />;
       case 'advisory-tracks':
         return <AdvisoryTracksModule />;
       case 'mentors':
@@ -124,6 +135,8 @@ function AppContent() {
         return <PitchCoachModule />;
       case 'notifications':
         return <NotificationsModule />;
+      case 'deal-flow':
+        return <DealFlowModule />;
       case 'settings':
         return <SettingsModule userType={userType} />;
       case 'messages':

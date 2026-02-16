@@ -112,43 +112,43 @@ export function LandingHowItWorks({ onNavigate }: LandingHowItWorksProps) {
       icon: FileText,
       title: 'Startup Hub',
       description: 'Centralized repository for all your ventures, ideas, and projects with status tracking.',
-      color: 'text-purple-600',
-      bg: 'bg-purple-50 dark:bg-purple-900/20'
+      color: 'text-[#76B947]',
+      bg: 'bg-gray-50 dark:bg-gray-800/50'
     },
     {
       icon: Sparkles,
       title: 'AI Chatbot',
       description: 'Get instant answers to entrepreneurship questions with context-aware AI assistance.',
       color: 'text-[#76B947]',
-      bg: 'bg-[#76B947]/10'
+      bg: 'bg-gray-50 dark:bg-gray-800/50'
     },
     {
       icon: Video,
       title: 'Pitch Performance',
       description: 'Record, analyze, and improve your pitch delivery with detailed AI feedback.',
-      color: 'text-blue-600',
-      bg: 'bg-blue-50 dark:bg-blue-900/20'
+      color: 'text-[#76B947]',
+      bg: 'bg-gray-50 dark:bg-gray-800/50'
     },
     {
       icon: MessageSquare,
       title: 'Advisory Tracks',
       description: 'Navigate structured learning paths across Legal, Finance, Marketing, and Operations.',
-      color: 'text-orange-600',
-      bg: 'bg-orange-50 dark:bg-orange-900/20'
+      color: 'text-[#76B947]',
+      bg: 'bg-gray-50 dark:bg-gray-800/50'
     },
     {
       icon: Users,
       title: 'Mentor Directory',
       description: 'Connect with experienced mentors and investors through our comprehensive network.',
-      color: 'text-pink-600',
-      bg: 'bg-pink-50 dark:bg-pink-900/20'
+      color: 'text-[#76B947]',
+      bg: 'bg-gray-50 dark:bg-gray-800/50'
     },
     {
       icon: Calendar,
       title: 'Readiness Calendar',
       description: 'Track milestones, deadlines, and investment opportunities in one place.',
-      color: 'text-cyan-600',
-      bg: 'bg-cyan-50 dark:bg-cyan-900/20'
+      color: 'text-[#76B947]',
+      bg: 'bg-gray-50 dark:bg-gray-800/50'
     }
   ];
 
@@ -207,16 +207,14 @@ export function LandingHowItWorks({ onNavigate }: LandingHowItWorksProps) {
               <div key={index} className="relative">
                 {/* Connector Line */}
                 {index < steps.length - 1 && (
-                  <div className="hidden lg:block absolute left-[60px] top-[140px] w-0.5 h-32 bg-gradient-to-b from-[#76B947] to-[#76B947]/20"></div>
+                  <div className="hidden lg:block absolute left-[32px] top-[80px] w-0.5 h-32 bg-gradient-to-b from-[#76B947] to-[#76B947]/20"></div>
                 )}
                 
                 <div className={`grid grid-cols-1 lg:grid-cols-12 gap-8 ${index % 2 === 0 ? '' : 'lg:flex-row-reverse'}`}>
                   {/* Step Number & Icon */}
                   <div className={`lg:col-span-3 flex ${index % 2 === 0 ? 'lg:justify-start' : 'lg:justify-end lg:order-2'}`}>
                     <div className="flex flex-col items-center">
-                      <div className={`w-24 h-24 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center shadow-lg mb-4`}>
-                        <step.icon className="h-12 w-12 text-white" />
-                      </div>
+                      <step.icon className="h-16 w-16 text-[#76B947] mb-4" />
                       <span className="text-6xl font-bold text-[#76B947]/20" style={{ fontFamily: 'var(--font-heading)' }}>
                         {step.number}
                       </span>
@@ -268,17 +266,12 @@ export function LandingHowItWorks({ onNavigate }: LandingHowItWorksProps) {
             </p>
           </div>
 
-          {/* Featured Cards Grid - Inspired Design */}
-          
-
           {/* Traditional Module Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {modules.map((module, index) => (
               <Card key={index} className="glass-card border-black/5 dark:border-white/10 hover:border-[#76B947]/30 transition-all group">
                 <CardContent className="pt-6">
-                  <div className={`w-14 h-14 rounded-xl ${module.bg} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                    <module.icon className={`h-7 w-7 ${module.color}`} />
-                  </div>
+                  <module.icon className="h-10 w-10 text-[#76B947] mb-4 group-hover:scale-110 transition-transform" />
                   <h3 className="text-xl font-bold mb-2 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
                     {module.title}
                   </h3>

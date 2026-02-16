@@ -30,43 +30,43 @@ export function LandingHome({ onNavigate }: LandingHomeProps) {
       icon: Lightbulb,
       title: 'Startup Ideation',
       description: 'Transform your ideas into structured business concepts with AI-powered guidance and validation.',
-      color: 'text-purple-600',
-      bg: 'bg-purple-50 dark:bg-purple-900/20'
+      color: 'text-[#76B947]',
+      bg: 'bg-gray-50 dark:bg-gray-800/50'
     },
     {
       icon: BarChart3,
       title: 'Uruti Score Ranking',
       description: 'Get publicly ranked on investment readiness metrics to attract the right investors.',
       color: 'text-[#76B947]',
-      bg: 'bg-[#76B947]/10'
+      bg: 'bg-gray-50 dark:bg-gray-800/50'
     },
     {
       icon: Video,
       title: 'Pitch Performance',
       description: 'Practice and perfect your pitch with AI feedback on delivery, pacing, and confidence.',
-      color: 'text-blue-600',
-      bg: 'bg-blue-50 dark:bg-blue-900/20'
+      color: 'text-[#76B947]',
+      bg: 'bg-gray-50 dark:bg-gray-800/50'
     },
     {
       icon: MessageSquare,
       title: 'AI Advisory Tracks',
       description: 'Navigate structured learning paths across Legal, Finance, Marketing, and Operations.',
-      color: 'text-orange-600',
-      bg: 'bg-orange-50 dark:bg-orange-900/20'
+      color: 'text-[#76B947]',
+      bg: 'bg-gray-50 dark:bg-gray-800/50'
     },
     {
       icon: Users,
       title: 'Mentor Network',
       description: 'Connect with experienced mentors and investors through our comprehensive directory.',
-      color: 'text-pink-600',
-      bg: 'bg-pink-50 dark:bg-pink-900/20'
+      color: 'text-[#76B947]',
+      bg: 'bg-gray-50 dark:bg-gray-800/50'
     },
     {
       icon: Calendar,
       title: 'Readiness Calendar',
       description: 'Track milestones, deadlines, and investment opportunities in one centralized hub.',
-      color: 'text-cyan-600',
-      bg: 'bg-cyan-50 dark:bg-cyan-900/20'
+      color: 'text-[#76B947]',
+      bg: 'bg-gray-50 dark:bg-gray-800/50'
     }
   ];
 
@@ -153,7 +153,7 @@ export function LandingHome({ onNavigate }: LandingHomeProps) {
         {/* Background Elements */}
         <div className="absolute inset-0 -z-10">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#76B947]/5 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#76B947]/5 rounded-full blur-3xl"></div>
         </div>
 
         <div className="container mx-auto">
@@ -214,41 +214,71 @@ export function LandingHome({ onNavigate }: LandingHomeProps) {
             </div>
 
             {/* Right Side - Images Grid */}
-            <div className="hidden lg:grid grid-cols-2 gap-4">
+            <div className="hidden lg:grid grid-cols-2 gap-4 relative">
               <div className="space-y-4">
-                <div className="glass-card rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform">
-                  <img 
-                    src="https://images.unsplash.com/photo-1655720357872-ce227e4164ba?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwZW50cmVwcmVuZXVyJTIwc3RhcnR1cCUyMHRlYW0lMjBtZWV0aW5nfGVufDF8fHx8MTc3MTE0ODY1MHww&ixlib=rb-4.1.0&q=80&w=1080" 
-                    alt="Entrepreneurs collaborating" 
-                    className="w-full h-64 object-cover"
-                  />
+                {/* Card 1 with heavily blurred vertical gradient */}
+                <div className="relative">
+                  {/* Heavily blurred vertical gradient behind */}
+                  <div className="absolute inset-0 flex items-center justify-center -z-10 opacity-95">
+                    <div className="w-[647px] h-[647px] bg-gradient-to-b from-[#ddffc2] via-[#76b947] to-[#9bcf6e] blur-[120px]"></div>
+                  </div>
+                  <div className="glass-card rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform animate-card-rotate">
+                    <img 
+                      src="https://images.unsplash.com/photo-1655720357872-ce227e4164ba?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwZW50cmVwcmVuZXVyJTIwc3RhcnR1cCUyMHRlYW0lMjBtZWV0aW5nfGVufDF8fHx8MTc3MTE0ODY1MHww&ixlib=rb-4.1.0&q=80&w=1080" 
+                      alt="Entrepreneurs collaborating" 
+                      className="w-full h-64 object-cover"
+                    />
+                  </div>
                 </div>
-                <div className="glass-card rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform">
-                  <img 
-                    src="https://images.unsplash.com/photo-1689857538296-b6e1a392a91d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwbWFuJTIwdGVjaG5vbG9neSUyMGlubm92YXRpb24lMjBsYXB0b3B8ZW58MXx8fHwxNzcxMTQ4NjU2fDA&ixlib=rb-4.1.0&q=80&w=1080" 
-                    alt="Working on innovation" 
-                    className="w-full h-48 object-cover"
-                  />
+                
+                {/* Card 2 with heavily blurred vertical gradient */}
+                <div className="relative">
+                  {/* Heavily blurred vertical gradient behind */}
+                  <div className="absolute inset-0 flex items-center justify-center -z-10 opacity-95">
+                    <div className="w-[600px] h-[600px] bg-gradient-to-b from-[#ddffc2] via-[#76b947] to-[#9bcf6e] blur-[120px]"></div>
+                  </div>
+                  <div className="glass-card rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform animate-card-rotate" style={{ animationDelay: '2s' }}>
+                    <img 
+                      src="https://images.unsplash.com/photo-1689857538296-b6e1a392a91d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwbWFuJTIwdGVjaG5vbG9neSUyMGlubm92YXRpb24lMjBsYXB0b3B8ZW58MXx8fHwxNzcxMTQ4NjU2fDA&ixlib=rb-4.1.0&q=80&w=1080" 
+                      alt="Working on innovation" 
+                      className="w-full h-48 object-cover"
+                    />
+                  </div>
                 </div>
               </div>
               <div className="space-y-4 pt-8">
-                <div className="glass-card rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform">
-                  <img 
-                    src="https://images.unsplash.com/photo-1710778044102-56a3a6b69a1b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwd29tYW4lMjBlbnRyZXByZW5ldXIlMjBwcmVzZW50YXRpb24lMjBidXNpbmVzc3xlbnwxfHx8fDE3NzExNDg2NTN8MA&ixlib=rb-4.1.0&q=80&w=1080" 
-                    alt="Business presentation" 
-                    className="w-full h-48 object-cover"
-                  />
+                {/* Card 3 with heavily blurred vertical gradient */}
+                <div className="relative">
+                  {/* Heavily blurred vertical gradient behind */}
+                  <div className="absolute inset-0 flex items-center justify-center -z-10 opacity-95">
+                    <div className="w-[600px] h-[600px] bg-gradient-to-b from-[#ddffc2] via-[#76b947] to-[#9bcf6e] blur-[120px]"></div>
+                  </div>
+                  <div className="glass-card rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform animate-card-rotate" style={{ animationDelay: '4s' }}>
+                    <img 
+                      src="https://images.unsplash.com/photo-1710778044102-56a3a6b69a1b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwd29tYW4lMjBlbnRyZXByZW5ldXIlMjBwcmVzZW50YXRpb24lMjBidXNpbmVzc3xlbnwxfHx8fDE3NzExNDg2NTN8MA&ixlib=rb-4.1.0&q=80&w=1080" 
+                      alt="Business presentation" 
+                      className="w-full h-48 object-cover"
+                    />
+                  </div>
                 </div>
-                <div className="glass-card rounded-2xl overflow-hidden shadow-2xl p-6 bg-gradient-to-br from-[#76B947]/10 to-purple-500/10">
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center">
-                      <Award className="h-12 w-12 text-[#76B947] mx-auto mb-3" />
-                      <p className="text-lg font-bold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                        Investment Ready
-                      </p>
-                      <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                        AI-Powered Scoring
-                      </p>
+                
+                {/* Card 4 with heavily blurred vertical gradient */}
+                <div className="relative">
+                  {/* Heavily blurred vertical gradient behind */}
+                  <div className="absolute inset-0 flex items-center justify-center -z-10 opacity-95">
+                    <div className="w-[550px] h-[550px] bg-gradient-to-b from-[#ddffc2] via-[#76b947] to-[#9bcf6e] blur-[120px]"></div>
+                  </div>
+                  <div className="glass-card rounded-2xl overflow-hidden shadow-2xl p-6 bg-gradient-to-br from-[#76B947]/10 to-purple-500/10 animate-card-rotate" style={{ animationDelay: '6s' }}>
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <Award className="h-12 w-12 text-[#76B947] mx-auto mb-3" />
+                        <p className="text-lg font-bold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                          Investment Ready
+                        </p>
+                        <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                          AI-Powered Scoring
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
