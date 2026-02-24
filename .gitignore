@@ -4,6 +4,10 @@ venv/
 env/
 .env
 .env.local
+.venv/
+venv/
+__pycache__/
+*.pyc
 
 # Build outputs
 dist/
