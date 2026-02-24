@@ -4,7 +4,9 @@ import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { UrutiLogo, UrutiLogoText } from '../UrutiLogo';
-import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import ForgotPasswordDialog from './ForgotPasswordDialog';
 
 interface LoginPageProps {
   onNavigate: (page: string) => void;
@@ -12,17 +14,28 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
+  const { login, isLoading, error, clearError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Here you would typically validate credentials
-    console.log('Login attempt:', formData);
-    onLogin();
+    setLocalError(null);
+    clearError();
+    
+    try {
+      await login(formData.email, formData.password);
+      onLogin();
+      onNavigate('dashboard');
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Login failed';
+      setLocalError(errorMsg);
+    }
   };
 
   const handleChange = (field: string, value: string) => {
@@ -116,6 +129,15 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
+              {(error || localError) && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-red-900">{error || localError}</p>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="email" className="flex items-center space-x-2" style={{ fontFamily: 'var(--font-body)' }}>
                   <Mail className="h-4 w-4 text-[#76B947]" />
@@ -126,8 +148,9 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
                   type="email"
                   placeholder="founder@example.com"
                   value={formData.email}
-                  onChange={(e) => handleChange('email', e.target.value)}
+                  onChange={(e) => { setFormData(prev => ({ ...prev, email: e.target.value })); setLocalError(null); }}
                   required
+                  disabled={isLoading}
                   className="glass-card border-black/10 dark:border-white/10 h-12"
                   style={{ fontFamily: 'var(--font-body)' }}
                 />
@@ -144,14 +167,16 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter your password"
                     value={formData.password}
-                    onChange={(e) => handleChange('password', e.target.value)}
+                    onChange={(e) => { setFormData(prev => ({ ...prev, password: e.target.value })); setLocalError(null); }}
                     required
+                    disabled={isLoading}
                     className="glass-card border-black/10 dark:border-white/10 h-12 pr-12"
                     style={{ fontFamily: 'var(--font-body)' }}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    disabled={isLoading}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-[#76B947] transition-colors"
                   >
                     {showPassword ? (
@@ -175,6 +200,7 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
                 </label>
                 <button
                   type="button"
+                  onClick={() => setShowForgotPassword(true)}
                   className="text-sm text-[#76B947] hover:text-[#76B947]/80 transition-colors"
                   style={{ fontFamily: 'var(--font-body)' }}
                 >
@@ -185,11 +211,21 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
               <Button
                 type="submit"
                 size="lg"
+                disabled={isLoading}
                 className="w-full bg-[#76B947] text-white hover:bg-[#76B947]/90 h-12 text-base"
                 style={{ fontFamily: 'var(--font-body)' }}
               >
-                Sign In
-                <ArrowRight className="ml-2 h-5 w-5" />
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Signing In...
+                  </>
+                ) : (
+                  <>
+                    Sign In
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </>
+                )}
               </Button>
             </form>
 
@@ -219,6 +255,11 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
           </CardContent>
         </Card>
       </div>
+
+      <ForgotPasswordDialog
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+      />
     </div>
   );
 }

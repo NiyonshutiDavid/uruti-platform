@@ -1,0 +1,86 @@
+[
+  {
+    "instruction": "How do I build a minimum viable product?",
+    "input": "",
+    "output": "Start with a simple solution that addresses one core problem well. Use no-code tools, prototypes, or even manual processes to validate demand before building.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I build a minimum viable product?\n### Response: Start with a simple solution that addresses one core problem well. Use no-code tools, prototypes, or even manual processes to validate demand before building."
+  },
+  {
+    "instruction": "How do I build strategic partnerships?",
+    "input": "",
+    "output": "Understand your leverage, prepare multiple term sheet options, focus on more than just valuation, consider board composition and liquidation preferences carefully.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I build strategic partnerships?\n### Response: Understand your leverage, prepare multiple term sheet options, focus on more than just valuation, consider board composition and liquidation preferences carefully."
+  },
+  {
+    "instruction": "What if my business model isn't sustainable?",
+    "input": "",
+    "output": "Review your unit economics, explore new revenue streams, reduce operational costs, improve customer lifetime value, and consider fundamental business model changes.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What if my business model isn't sustainable?\n### Response: Review your unit economics, explore new revenue streams, reduce operational costs, improve customer lifetime value, and consider fundamental business model changes."
+  },
+  {
+    "instruction": "What should I include in my business plan?",
+    "input": "",
+    "output": "Include executive summary, market analysis, competitive landscape, business model, financial projections, marketing strategy, team overview, and funding requirements.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What should I include in my business plan?\n### Response: Include executive summary, market analysis, competitive landscape, business model, financial projections, marketing strategy, team overview, and funding requirements."
+  },
+  {
+    "instruction": "What should I do if I'm running out of funding?",
+    "input": "",
+    "output": "Extend your runway through cost reduction, explore revenue-based financing, pitch to new investors, consider strategic partnerships, or pursue grants and competitions.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What should I do if I'm running out of funding?\n### Response: Extend your runway through cost reduction, explore revenue-based financing, pitch to new investors, consider strategic partnerships, or pursue grants and competitions."
+  },
+  {
+    "instruction": "How do I navigate regulatory requirements for a fintech startup?",
+    "input": "",
+    "output": "Fintech regulatory compliance is complex but manageable with the right approach: 1) Identify applicable regulations - banking, securities, anti-money laundering, data protection, 2) Engage legal experts early - don't try to navigate this alone, 3) Build compliance into your product - design systems to meet regulatory requirements from day one, 4) Establish relationships with regulators - participate in regulatory sandboxes if available, 5) Plan for licensing - understand timeline and costs for required licenses, 6) Consider partnerships - work with licensed institutions to reduce regulatory burden. Start with legal research and expert consultation before building. Compliance costs should be factored into your financial planning and fundraising.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I navigate regulatory requirements for a fintech startup?\n### Response: Fintech regulatory compliance is complex but manageable with the right approach: 1) Identify applicable regulations - banking, securities, anti-money laundering, data protection, 2) Engage legal experts early - don't try to navigate this alone, 3) Build compliance into your product - design systems to meet regulatory requirements from day one, 4) Establish relationships with regulators - participate in regulatory sandboxes if available, 5) Plan for licensing - understand timeline and costs for required licenses, 6) Consider partnerships - work with licensed institutions to reduce regulatory burden. Start with legal research and expert consultation before building. Compliance costs should be factored into your financial planning and fundraising."
+  },
+  {
+    "instruction": "How do I fix brand reputation issues?",
+    "input": "",
+    "output": "Conduct fresh customer interviews, analyze successful competitors, test new messaging, focus on unique benefits, and ensure your value proposition addresses real customer pain points.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I fix brand reputation issues?\n### Response: Conduct fresh customer interviews, analyze successful competitors, test new messaging, focus on unique benefits, and ensure your value proposition addresses real customer pain points."
+  },
+  {
+    "instruction": "What tools can help me organize my startup?",
+    "input": "",
+    "output": "Use project management tools like Notion or Asana, financial tracking with QuickBooks, customer relationship management systems, and communication platforms like Slack.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What tools can help me organize my startup?\n### Response: Use project management tools like Notion or Asana, financial tracking with QuickBooks, customer relationship management systems, and communication platforms like Slack."
+  },
+  {
+    "instruction": "How can I access funding for my startup in East Africa?",
+    "input": "",
+    "output": "East Africa has a growing funding ecosystem. Consider: 1) Local VCs like Knife Capital, TLcom Capital, and Novastar Ventures. 2) Development finance institutions like IFC and CDC. 3) Accelerators such as Seedstars, GSMA Ecosystem Accelerator, and local programs. 4) Grants from organizations like USAID, GIZ, and the World Bank. 5) Regional startup competitions and pitch events. Build strong local networks and focus on solving problems relevant to the East African market.",
+    "category": "investment_ready",
+    "text": "### Instruction: How can I access funding for my startup in East Africa?\n### Response: East Africa has a growing funding ecosystem. Consider: 1) Local VCs like Knife Capital, TLcom Capital, and Novastar Ventures. 2) Development finance institutions like IFC and CDC. 3) Accelerators such as Seedstars, GSMA Ecosystem Accelerator, and local programs. 4) Grants from organizations like USAID, GIZ, and the World Bank. 5) Regional startup competitions and pitch events. Build strong local networks and focus on solving problems relevant to the East African market."
+  },
+  {
+    "instruction": "What are the different types of business structures?",
+    "input": "",
+    "output": "Choose between sole proprietorship, LLC, corporation, or partnership based on liability protection, tax implications, growth plans, and investor requirements.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What are the different types of business structures?\n### Response: Choose between sole proprietorship, LLC, corporation, or partnership based on liability protection, tax implications, growth plans, and investor requirements."
+  },
+  {
+    "instruction": "How do I manage startup stress?",
+    "input": "",
+    "output": "Choose between B2B, B2C, subscription, marketplace, or freemium models based on your customer type and value delivery method. Test and iterate.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I manage startup stress?\n### Response: Choose between B2B, B2C, subscription, marketplace, or freemium models based on your customer type and value delivery method. Test and iterate."
+  },
+  {
+    "instruction": "What metrics do investors look for?",
+    "input": "",
+    "output": "Investors focus on market size, revenue growth, customer retention, unit economics, team experience, competitive moats, and scalability potential. Ensure your metrics tell a compelling story.",
+    "category": "investment_ready",
+    "text": "### Instruction: What metrics do investors look for?\n### Response: Investors focus on market size, revenue growth, customer retention, unit economics, team experience, competitive moats, and scalability potential. Ensure your metrics tell a compelling story."
+  }
+]

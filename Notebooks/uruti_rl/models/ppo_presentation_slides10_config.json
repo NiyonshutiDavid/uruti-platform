@@ -1,0 +1,8 @@
+{
+  "algorithm": "ppo",
+  "environment": "presentation",
+  "total_slides": 10,
+  "total_timesteps": 50,
+  "seed": 42,
+  "hyperparameters": {}
+}

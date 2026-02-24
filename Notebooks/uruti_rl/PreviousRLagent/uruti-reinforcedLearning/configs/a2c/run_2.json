@@ -1,0 +1,7 @@
+{
+  "learning_rate": 0.0031,
+  "gamma": 0.99,
+  "n_steps": 50,
+  "ent_coef": 0.011,
+  "total_timesteps": 20000
+}

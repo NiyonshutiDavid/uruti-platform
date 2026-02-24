@@ -1,0 +1,8 @@
+{
+  "learning_rate": 0.001,
+  "gamma": 0.95,
+  "n_steps": 256,
+  "ent_coef": 0.05,
+  "clip_range": 0.3,
+  "total_timesteps": 50000
+}

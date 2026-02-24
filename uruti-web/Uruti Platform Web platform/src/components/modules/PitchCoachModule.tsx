@@ -3,13 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
-import { Mic, MicOff, Video, VideoOff, MonitorUp, StopCircle, Play, Pause, Volume2, Settings, AlertCircle } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, MonitorUp, StopCircle, Play, Pause, Volume2, Settings, AlertCircle, Phone, Users } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Slider } from '../ui/slider';
 import { Switch } from '../ui/switch';
+import { useVideoCall } from '../../lib/useVideoCall';
+import { VideoCallView } from '../VideoCallView';
 
 export function PitchCoachModule() {
   const [isRecording, setIsRecording] = useState(false);
@@ -21,6 +23,8 @@ export function PitchCoachModule() {
   const [aiListening, setAiListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showVideoCall, setShowVideoCall] = useState(false);
+  const [remotePeerId, setRemotePeerId] = useState<string | null>(null);
 
   // Settings states
   const [backgroundBlur, setBackgroundBlur] = useState(false);
@@ -35,6 +39,23 @@ export function PitchCoachModule() {
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Video call hook
+  const {
+    localStream,
+    participants,
+    isCallActive,
+    initializeLocalStream: initializeVideoCallStream,
+    startCall,
+    handleOffer,
+    handleAnswer,
+    handleIceCandidate,
+    toggleVideo: toggleVideoCall,
+    toggleAudio: toggleAudioCall,
+    endAllCalls
+  } = useVideoCall('current-user-id', {
+    onError: (err) => setError(`Video call error: ${err.message}`)
+  });
 
   // Real-time AI feedback metrics
   const [pitchMetrics] = useState({
@@ -273,6 +294,8 @@ export function PitchCoachModule() {
                   autoPlay
                   playsInline
                   muted
+                  controls
+                  style={{ transform: 'scaleX(-1)' }}
                 />
               ) : isVideoOn ? (
                 // Camera Display
@@ -282,6 +305,7 @@ export function PitchCoachModule() {
                   autoPlay
                   playsInline
                   muted
+                  style={{ transform: 'scaleX(-1)' }}
                 />
               ) : (
                 // Placeholder when no video
@@ -392,6 +416,15 @@ export function PitchCoachModule() {
                   >
                     <MonitorUp className="h-4 w-4 mr-2" />
                     {isPresenting ? 'Stop Presenting' : 'Present'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={isCallActive ? "destructive" : "default"}
+                    className={!isCallActive ? "bg-blue-600 hover:bg-blue-700" : ""}
+                    onClick={() => setShowVideoCall(!showVideoCall)}
+                  >
+                    <Phone className={`h-4 w-4 ${isCallActive ? 'mr-2' : ''}`} />
+                    {isCallActive ? 'Call Active' : 'Video Call'}
                   </Button>
                 </div>
 
@@ -667,6 +700,129 @@ export function PitchCoachModule() {
               />
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Video Call Dialog */}
+      <Dialog open={showVideoCall} onOpenChange={setShowVideoCall}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle style={{ fontFamily: 'var(--font-heading)' }}>Video Call Session</DialogTitle>
+            <DialogDescription style={{ fontFamily: 'var(--font-body)' }}>
+              Practice your pitch with mentors or coaches via video call
+            </DialogDescription>
+          </DialogHeader>
+
+          {!isCallActive ? (
+            <div className="space-y-4">
+              <div className="bg-gray-50 rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4" style={{ fontFamily: 'var(--font-heading)' }}>
+                  Start a Video Call
+                </h3>
+
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="mentorSelect">Select Mentor/Coach</Label>
+                    <Select value={remotePeerId || ''} onValueChange={setRemotePeerId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a mentor..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mentor-1">Marie Umutoni - VC Expert</SelectItem>
+                        <SelectItem value="mentor-2">Jean-Paul Uwimana - Pitch Coach</SelectItem>
+                        <SelectItem value="mentor-3">Sarah Johnson - Business Strategy</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Button
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                    onClick={async () => {
+                      if (remotePeerId) {
+                        try {
+                          await initializeVideoCallStream();
+                          await startCall(remotePeerId, 'Mentor');
+                        } catch (err) {
+                          setError(`Failed to start call: ${err}`);
+                        }
+                      }
+                    }}
+                  >
+                    <Phone className="h-4 w-4 mr-2" />
+                    Start Call
+                  </Button>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                <p className="text-sm text-blue-800" style={{ fontFamily: 'var(--font-body)' }}>
+                  <strong>💡 Tip:</strong> Video calls allow you to get real-time feedback from experienced mentors and coaches on your pitch delivery, pacing, and presentation skills.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <VideoCallView
+                localStream={localStream}
+                participants={participants}
+                isVideoOn={isVideoOn}
+                isAudioOn={isMicOn}
+                onToggleVideo={toggleVideoCall}
+                onToggleAudio={toggleAudioCall}
+                onEndCall={() => {
+                  endAllCalls();
+                  setShowVideoCall(false);
+                }}
+              />
+
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  onClick={toggleVideoCall}
+                >
+                  {isVideoOn ? (
+                    <>
+                      <Video className="h-4 w-4 mr-2" />
+                      Camera On
+                    </>
+                  ) : (
+                    <>
+                      <VideoOff className="h-4 w-4 mr-2" />
+                      Camera Off
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  onClick={toggleAudioCall}
+                >
+                  {isMicOn ? (
+                    <>
+                      <Mic className="h-4 w-4 mr-2" />
+                      Muted
+                    </>
+                  ) : (
+                    <>
+                      <MicOff className="h-4 w-4 mr-2" />
+                      Unmuted
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    endAllCalls();
+                    setShowVideoCall(false);
+                  }}
+                >
+                  <Phone className="h-4 w-4 mr-2" />
+                  End Call
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

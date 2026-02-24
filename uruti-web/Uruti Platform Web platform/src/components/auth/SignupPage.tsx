@@ -22,6 +22,8 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import apiClient from '../../services/api';
 
 interface SignupPageProps {
   onNavigate: (page: string) => void;
@@ -29,9 +31,12 @@ interface SignupPageProps {
 }
 
 export function SignupPage({ onNavigate, onSignupComplete }: SignupPageProps) {
+  const { signup } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [userType, setUserType] = useState<'founder' | 'investor' | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     // Step 1: User Type Selection
     accountType: '',
@@ -68,6 +73,7 @@ export function SignupPage({ onNavigate, onSignupComplete }: SignupPageProps) {
   };
 
   const handleUserTypeSelect = (type: 'founder' | 'investor') => {
+    setSubmitError(null);
     setUserType(type);
     setFormData(prev => ({ ...prev, accountType: type }));
     setCurrentStep(2);
@@ -86,10 +92,51 @@ export function SignupPage({ onNavigate, onSignupComplete }: SignupPageProps) {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('Signup data:', formData);
-    onSignupComplete();
+    if (!userType) {
+      setSubmitError('Please select an account type.');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setSubmitError('Passwords do not match.');
+      return;
+    }
+
+    if (formData.password.length < 8) {
+      setSubmitError('Password must be at least 8 characters long.');
+      return;
+    }
+
+    setSubmitError(null);
+    setIsSubmitting(true);
+
+    try {
+      await signup({
+        email: formData.email,
+        full_name: formData.fullName,
+        password: formData.password,
+        role: userType,
+      });
+
+      if (userType === 'founder' && formData.startupName.trim()) {
+        await apiClient.createVenture({
+          title: formData.startupName.trim(),
+          description: formData.businessDescription || undefined,
+          industry: formData.industry || undefined,
+          stage: formData.startupStage || 'idea',
+          problem_statement: formData.businessDescription || undefined,
+          target_market: formData.location || undefined,
+        });
+      }
+
+      onSignupComplete();
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Signup failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const totalSteps = 3;
@@ -150,6 +197,12 @@ export function SignupPage({ onNavigate, onSignupComplete }: SignupPageProps) {
         <Card className="glass-card border-black/5 dark:border-white/10 shadow-2xl">
           <CardContent className="p-8 sm:p-12">
             <form onSubmit={handleSubmit}>
+              {submitError && (
+                <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {submitError}
+                </div>
+              )}
+
               {/* Step 1: User Type Selection */}
               {currentStep === 1 && (
                 <div className="space-y-6">
@@ -600,6 +653,7 @@ export function SignupPage({ onNavigate, onSignupComplete }: SignupPageProps) {
                     type="button"
                     variant="outline"
                     onClick={handleBack}
+                    disabled={isSubmitting}
                     className="flex-1 border-black/10 dark:border-white/20"
                   >
                     <ArrowLeft className="mr-2 h-4 w-4" />
@@ -609,6 +663,7 @@ export function SignupPage({ onNavigate, onSignupComplete }: SignupPageProps) {
                     <Button
                       type="button"
                       onClick={handleNext}
+                      disabled={isSubmitting}
                       className="flex-1 bg-[#76B947] text-white hover:bg-[#76B947]/90"
                     >
                       Continue
@@ -617,10 +672,11 @@ export function SignupPage({ onNavigate, onSignupComplete }: SignupPageProps) {
                   ) : (
                     <Button
                       type="submit"
+                      disabled={isSubmitting}
                       className="flex-1 bg-[#76B947] text-white hover:bg-[#76B947]/90"
                     >
                       <CheckCircle2 className="mr-2 h-4 w-4" />
-                      Complete Registration
+                      {isSubmitting ? 'Creating Account...' : 'Complete Registration'}
                     </Button>
                   )}
                 </div>

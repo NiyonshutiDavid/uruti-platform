@@ -8,11 +8,13 @@ import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
-import { Plus, Search, Filter, TrendingUp, Edit, Eye, Trash2, Sparkles, Award, X, ArrowLeft } from 'lucide-react';
+import { Plus, Search, Filter, TrendingUp, Edit, Eye, Trash2, Sparkles, Award, X, ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
 import { Progress } from '../ui/progress';
 import { EnhancedCaptureIdeaDialog } from '../EnhancedCaptureIdeaDialog';
 import { VentureDetailView } from '../VentureDetailView';
 import { EditVentureDialog } from '../EditVentureDialog';
+import apiClient from '../../services/api';
+import { useEffect } from 'react';
 
 interface Startup {
   id: string;
@@ -28,63 +30,10 @@ interface Startup {
   urutiScore?: number;
 }
 
-const mockStartups: Startup[] = [
-  {
-    id: '1',
-    name: 'AgriConnect',
-    sector: 'AgTech',
-    problemStatement: 'Small-scale farmers lack access to modern equipment and technical support',
-    solutionHypothesis: 'AI-powered platform connecting farmers with equipment rental and agronomists',
-    targetMarket: 'Rwanda rural farming communities (5000+ farmers)',
-    readinessScore: 85,
-    developmentTrack: 'Financial Projection Validation',
-    createdDate: '2025-11-15',
-    status: 'ready',
-    urutiScore: 87
-  },
-  {
-    id: '2',
-    name: 'EduLearn Rwanda',
-    sector: 'EdTech',
-    problemStatement: 'Limited access to quality STEM education in remote areas',
-    solutionHypothesis: 'Mobile-first learning platform with offline capabilities',
-    targetMarket: 'Secondary school students in Eastern Province',
-    readinessScore: 72,
-    developmentTrack: 'Market Validation',
-    createdDate: '2025-12-03',
-    status: 'development',
-    urutiScore: 92
-  },
-  {
-    id: '3',
-    name: 'HealthBridge',
-    sector: 'HealthTech',
-    problemStatement: 'Healthcare information silos prevent effective patient care coordination',
-    solutionHypothesis: 'Blockchain-based health records sharing system',
-    targetMarket: 'Kigali hospitals and clinics network',
-    readinessScore: 68,
-    developmentTrack: 'Legal Structuring for Seed Rounds',
-    createdDate: '2026-01-10',
-    status: 'validation',
-    urutiScore: 78
-  },
-  {
-    id: '4',
-    name: 'FinTrack',
-    sector: 'FinTech',
-    problemStatement: 'SMEs struggle with financial management and credit access',
-    solutionHypothesis: 'AI-powered bookkeeping and credit scoring for microenterprises',
-    targetMarket: 'SMEs and microenterprises in Kigali',
-    readinessScore: 90,
-    developmentTrack: 'Investor Pitch Preparation',
-    createdDate: '2025-10-20',
-    status: 'ready',
-    urutiScore: 95
-  }
-];
-
 export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { name: string; description: string }) => void }) {
-  const [startups, setStartups] = useState<Startup[]>(mockStartups);
+  const [startups, setStartups] = useState<Startup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSector, setFilterSector] = useState('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -94,6 +43,43 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [viewingStartup, setViewingStartup] = useState<any | null>(null);
+
+  // Load ventures from API
+  useEffect(() => {
+    const loadVentures = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const ventures = await apiClient.getVentures();
+        
+        // Map ventures to Startup interface
+        const mappedStartups: Startup[] = ventures.map((v: any) => ({
+          id: v.id?.toString() || Math.random().toString(),
+          name: v.title || 'Untitled Venture',
+          sector: v.industry || 'Technology',
+          problemStatement: v.problem_statement || 'No problem statement',
+          solutionHypothesis: v.solution || 'Solution in development',
+          targetMarket: v.target_market || 'Market to be defined',
+          readinessScore: v.investment_score || 0,
+          developmentTrack: v.stage || 'Ideation',
+          createdDate: v.created_at || new Date().toISOString(),
+          status: 'development' as const,
+          urutiScore: v.pitch_score || 0
+        }));
+        
+        setStartups(mappedStartups);
+      } catch (err) {
+        console.error('Error loading ventures:', err);
+        setError('Failed to load ventures. Please try again.');
+        // Fallback to empty array
+        setStartups([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadVentures();
+  }, []);
 
   const handleViewUrutiScore = (startup: Startup) => {
     setSelectedStartup(startup);
@@ -234,6 +220,39 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
             });
           }}
         />
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#76B947]" />
+          <p className="text-muted-foreground">Loading your ventures...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="text-3xl mb-2" style={{ fontFamily: 'var(--font-heading)' }}>Startup Hub</div>
+        <Card className="glass-card border-red-200 bg-red-50/50 dark:bg-red-900/10">
+          <CardContent className="pt-6">
+            <div className="flex items-center space-x-3">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              <p className="text-red-600">{error}</p>
+            </div>
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="mt-4 bg-[#76B947] hover:bg-[#5a8f35]"
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

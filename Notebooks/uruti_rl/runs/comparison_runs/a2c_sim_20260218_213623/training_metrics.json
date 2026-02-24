@@ -1,0 +1,14 @@
+{
+  "episode_rewards": [
+    30.027789,
+    30.369029
+  ],
+  "episode_lengths": [
+    60,
+    60
+  ],
+  "timesteps": [
+    60,
+    120
+  ]
+}

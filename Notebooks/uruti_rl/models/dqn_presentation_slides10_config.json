@@ -1,0 +1,8 @@
+{
+  "algorithm": "dqn",
+  "environment": "presentation",
+  "total_slides": 10,
+  "total_timesteps": 5000,
+  "seed": 42,
+  "hyperparameters": {}
+}

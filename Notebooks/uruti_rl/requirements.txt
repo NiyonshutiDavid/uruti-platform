@@ -1,0 +1,31 @@
+# RL Training & Evaluation for Pitch Coaching
+# Tested on Python 3.8+
+
+# Core RL Framework
+stable-baselines3==2.0.0
+gymnasium==0.27.0
+
+# Data Processing & Scientific Computing
+numpy==1.24.0
+pandas==2.0.0
+scikit-learn==1.3.0
+
+# Visualization
+matplotlib==3.7.0
+pygame==2.2.0
+
+# Video Processing
+opencv-contrib-python-headless==4.8.0.76
+
+# Pose Estimation
+mediapipe==0.10.14
+
+# Development & Analysis
+tensorboard==2.13.0
+jupyter==1.0.0
+ipython==8.12.0
+rich==13.7.1
+
+# Utilities
+python-dotenv==1.0.0
+tqdm==4.65.0

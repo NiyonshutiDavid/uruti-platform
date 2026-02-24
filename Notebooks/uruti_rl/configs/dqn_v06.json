@@ -1,0 +1,9 @@
+{
+  "learning_rate": 0.0007,
+  "gamma": 0.96,
+  "buffer_size": 25000,
+  "batch_size": 32,
+  "exploration_fraction": 0.4,
+  "exploration_final_eps": 0.08,
+  "total_timesteps": 50000
+}

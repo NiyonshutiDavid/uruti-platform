@@ -12,7 +12,6 @@ interface SidebarProps {
   activeModule: string;
   onModuleChange: (module: string) => void;
   userType?: 'founder' | 'investor';
-  onUserTypeChange?: (type: 'founder' | 'investor') => void;
   isMobileSidebarOpen?: boolean;
   setIsMobileSidebarOpen?: (open: boolean) => void;
 }
@@ -43,7 +42,7 @@ const investorMenuItems = [
   { id: 'messages', label: 'Messages', icon: MessageSquare },
 ];
 
-export function Sidebar({ activeModule, onModuleChange, userType = 'founder', onUserTypeChange, isMobileSidebarOpen, setIsMobileSidebarOpen }: SidebarProps) {
+export function Sidebar({ activeModule, onModuleChange, userType = 'founder', isMobileSidebarOpen, setIsMobileSidebarOpen }: SidebarProps) {
   const navigationItems = userType === 'founder' ? founderNavItems : investorMenuItems;
   const [captureDialogOpen, setCaptureDialogOpen] = useState(false);
   const [newIdea, setNewIdea] = useState({
@@ -97,31 +96,6 @@ export function Sidebar({ activeModule, onModuleChange, userType = 'founder', on
         >
           <X className="h-5 w-5 text-black dark:text-white" />
         </Button>
-
-        {/* User Type Toggle */}
-        {onUserTypeChange && (
-          <div className="mb-4 p-3 glass-card dark:bg-transparent dark:border dark:border-white/20 rounded-lg">
-            <p className="text-xs text-muted-foreground mb-2" style={{ fontFamily: 'var(--font-body)' }}>SWITCH VIEW</p>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                size="sm"
-                variant={userType === 'founder' ? 'default' : 'outline'}
-                className={userType === 'founder' ? 'bg-black dark:bg-[#76B947] text-white hover:bg-black/90 dark:hover:bg-[#76B947]/90' : 'hover:bg-transparent hover:text-[#76B947] hover:border-[#76B947] dark:border-white/20'}
-                onClick={() => onUserTypeChange('founder')}
-              >
-                Founder
-              </Button>
-              <Button
-                size="sm"
-                variant={userType === 'investor' ? 'default' : 'outline'}
-                className={userType === 'investor' ? 'bg-black dark:bg-[#76B947] text-white hover:bg-black/90 dark:hover:bg-[#76B947]/90' : 'hover:bg-transparent hover:text-[#76B947] hover:border-[#76B947] dark:border-white/20'}
-                onClick={() => onUserTypeChange('investor')}
-              >
-                Investor
-              </Button>
-            </div>
-          </div>
-        )}
 
         <nav className="space-y-2">
           {navigationItems.map((item) => {

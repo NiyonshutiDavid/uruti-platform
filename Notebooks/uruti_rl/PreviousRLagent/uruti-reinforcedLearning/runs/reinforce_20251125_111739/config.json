@@ -1,0 +1,7 @@
+{
+  "learning_rate": 0.0005,
+  "gamma": 0.99,
+  "batch_size": 5,
+  "total_episodes": 400,
+  "total_timesteps": 50000
+}

@@ -1,0 +1,86 @@
+[
+  {
+    "instruction": "What should I do about market timing issues?",
+    "input": "",
+    "output": "Extend your runway through cost reduction, explore revenue-based financing, pitch to new investors, consider strategic partnerships, or pursue grants and competitions.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What should I do about market timing issues?\n### Response: Extend your runway through cost reduction, explore revenue-based financing, pitch to new investors, consider strategic partnerships, or pursue grants and competitions."
+  },
+  {
+    "instruction": "What if my product roadmap is unclear?",
+    "input": "",
+    "output": "Consider expanding your target market, finding niche applications, exploring B2B opportunities, or pivoting to adjacent markets with larger addressable audiences.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What if my product roadmap is unclear?\n### Response: Consider expanding your target market, finding niche applications, exploring B2B opportunities, or pivoting to adjacent markets with larger addressable audiences."
+  },
+  {
+    "instruction": "My startup has $2M ARR, 40% YoY growth, and strong unit economics. I want to raise Series A to scale our sales team and expand internationally. How should I prepare?",
+    "input": "",
+    "output": "Congratulations! You're clearly 'Investment Ready'. For Series A preparation, focus on: 1) Financial metrics: Ensure your LTV/CAC ratio is >3, gross margin >70%, and net revenue retention >100%. 2) Create a compelling pitch deck highlighting your TAM expansion, competitive moats, and international expansion strategy. 3) Build relationships with tier-1 VCs 6 months before fundraising. 4) Prepare detailed financial projections showing path to $10M+ ARR. 5) Document your go-to-market playbook to demonstrate repeatability. Target $5-15M raise based on your metrics and market opportunity.",
+    "category": "investment_ready",
+    "text": "### Instruction: My startup has $2M ARR, 40% YoY growth, and strong unit economics. I want to raise Series A to scale our sales team and expand internationally. How should I prepare?\n### Response: Congratulations! You're clearly 'Investment Ready'. For Series A preparation, focus on: 1) Financial metrics: Ensure your LTV/CAC ratio is >3, gross margin >70%, and net revenue retention >100%. 2) Create a compelling pitch deck highlighting your TAM expansion, competitive moats, and international expansion strategy. 3) Build relationships with tier-1 VCs 6 months before fundraising. 4) Prepare detailed financial projections showing path to $10M+ ARR. 5) Document your go-to-market playbook to demonstrate repeatability. Target $5-15M raise based on your metrics and market opportunity."
+  },
+  {
+    "instruction": "What are the stages of startup development?",
+    "input": "",
+    "output": "Avoid perfectionism, building without customer input, ignoring cash flow, hiring too quickly, and neglecting legal foundations. Focus on learning and iteration.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What are the stages of startup development?\n### Response: Avoid perfectionism, building without customer input, ignoring cash flow, hiring too quickly, and neglecting legal foundations. Focus on learning and iteration."
+  },
+  {
+    "instruction": "What if my team isn't performing well?",
+    "input": "",
+    "output": "Assess team members individually, provide additional training or support, clarify roles and expectations, consider team restructuring, and focus on cultural fit and performance.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What if my team isn't performing well?\n### Response: Assess team members individually, provide additional training or support, clarify roles and expectations, consider team restructuring, and focus on cultural fit and performance."
+  },
+  {
+    "instruction": "How do I know if I should pivot or persevere?",
+    "input": "",
+    "output": "The pivot vs persevere decision depends on key signals: 1) Customer engagement - are users actually using your product regularly?, 2) Growth rate - is organic growth accelerating or flattering?, 3) Market feedback - are customers asking for fundamental changes or just features?, 4) Founder conviction - do you still believe in the problem?, 5) Resource runway - how much time do you have to experiment?. Pivot if you're not seeing organic growth after 6+ months of iteration, customers don't seem to care when you go away, or you've lost conviction in the problem. Persevere if you're seeing slow but consistent growth, strong user engagement, and clear path to product-market fit.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I know if I should pivot or persevere?\n### Response: The pivot vs persevere decision depends on key signals: 1) Customer engagement - are users actually using your product regularly?, 2) Growth rate - is organic growth accelerating or flattering?, 3) Market feedback - are customers asking for fundamental changes or just features?, 4) Founder conviction - do you still believe in the problem?, 5) Resource runway - how much time do you have to experiment?. Pivot if you're not seeing organic growth after 6+ months of iteration, customers don't seem to care when you go away, or you've lost conviction in the problem. Persevere if you're seeing slow but consistent growth, strong user engagement, and clear path to product-market fit."
+  },
+  {
+    "instruction": "What should I do about low conversion rates?",
+    "input": "",
+    "output": "Analyze your funnel, A/B test different approaches, improve your value proposition, optimize your website and marketing materials, and remove friction from the conversion process.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What should I do about low conversion rates?\n### Response: Analyze your funnel, A/B test different approaches, improve your value proposition, optimize your website and marketing materials, and remove friction from the conversion process."
+  },
+  {
+    "instruction": "How do I fix poor unit economics?",
+    "input": "",
+    "output": "Analyze your cost structure, improve pricing strategy, optimize customer acquisition channels, reduce churn, increase customer lifetime value, and eliminate unprofitable segments.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I fix poor unit economics?\n### Response: Analyze your cost structure, improve pricing strategy, optimize customer acquisition channels, reduce churn, increase customer lifetime value, and eliminate unprofitable segments."
+  },
+  {
+    "instruction": "What books should I read as an entrepreneur?",
+    "input": "",
+    "output": "Register your business entity, understand tax obligations, protect intellectual property, draft founder agreements, and comply with industry regulations.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What books should I read as an entrepreneur?\n### Response: Register your business entity, understand tax obligations, protect intellectual property, draft founder agreements, and comply with industry regulations."
+  },
+  {
+    "instruction": "What networking strategies should I use?",
+    "input": "",
+    "output": "You'll need domain expertise, basic financial understanding, network of advisors, minimal viable team, and sufficient runway to reach key milestones.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What networking strategies should I use?\n### Response: You'll need domain expertise, basic financial understanding, network of advisors, minimal viable team, and sufficient runway to reach key milestones."
+  },
+  {
+    "instruction": "How do I create a compelling pitch deck that stands out?",
+    "input": "",
+    "output": "A compelling pitch deck tells a story in 10-12 slides: 1) Problem - paint a vivid picture of customer pain, 2) Solution - show your unique approach, 3) Market - size and growth potential, 4) Product - demo the core value, 5) Traction - prove customers want this, 6) Business Model - how you make money, 7) Competition - why you'll win, 8) Team - why you're the right people, 9) Financials - realistic projections, 10) Funding ask - specific use of funds. Keep it visual, tell stories not statistics, practice obsessively, and always end with a clear ask. The goal is to get a meeting, not close the deal in the deck.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I create a compelling pitch deck that stands out?\n### Response: A compelling pitch deck tells a story in 10-12 slides: 1) Problem - paint a vivid picture of customer pain, 2) Solution - show your unique approach, 3) Market - size and growth potential, 4) Product - demo the core value, 5) Traction - prove customers want this, 6) Business Model - how you make money, 7) Competition - why you'll win, 8) Team - why you're the right people, 9) Financials - realistic projections, 10) Funding ask - specific use of funds. Keep it visual, tell stories not statistics, practice obsessively, and always end with a clear ask. The goal is to get a meeting, not close the deal in the deck."
+  },
+  {
+    "instruction": "What are the key metrics I should track?",
+    "input": "",
+    "output": "Track key metrics like customer acquisition cost (CAC), lifetime value (LTV), monthly recurring revenue (MRR), and churn rate. These will guide your decision-making.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What are the key metrics I should track?\n### Response: Track key metrics like customer acquisition cost (CAC), lifetime value (LTV), monthly recurring revenue (MRR), and churn rate. These will guide your decision-making."
+  }
+]

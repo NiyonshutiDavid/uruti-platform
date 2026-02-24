@@ -1,0 +1,751 @@
+[
+  {
+    "instruction": "How do I validate my startup idea?",
+    "input": "",
+    "output": "As a mentor, I'd recommend starting with customer discovery. Talk to at least 50 potential customers to validate your problem hypothesis. Document their pain points and willingness to pay for a solution.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I validate my startup idea?\n### Response: As a mentor, I'd recommend starting with customer discovery. Talk to at least 50 potential customers to validate your problem hypothesis. Document their pain points and willingness to pay for a solution."
+  },
+  {
+    "instruction": "What should I focus on in the early stages?",
+    "input": "",
+    "output": "Focus on building an MVP (Minimum Viable Product) first. This should be the simplest version that solves the core problem. Avoid feature bloat in the early stages.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What should I focus on in the early stages?\n### Response: Focus on building an MVP (Minimum Viable Product) first. This should be the simplest version that solves the core problem. Avoid feature bloat in the early stages."
+  },
+  {
+    "instruction": "How do I find my target market?",
+    "input": "",
+    "output": "Conduct primary research through surveys, interviews, and observational studies. Use tools like Google Analytics, social media insights, and competitor analysis to understand your market.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I find my target market?\n### Response: Conduct primary research through surveys, interviews, and observational studies. Use tools like Google Analytics, social media insights, and competitor analysis to understand your market."
+  },
+  {
+    "instruction": "What are the key metrics I should track?",
+    "input": "",
+    "output": "Track key metrics like customer acquisition cost (CAC), lifetime value (LTV), monthly recurring revenue (MRR), and churn rate. These will guide your decision-making.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What are the key metrics I should track?\n### Response: Track key metrics like customer acquisition cost (CAC), lifetime value (LTV), monthly recurring revenue (MRR), and churn rate. These will guide your decision-making."
+  },
+  {
+    "instruction": "How do I build a minimum viable product?",
+    "input": "",
+    "output": "Start with a simple solution that addresses one core problem well. Use no-code tools, prototypes, or even manual processes to validate demand before building.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I build a minimum viable product?\n### Response: Start with a simple solution that addresses one core problem well. Use no-code tools, prototypes, or even manual processes to validate demand before building."
+  },
+  {
+    "instruction": "What mistakes should I avoid as a first-time entrepreneur?",
+    "input": "",
+    "output": "Avoid perfectionism, building without customer input, ignoring cash flow, hiring too quickly, and neglecting legal foundations. Focus on learning and iteration.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What mistakes should I avoid as a first-time entrepreneur?\n### Response: Avoid perfectionism, building without customer input, ignoring cash flow, hiring too quickly, and neglecting legal foundations. Focus on learning and iteration."
+  },
+  {
+    "instruction": "How do I know if my idea is viable?",
+    "input": "",
+    "output": "Test your assumptions through experiments. Look for strong customer demand, clear monetization path, scalable business model, and your ability to execute effectively.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I know if my idea is viable?\n### Response: Test your assumptions through experiments. Look for strong customer demand, clear monetization path, scalable business model, and your ability to execute effectively."
+  },
+  {
+    "instruction": "What resources do I need to get started?",
+    "input": "",
+    "output": "You'll need domain expertise, basic financial understanding, network of advisors, minimal viable team, and sufficient runway to reach key milestones.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What resources do I need to get started?\n### Response: You'll need domain expertise, basic financial understanding, network of advisors, minimal viable team, and sufficient runway to reach key milestones."
+  },
+  {
+    "instruction": "How do I develop a business model?",
+    "input": "",
+    "output": "Choose between B2B, B2C, subscription, marketplace, or freemium models based on your customer type and value delivery method. Test and iterate.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I develop a business model?\n### Response: Choose between B2B, B2C, subscription, marketplace, or freemium models based on your customer type and value delivery method. Test and iterate."
+  },
+  {
+    "instruction": "What legal considerations should I be aware of?",
+    "input": "",
+    "output": "Register your business entity, understand tax obligations, protect intellectual property, draft founder agreements, and comply with industry regulations.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What legal considerations should I be aware of?\n### Response: Register your business entity, understand tax obligations, protect intellectual property, draft founder agreements, and comply with industry regulations."
+  },
+  {
+    "instruction": "How do I protect my intellectual property?",
+    "input": "",
+    "output": "File for patents or trademarks if applicable, use non-disclosure agreements, document your IP creation process, and consider trade secret protection strategies.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I protect my intellectual property?\n### Response: File for patents or trademarks if applicable, use non-disclosure agreements, document your IP creation process, and consider trade secret protection strategies."
+  },
+  {
+    "instruction": "What should I include in my business plan?",
+    "input": "",
+    "output": "Include executive summary, market analysis, competitive landscape, business model, financial projections, marketing strategy, team overview, and funding requirements.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What should I include in my business plan?\n### Response: Include executive summary, market analysis, competitive landscape, business model, financial projections, marketing strategy, team overview, and funding requirements."
+  },
+  {
+    "instruction": "How do I conduct market research?",
+    "input": "",
+    "output": "Use both primary (surveys, interviews) and secondary research (industry reports, competitor analysis). Focus on market size, customer needs, and competitive positioning.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I conduct market research?\n### Response: Use both primary (surveys, interviews) and secondary research (industry reports, competitor analysis). Focus on market size, customer needs, and competitive positioning."
+  },
+  {
+    "instruction": "What tools can help me organize my startup?",
+    "input": "",
+    "output": "Use project management tools like Notion or Asana, financial tracking with QuickBooks, customer relationship management systems, and communication platforms like Slack.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What tools can help me organize my startup?\n### Response: Use project management tools like Notion or Asana, financial tracking with QuickBooks, customer relationship management systems, and communication platforms like Slack."
+  },
+  {
+    "instruction": "How do I manage my time effectively as a founder?",
+    "input": "",
+    "output": "Prioritize tasks using frameworks like RICE or MoSCoW, time-block your calendar, delegate effectively, and maintain work-life balance to prevent burnout.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I manage my time effectively as a founder?\n### Response: Prioritize tasks using frameworks like RICE or MoSCoW, time-block your calendar, delegate effectively, and maintain work-life balance to prevent burnout."
+  },
+  {
+    "instruction": "What skills do I need to develop?",
+    "input": "",
+    "output": "Develop leadership, sales, financial literacy, product management, and communication skills. Consider taking courses or finding mentors in these areas.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What skills do I need to develop?\n### Response: Develop leadership, sales, financial literacy, product management, and communication skills. Consider taking courses or finding mentors in these areas."
+  },
+  {
+    "instruction": "How do I handle uncertainty and risk?",
+    "input": "",
+    "output": "Build financial reserves, diversify revenue streams, create contingency plans, maintain strong relationships, and focus on learning from failures rather than avoiding them.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I handle uncertainty and risk?\n### Response: Build financial reserves, diversify revenue streams, create contingency plans, maintain strong relationships, and focus on learning from failures rather than avoiding them."
+  },
+  {
+    "instruction": "What are the different types of business structures?",
+    "input": "",
+    "output": "Choose between sole proprietorship, LLC, corporation, or partnership based on liability protection, tax implications, growth plans, and investor requirements.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What are the different types of business structures?\n### Response: Choose between sole proprietorship, LLC, corporation, or partnership based on liability protection, tax implications, growth plans, and investor requirements."
+  },
+  {
+    "instruction": "How do I price my product or service?",
+    "input": "",
+    "output": "Research competitor pricing, calculate your costs plus margin, test different price points, consider value-based pricing, and be prepared to iterate based on market feedback.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I price my product or service?\n### Response: Research competitor pricing, calculate your costs plus margin, test different price points, consider value-based pricing, and be prepared to iterate based on market feedback."
+  },
+  {
+    "instruction": "What are the essential elements of a startup?",
+    "input": "",
+    "output": "Essential elements include a clear value proposition, viable business model, target market understanding, competitive advantage, founding team, and execution capability.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What are the essential elements of a startup?\n### Response: Essential elements include a clear value proposition, viable business model, target market understanding, competitive advantage, founding team, and execution capability."
+  },
+  {
+    "instruction": "How do I identify my competition?",
+    "input": "",
+    "output": "As a mentor, I'd recommend starting with customer discovery. Talk to at least 50 potential customers to validate your problem hypothesis. Document their pain points and willingness to pay for a solution.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I identify my competition?\n### Response: As a mentor, I'd recommend starting with customer discovery. Talk to at least 50 potential customers to validate your problem hypothesis. Document their pain points and willingness to pay for a solution."
+  },
+  {
+    "instruction": "What is a value proposition?",
+    "input": "",
+    "output": "Focus on building an MVP (Minimum Viable Product) first. This should be the simplest version that solves the core problem. Avoid feature bloat in the early stages.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What is a value proposition?\n### Response: Focus on building an MVP (Minimum Viable Product) first. This should be the simplest version that solves the core problem. Avoid feature bloat in the early stages."
+  },
+  {
+    "instruction": "How do I create a user persona?",
+    "input": "",
+    "output": "Conduct primary research through surveys, interviews, and observational studies. Use tools like Google Analytics, social media insights, and competitor analysis to understand your market.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I create a user persona?\n### Response: Conduct primary research through surveys, interviews, and observational studies. Use tools like Google Analytics, social media insights, and competitor analysis to understand your market."
+  },
+  {
+    "instruction": "What is the lean startup methodology?",
+    "input": "",
+    "output": "Track key metrics like customer acquisition cost (CAC), lifetime value (LTV), monthly recurring revenue (MRR), and churn rate. These will guide your decision-making.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What is the lean startup methodology?\n### Response: Track key metrics like customer acquisition cost (CAC), lifetime value (LTV), monthly recurring revenue (MRR), and churn rate. These will guide your decision-making."
+  },
+  {
+    "instruction": "How do I test my assumptions?",
+    "input": "",
+    "output": "Start with a simple solution that addresses one core problem well. Use no-code tools, prototypes, or even manual processes to validate demand before building.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I test my assumptions?\n### Response: Start with a simple solution that addresses one core problem well. Use no-code tools, prototypes, or even manual processes to validate demand before building."
+  },
+  {
+    "instruction": "What are the stages of startup development?",
+    "input": "",
+    "output": "Avoid perfectionism, building without customer input, ignoring cash flow, hiring too quickly, and neglecting legal foundations. Focus on learning and iteration.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What are the stages of startup development?\n### Response: Avoid perfectionism, building without customer input, ignoring cash flow, hiring too quickly, and neglecting legal foundations. Focus on learning and iteration."
+  },
+  {
+    "instruction": "How do I build credibility for my startup?",
+    "input": "",
+    "output": "Test your assumptions through experiments. Look for strong customer demand, clear monetization path, scalable business model, and your ability to execute effectively.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I build credibility for my startup?\n### Response: Test your assumptions through experiments. Look for strong customer demand, clear monetization path, scalable business model, and your ability to execute effectively."
+  },
+  {
+    "instruction": "What networking strategies should I use?",
+    "input": "",
+    "output": "You'll need domain expertise, basic financial understanding, network of advisors, minimal viable team, and sufficient runway to reach key milestones.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What networking strategies should I use?\n### Response: You'll need domain expertise, basic financial understanding, network of advisors, minimal viable team, and sufficient runway to reach key milestones."
+  },
+  {
+    "instruction": "How do I manage startup stress?",
+    "input": "",
+    "output": "Choose between B2B, B2C, subscription, marketplace, or freemium models based on your customer type and value delivery method. Test and iterate.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I manage startup stress?\n### Response: Choose between B2B, B2C, subscription, marketplace, or freemium models based on your customer type and value delivery method. Test and iterate."
+  },
+  {
+    "instruction": "What books should I read as an entrepreneur?",
+    "input": "",
+    "output": "Register your business entity, understand tax obligations, protect intellectual property, draft founder agreements, and comply with industry regulations.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What books should I read as an entrepreneur?\n### Response: Register your business entity, understand tax obligations, protect intellectual property, draft founder agreements, and comply with industry regulations."
+  },
+  {
+    "instruction": "How do I prepare for Series A funding?",
+    "input": "",
+    "output": "Prepare detailed financial projections, demonstrate strong unit economics, show consistent growth metrics, build a experienced team, and create a compelling growth story for investors.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I prepare for Series A funding?\n### Response: Prepare detailed financial projections, demonstrate strong unit economics, show consistent growth metrics, build a experienced team, and create a compelling growth story for investors."
+  },
+  {
+    "instruction": "What metrics do investors look for?",
+    "input": "",
+    "output": "Investors focus on market size, revenue growth, customer retention, unit economics, team experience, competitive moats, and scalability potential. Ensure your metrics tell a compelling story.",
+    "category": "investment_ready",
+    "text": "### Instruction: What metrics do investors look for?\n### Response: Investors focus on market size, revenue growth, customer retention, unit economics, team experience, competitive moats, and scalability potential. Ensure your metrics tell a compelling story."
+  },
+  {
+    "instruction": "How do I create a compelling pitch deck?",
+    "input": "",
+    "output": "Create a 10-12 slide deck covering problem, solution, market opportunity, business model, traction, competition, team, financials, funding ask, and use of funds.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I create a compelling pitch deck?\n### Response: Create a 10-12 slide deck covering problem, solution, market opportunity, business model, traction, competition, team, financials, funding ask, and use of funds."
+  },
+  {
+    "instruction": "What valuation should I expect?",
+    "input": "",
+    "output": "Valuation depends on stage, traction, market size, and comparables. Early-stage companies typically trade at 10-20x revenue multiples, but this varies significantly by industry.",
+    "category": "investment_ready",
+    "text": "### Instruction: What valuation should I expect?\n### Response: Valuation depends on stage, traction, market size, and comparables. Early-stage companies typically trade at 10-20x revenue multiples, but this varies significantly by industry."
+  },
+  {
+    "instruction": "How do I negotiate with investors?",
+    "input": "",
+    "output": "Understand your leverage, prepare multiple term sheet options, focus on more than just valuation, consider board composition and liquidation preferences carefully.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I negotiate with investors?\n### Response: Understand your leverage, prepare multiple term sheet options, focus on more than just valuation, consider board composition and liquidation preferences carefully."
+  },
+  {
+    "instruction": "What are the different types of funding?",
+    "input": "",
+    "output": "Options include bootstrapping, angel investors, venture capital, crowdfunding, debt financing, grants, and strategic partnerships. Choose based on your stage and needs.",
+    "category": "investment_ready",
+    "text": "### Instruction: What are the different types of funding?\n### Response: Options include bootstrapping, angel investors, venture capital, crowdfunding, debt financing, grants, and strategic partnerships. Choose based on your stage and needs."
+  },
+  {
+    "instruction": "How do I find angel investors?",
+    "input": "",
+    "output": "Network through industry events, accelerators, online platforms like AngelList, warm introductions from other entrepreneurs, and angel investor groups in your area.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I find angel investors?\n### Response: Network through industry events, accelerators, online platforms like AngelList, warm introductions from other entrepreneurs, and angel investor groups in your area."
+  },
+  {
+    "instruction": "What due diligence should I expect?",
+    "input": "",
+    "output": "Expect review of financials, legal documents, customer references, technical architecture, IP portfolio, team backgrounds, and market analysis. Prepare comprehensive documentation.",
+    "category": "investment_ready",
+    "text": "### Instruction: What due diligence should I expect?\n### Response: Expect review of financials, legal documents, customer references, technical architecture, IP portfolio, team backgrounds, and market analysis. Prepare comprehensive documentation."
+  },
+  {
+    "instruction": "How do I scale my team effectively?",
+    "input": "",
+    "output": "Hire for culture fit and growth potential, implement scalable HR processes, create clear role definitions, establish performance management systems, and maintain team cohesion.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I scale my team effectively?\n### Response: Hire for culture fit and growth potential, implement scalable HR processes, create clear role definitions, establish performance management systems, and maintain team cohesion."
+  },
+  {
+    "instruction": "What are the key performance indicators for growth?",
+    "input": "",
+    "output": "Focus on North Star metrics like revenue, user growth, retention, NPS scores, market share, operational efficiency, and team performance indicators that drive long-term value.",
+    "category": "investment_ready",
+    "text": "### Instruction: What are the key performance indicators for growth?\n### Response: Focus on North Star metrics like revenue, user growth, retention, NPS scores, market share, operational efficiency, and team performance indicators that drive long-term value."
+  },
+  {
+    "instruction": "How do I expand to new markets?",
+    "input": "",
+    "output": "Conduct thorough market research, adapt your product for local needs, establish local partnerships, understand regulatory requirements, and build region-specific marketing strategies.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I expand to new markets?\n### Response: Conduct thorough market research, adapt your product for local needs, establish local partnerships, understand regulatory requirements, and build region-specific marketing strategies."
+  },
+  {
+    "instruction": "What operational systems should I implement?",
+    "input": "",
+    "output": "Implement ERP systems, standardize processes, create detailed documentation, establish quality controls, and build scalable customer support and fulfillment operations.",
+    "category": "investment_ready",
+    "text": "### Instruction: What operational systems should I implement?\n### Response: Implement ERP systems, standardize processes, create detailed documentation, establish quality controls, and build scalable customer support and fulfillment operations."
+  },
+  {
+    "instruction": "How do I maintain company culture during growth?",
+    "input": "",
+    "output": "Document your values clearly, hire culture champions, create rituals and traditions, maintain transparent communication, and ensure leadership models desired behaviors consistently.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I maintain company culture during growth?\n### Response: Document your values clearly, hire culture champions, create rituals and traditions, maintain transparent communication, and ensure leadership models desired behaviors consistently."
+  },
+  {
+    "instruction": "What financial controls do I need?",
+    "input": "",
+    "output": "Implement financial planning software, establish approval workflows, create detailed budgets and forecasts, maintain strong audit trails, and separate duties appropriately.",
+    "category": "investment_ready",
+    "text": "### Instruction: What financial controls do I need?\n### Response: Implement financial planning software, establish approval workflows, create detailed budgets and forecasts, maintain strong audit trails, and separate duties appropriately."
+  },
+  {
+    "instruction": "How do I manage cash flow during scaling?",
+    "input": "",
+    "output": "Create detailed cash flow forecasts, maintain sufficient reserves, optimize payment terms, implement efficient collections, and establish credit facilities before you need them.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I manage cash flow during scaling?\n### Response: Create detailed cash flow forecasts, maintain sufficient reserves, optimize payment terms, implement efficient collections, and establish credit facilities before you need them."
+  },
+  {
+    "instruction": "What partnerships should I consider?",
+    "input": "",
+    "output": "Consider strategic partnerships for distribution, technology integrations, co-marketing opportunities, or complementary product offerings that enhance your value proposition.",
+    "category": "investment_ready",
+    "text": "### Instruction: What partnerships should I consider?\n### Response: Consider strategic partnerships for distribution, technology integrations, co-marketing opportunities, or complementary product offerings that enhance your value proposition."
+  },
+  {
+    "instruction": "How do I optimize my sales funnel?",
+    "input": "",
+    "output": "Analyze each funnel stage, A/B test improvements, implement marketing automation, optimize conversion points, and focus on reducing friction in the customer journey.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I optimize my sales funnel?\n### Response: Analyze each funnel stage, A/B test improvements, implement marketing automation, optimize conversion points, and focus on reducing friction in the customer journey."
+  },
+  {
+    "instruction": "What technology infrastructure do I need?",
+    "input": "",
+    "output": "Build cloud-native architecture, implement robust security, create scalable databases, establish DevOps practices, and ensure high availability and disaster recovery capabilities.",
+    "category": "investment_ready",
+    "text": "### Instruction: What technology infrastructure do I need?\n### Response: Build cloud-native architecture, implement robust security, create scalable databases, establish DevOps practices, and ensure high availability and disaster recovery capabilities."
+  },
+  {
+    "instruction": "How do I handle international expansion?",
+    "input": "",
+    "output": "Develop local market entry strategies, establish legal entities, understand cultural differences, build local teams, and adapt your product for international markets.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I handle international expansion?\n### Response: Develop local market entry strategies, establish legal entities, understand cultural differences, build local teams, and adapt your product for international markets."
+  },
+  {
+    "instruction": "What exit strategies should I consider?",
+    "input": "",
+    "output": "Consider IPO, acquisition, or management buyout based on your goals, market conditions, and business performance. Prepare years in advance for any exit strategy.",
+    "category": "investment_ready",
+    "text": "### Instruction: What exit strategies should I consider?\n### Response: Consider IPO, acquisition, or management buyout based on your goals, market conditions, and business performance. Prepare years in advance for any exit strategy."
+  },
+  {
+    "instruction": "How do I prepare for an IPO?",
+    "input": "",
+    "output": "Prepare detailed financial projections, demonstrate strong unit economics, show consistent growth metrics, build a experienced team, and create a compelling growth story for investors.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I prepare for an IPO?\n### Response: Prepare detailed financial projections, demonstrate strong unit economics, show consistent growth metrics, build a experienced team, and create a compelling growth story for investors."
+  },
+  {
+    "instruction": "What are the risks of rapid scaling?",
+    "input": "",
+    "output": "Investors focus on market size, revenue growth, customer retention, unit economics, team experience, competitive moats, and scalability potential. Ensure your metrics tell a compelling story.",
+    "category": "investment_ready",
+    "text": "### Instruction: What are the risks of rapid scaling?\n### Response: Investors focus on market size, revenue growth, customer retention, unit economics, team experience, competitive moats, and scalability potential. Ensure your metrics tell a compelling story."
+  },
+  {
+    "instruction": "How do I maintain product quality during growth?",
+    "input": "",
+    "output": "Create a 10-12 slide deck covering problem, solution, market opportunity, business model, traction, competition, team, financials, funding ask, and use of funds.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I maintain product quality during growth?\n### Response: Create a 10-12 slide deck covering problem, solution, market opportunity, business model, traction, competition, team, financials, funding ask, and use of funds."
+  },
+  {
+    "instruction": "What customer retention strategies work best?",
+    "input": "",
+    "output": "Valuation depends on stage, traction, market size, and comparables. Early-stage companies typically trade at 10-20x revenue multiples, but this varies significantly by industry.",
+    "category": "investment_ready",
+    "text": "### Instruction: What customer retention strategies work best?\n### Response: Valuation depends on stage, traction, market size, and comparables. Early-stage companies typically trade at 10-20x revenue multiples, but this varies significantly by industry."
+  },
+  {
+    "instruction": "How do I build strategic partnerships?",
+    "input": "",
+    "output": "Understand your leverage, prepare multiple term sheet options, focus on more than just valuation, consider board composition and liquidation preferences carefully.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I build strategic partnerships?\n### Response: Understand your leverage, prepare multiple term sheet options, focus on more than just valuation, consider board composition and liquidation preferences carefully."
+  },
+  {
+    "instruction": "What acquisitions should I consider?",
+    "input": "",
+    "output": "Options include bootstrapping, angel investors, venture capital, crowdfunding, debt financing, grants, and strategic partnerships. Choose based on your stage and needs.",
+    "category": "investment_ready",
+    "text": "### Instruction: What acquisitions should I consider?\n### Response: Options include bootstrapping, angel investors, venture capital, crowdfunding, debt financing, grants, and strategic partnerships. Choose based on your stage and needs."
+  },
+  {
+    "instruction": "How do I manage investor relations?",
+    "input": "",
+    "output": "Network through industry events, accelerators, online platforms like AngelList, warm introductions from other entrepreneurs, and angel investor groups in your area.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I manage investor relations?\n### Response: Network through industry events, accelerators, online platforms like AngelList, warm introductions from other entrepreneurs, and angel investor groups in your area."
+  },
+  {
+    "instruction": "What governance structures do I need?",
+    "input": "",
+    "output": "Expect review of financials, legal documents, customer references, technical architecture, IP portfolio, team backgrounds, and market analysis. Prepare comprehensive documentation.",
+    "category": "investment_ready",
+    "text": "### Instruction: What governance structures do I need?\n### Response: Expect review of financials, legal documents, customer references, technical architecture, IP portfolio, team backgrounds, and market analysis. Prepare comprehensive documentation."
+  },
+  {
+    "instruction": "How do I handle market competition at scale?",
+    "input": "",
+    "output": "Hire for culture fit and growth potential, implement scalable HR processes, create clear role definitions, establish performance management systems, and maintain team cohesion.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I handle market competition at scale?\n### Response: Hire for culture fit and growth potential, implement scalable HR processes, create clear role definitions, establish performance management systems, and maintain team cohesion."
+  },
+  {
+    "instruction": "What are the signs of product-market fit?",
+    "input": "",
+    "output": "Focus on North Star metrics like revenue, user growth, retention, NPS scores, market share, operational efficiency, and team performance indicators that drive long-term value.",
+    "category": "investment_ready",
+    "text": "### Instruction: What are the signs of product-market fit?\n### Response: Focus on North Star metrics like revenue, user growth, retention, NPS scores, market share, operational efficiency, and team performance indicators that drive long-term value."
+  },
+  {
+    "instruction": "How do I pivot my business model?",
+    "input": "",
+    "output": "Analyze what's not working, gather customer feedback, explore adjacent markets, test new business models, and be prepared to make significant changes to find product-market fit.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I pivot my business model?\n### Response: Analyze what's not working, gather customer feedback, explore adjacent markets, test new business models, and be prepared to make significant changes to find product-market fit."
+  },
+  {
+    "instruction": "What should I do if my product isn't selling?",
+    "input": "",
+    "output": "Conduct customer interviews to understand why they're not buying, analyze your value proposition, review your pricing strategy, improve your marketing message, and consider product improvements.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What should I do if my product isn't selling?\n### Response: Conduct customer interviews to understand why they're not buying, analyze your value proposition, review your pricing strategy, improve your marketing message, and consider product improvements."
+  },
+  {
+    "instruction": "How do I improve customer retention?",
+    "input": "",
+    "output": "Analyze churn reasons, improve onboarding, create customer success programs, gather regular feedback, build loyalty programs, and focus on delivering consistent value.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I improve customer retention?\n### Response: Analyze churn reasons, improve onboarding, create customer success programs, gather regular feedback, build loyalty programs, and focus on delivering consistent value."
+  },
+  {
+    "instruction": "What if my target market is too small?",
+    "input": "",
+    "output": "Consider expanding your target market, finding niche applications, exploring B2B opportunities, or pivoting to adjacent markets with larger addressable audiences.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What if my target market is too small?\n### Response: Consider expanding your target market, finding niche applications, exploring B2B opportunities, or pivoting to adjacent markets with larger addressable audiences."
+  },
+  {
+    "instruction": "How do I fix poor unit economics?",
+    "input": "",
+    "output": "Analyze your cost structure, improve pricing strategy, optimize customer acquisition channels, reduce churn, increase customer lifetime value, and eliminate unprofitable segments.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I fix poor unit economics?\n### Response: Analyze your cost structure, improve pricing strategy, optimize customer acquisition channels, reduce churn, increase customer lifetime value, and eliminate unprofitable segments."
+  },
+  {
+    "instruction": "What should I do about negative customer feedback?",
+    "input": "",
+    "output": "Listen carefully to feedback, identify patterns, prioritize critical issues, communicate your improvement plans, and show customers you value their input through action.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What should I do about negative customer feedback?\n### Response: Listen carefully to feedback, identify patterns, prioritize critical issues, communicate your improvement plans, and show customers you value their input through action."
+  },
+  {
+    "instruction": "How do I revise my value proposition?",
+    "input": "",
+    "output": "Conduct fresh customer interviews, analyze successful competitors, test new messaging, focus on unique benefits, and ensure your value proposition addresses real customer pain points.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I revise my value proposition?\n### Response: Conduct fresh customer interviews, analyze successful competitors, test new messaging, focus on unique benefits, and ensure your value proposition addresses real customer pain points."
+  },
+  {
+    "instruction": "What if my competition is outperforming me?",
+    "input": "",
+    "output": "Analyze their advantages, identify your unique strengths, improve your product differentiation, enhance customer experience, optimize your marketing, or find underserved niches.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What if my competition is outperforming me?\n### Response: Analyze their advantages, identify your unique strengths, improve your product differentiation, enhance customer experience, optimize your marketing, or find underserved niches."
+  },
+  {
+    "instruction": "How do I improve my product features?",
+    "input": "",
+    "output": "Prioritize features based on customer feedback, conduct usability testing, implement agile development processes, gather continuous feedback, and focus on core functionality first.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I improve my product features?\n### Response: Prioritize features based on customer feedback, conduct usability testing, implement agile development processes, gather continuous feedback, and focus on core functionality first."
+  },
+  {
+    "instruction": "What should I do if I'm running out of funding?",
+    "input": "",
+    "output": "Extend your runway through cost reduction, explore revenue-based financing, pitch to new investors, consider strategic partnerships, or pursue grants and competitions.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What should I do if I'm running out of funding?\n### Response: Extend your runway through cost reduction, explore revenue-based financing, pitch to new investors, consider strategic partnerships, or pursue grants and competitions."
+  },
+  {
+    "instruction": "How do I reduce customer acquisition costs?",
+    "input": "",
+    "output": "Optimize your marketing channels, improve conversion rates, enhance referral programs, focus on organic growth strategies, and analyze customer lifetime value to justify acquisition costs.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I reduce customer acquisition costs?\n### Response: Optimize your marketing channels, improve conversion rates, enhance referral programs, focus on organic growth strategies, and analyze customer lifetime value to justify acquisition costs."
+  },
+  {
+    "instruction": "What if my team isn't performing well?",
+    "input": "",
+    "output": "Assess team members individually, provide additional training or support, clarify roles and expectations, consider team restructuring, and focus on cultural fit and performance.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What if my team isn't performing well?\n### Response: Assess team members individually, provide additional training or support, clarify roles and expectations, consider team restructuring, and focus on cultural fit and performance."
+  },
+  {
+    "instruction": "How do I improve my marketing strategy?",
+    "input": "",
+    "output": "Analyze your current strategy's performance, test new channels, improve your messaging, enhance your brand positioning, and focus on channels with the best ROI.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I improve my marketing strategy?\n### Response: Analyze your current strategy's performance, test new channels, improve your messaging, enhance your brand positioning, and focus on channels with the best ROI."
+  },
+  {
+    "instruction": "What should I do about technical debt?",
+    "input": "",
+    "output": "Prioritize critical issues, allocate time for refactoring, implement better development practices, consider bringing in technical expertise, and balance new features with improvements.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What should I do about technical debt?\n### Response: Prioritize critical issues, allocate time for refactoring, implement better development practices, consider bringing in technical expertise, and balance new features with improvements."
+  },
+  {
+    "instruction": "How do I handle a failing partnership?",
+    "input": "",
+    "output": "Evaluate the partnership's strategic value, communicate issues openly, renegotiate terms if needed, or consider ending partnerships that aren't delivering mutual value.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I handle a failing partnership?\n### Response: Evaluate the partnership's strategic value, communicate issues openly, renegotiate terms if needed, or consider ending partnerships that aren't delivering mutual value."
+  },
+  {
+    "instruction": "What if my business model isn't sustainable?",
+    "input": "",
+    "output": "Review your unit economics, explore new revenue streams, reduce operational costs, improve customer lifetime value, and consider fundamental business model changes.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What if my business model isn't sustainable?\n### Response: Review your unit economics, explore new revenue streams, reduce operational costs, improve customer lifetime value, and consider fundamental business model changes."
+  },
+  {
+    "instruction": "How do I improve operational efficiency?",
+    "input": "",
+    "output": "Identify bottlenecks, automate repetitive processes, implement better tools and systems, optimize workflows, and continuously measure and improve key operational metrics.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I improve operational efficiency?\n### Response: Identify bottlenecks, automate repetitive processes, implement better tools and systems, optimize workflows, and continuously measure and improve key operational metrics."
+  },
+  {
+    "instruction": "What should I do about low conversion rates?",
+    "input": "",
+    "output": "Analyze your funnel, A/B test different approaches, improve your value proposition, optimize your website and marketing materials, and remove friction from the conversion process.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What should I do about low conversion rates?\n### Response: Analyze your funnel, A/B test different approaches, improve your value proposition, optimize your website and marketing materials, and remove friction from the conversion process."
+  },
+  {
+    "instruction": "How do I fix pricing strategy issues?",
+    "input": "",
+    "output": "Analyze competitor pricing, survey your customers about price sensitivity, test different pricing models, consider value-based pricing, and ensure your pricing reflects your value.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I fix pricing strategy issues?\n### Response: Analyze competitor pricing, survey your customers about price sensitivity, test different pricing models, consider value-based pricing, and ensure your pricing reflects your value."
+  },
+  {
+    "instruction": "What if my market positioning is wrong?",
+    "input": "",
+    "output": "Conduct new market research, test different positioning messages, analyze successful competitors, and consider repositioning around different customer segments or value propositions.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What if my market positioning is wrong?\n### Response: Conduct new market research, test different positioning messages, analyze successful competitors, and consider repositioning around different customer segments or value propositions."
+  },
+  {
+    "instruction": "How do I improve customer satisfaction?",
+    "input": "",
+    "output": "Analyze what's not working, gather customer feedback, explore adjacent markets, test new business models, and be prepared to make significant changes to find product-market fit.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I improve customer satisfaction?\n### Response: Analyze what's not working, gather customer feedback, explore adjacent markets, test new business models, and be prepared to make significant changes to find product-market fit."
+  },
+  {
+    "instruction": "What should I do about high churn rates?",
+    "input": "",
+    "output": "Conduct customer interviews to understand why they're not buying, analyze your value proposition, review your pricing strategy, improve your marketing message, and consider product improvements.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What should I do about high churn rates?\n### Response: Conduct customer interviews to understand why they're not buying, analyze your value proposition, review your pricing strategy, improve your marketing message, and consider product improvements."
+  },
+  {
+    "instruction": "How do I optimize my supply chain?",
+    "input": "",
+    "output": "Analyze churn reasons, improve onboarding, create customer success programs, gather regular feedback, build loyalty programs, and focus on delivering consistent value.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I optimize my supply chain?\n### Response: Analyze churn reasons, improve onboarding, create customer success programs, gather regular feedback, build loyalty programs, and focus on delivering consistent value."
+  },
+  {
+    "instruction": "What if my product roadmap is unclear?",
+    "input": "",
+    "output": "Consider expanding your target market, finding niche applications, exploring B2B opportunities, or pivoting to adjacent markets with larger addressable audiences.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What if my product roadmap is unclear?\n### Response: Consider expanding your target market, finding niche applications, exploring B2B opportunities, or pivoting to adjacent markets with larger addressable audiences."
+  },
+  {
+    "instruction": "How do I improve team communication?",
+    "input": "",
+    "output": "Analyze your cost structure, improve pricing strategy, optimize customer acquisition channels, reduce churn, increase customer lifetime value, and eliminate unprofitable segments.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I improve team communication?\n### Response: Analyze your cost structure, improve pricing strategy, optimize customer acquisition channels, reduce churn, increase customer lifetime value, and eliminate unprofitable segments."
+  },
+  {
+    "instruction": "What should I do about regulatory challenges?",
+    "input": "",
+    "output": "Listen carefully to feedback, identify patterns, prioritize critical issues, communicate your improvement plans, and show customers you value their input through action.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What should I do about regulatory challenges?\n### Response: Listen carefully to feedback, identify patterns, prioritize critical issues, communicate your improvement plans, and show customers you value their input through action."
+  },
+  {
+    "instruction": "How do I fix brand reputation issues?",
+    "input": "",
+    "output": "Conduct fresh customer interviews, analyze successful competitors, test new messaging, focus on unique benefits, and ensure your value proposition addresses real customer pain points.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I fix brand reputation issues?\n### Response: Conduct fresh customer interviews, analyze successful competitors, test new messaging, focus on unique benefits, and ensure your value proposition addresses real customer pain points."
+  },
+  {
+    "instruction": "What if my growth has stagnated?",
+    "input": "",
+    "output": "Analyze their advantages, identify your unique strengths, improve your product differentiation, enhance customer experience, optimize your marketing, or find underserved niches.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What if my growth has stagnated?\n### Response: Analyze their advantages, identify your unique strengths, improve your product differentiation, enhance customer experience, optimize your marketing, or find underserved niches."
+  },
+  {
+    "instruction": "How do I improve cash flow management?",
+    "input": "",
+    "output": "Prioritize features based on customer feedback, conduct usability testing, implement agile development processes, gather continuous feedback, and focus on core functionality first.",
+    "category": "needs_refinement",
+    "text": "### Instruction: How do I improve cash flow management?\n### Response: Prioritize features based on customer feedback, conduct usability testing, implement agile development processes, gather continuous feedback, and focus on core functionality first."
+  },
+  {
+    "instruction": "What should I do about market timing issues?",
+    "input": "",
+    "output": "Extend your runway through cost reduction, explore revenue-based financing, pitch to new investors, consider strategic partnerships, or pursue grants and competitions.",
+    "category": "needs_refinement",
+    "text": "### Instruction: What should I do about market timing issues?\n### Response: Extend your runway through cost reduction, explore revenue-based financing, pitch to new investors, consider strategic partnerships, or pursue grants and competitions."
+  },
+  {
+    "instruction": "I'm a first-time founder with a SaaS idea for small businesses. I've built a prototype but haven't gotten any paying customers yet. What should I focus on?",
+    "input": "",
+    "output": "Based on your stage, you're in the 'Mentorship Needed' category. Focus on customer discovery first - reach out to 50+ small business owners to validate your problem hypothesis. Don't just ask if they like your solution; ask about their current workflows and pain points. Once you understand their needs better, refine your prototype to address the most critical issues. Then, offer a free trial or pilot program to gather real usage data and feedback. Remember, at this stage, learning is more valuable than revenue.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: I'm a first-time founder with a SaaS idea for small businesses. I've built a prototype but haven't gotten any paying customers yet. What should I focus on?\n### Response: Based on your stage, you're in the 'Mentorship Needed' category. Focus on customer discovery first - reach out to 50+ small business owners to validate your problem hypothesis. Don't just ask if they like your solution; ask about their current workflows and pain points. Once you understand their needs better, refine your prototype to address the most critical issues. Then, offer a free trial or pilot program to gather real usage data and feedback. Remember, at this stage, learning is more valuable than revenue."
+  },
+  {
+    "instruction": "My startup has $2M ARR, 40% YoY growth, and strong unit economics. I want to raise Series A to scale our sales team and expand internationally. How should I prepare?",
+    "input": "",
+    "output": "Congratulations! You're clearly 'Investment Ready'. For Series A preparation, focus on: 1) Financial metrics: Ensure your LTV/CAC ratio is >3, gross margin >70%, and net revenue retention >100%. 2) Create a compelling pitch deck highlighting your TAM expansion, competitive moats, and international expansion strategy. 3) Build relationships with tier-1 VCs 6 months before fundraising. 4) Prepare detailed financial projections showing path to $10M+ ARR. 5) Document your go-to-market playbook to demonstrate repeatability. Target $5-15M raise based on your metrics and market opportunity.",
+    "category": "investment_ready",
+    "text": "### Instruction: My startup has $2M ARR, 40% YoY growth, and strong unit economics. I want to raise Series A to scale our sales team and expand internationally. How should I prepare?\n### Response: Congratulations! You're clearly 'Investment Ready'. For Series A preparation, focus on: 1) Financial metrics: Ensure your LTV/CAC ratio is >3, gross margin >70%, and net revenue retention >100%. 2) Create a compelling pitch deck highlighting your TAM expansion, competitive moats, and international expansion strategy. 3) Build relationships with tier-1 VCs 6 months before fundraising. 4) Prepare detailed financial projections showing path to $10M+ ARR. 5) Document your go-to-market playbook to demonstrate repeatability. Target $5-15M raise based on your metrics and market opportunity."
+  },
+  {
+    "instruction": "Our startup launched 18 months ago but we're struggling with high churn rates (15% monthly), low conversion from trial to paid (2%), and our CAC is higher than our LTV. What should we do?",
+    "input": "",
+    "output": "Your startup falls into the 'Needs Refinement' category and requires immediate attention to unit economics. Here's a systematic approach: 1) Churn Analysis: Interview churned customers to identify patterns - is it product fit, onboarding, or value realization? 2) Conversion Optimization: Analyze your trial-to-paid funnel, improve onboarding experience, and add more value during trial period. 3) Cost Reduction: Pause expensive acquisition channels, focus on organic growth and referrals. 4) Product-Market Fit: You may need to pivot your target market or core features. 5) Consider a strategic pause on growth to fix fundamentals. These metrics suggest fundamental issues that need addressing before scaling further.",
+    "category": "needs_refinement",
+    "text": "### Instruction: Our startup launched 18 months ago but we're struggling with high churn rates (15% monthly), low conversion from trial to paid (2%), and our CAC is higher than our LTV. What should we do?\n### Response: Your startup falls into the 'Needs Refinement' category and requires immediate attention to unit economics. Here's a systematic approach: 1) Churn Analysis: Interview churned customers to identify patterns - is it product fit, onboarding, or value realization? 2) Conversion Optimization: Analyze your trial-to-paid funnel, improve onboarding experience, and add more value during trial period. 3) Cost Reduction: Pause expensive acquisition channels, focus on organic growth and referrals. 4) Product-Market Fit: You may need to pivot your target market or core features. 5) Consider a strategic pause on growth to fix fundamentals. These metrics suggest fundamental issues that need addressing before scaling further."
+  },
+  {
+    "instruction": "What opportunities exist for startups in Rwanda's economy?",
+    "input": "",
+    "output": "Rwanda offers excellent opportunities in fintech (mobile payments, digital banking), agritech (supporting smallholder farmers), healthtech (telemedicine, health records), edtech (digital learning platforms), and tourism tech. The government's Vision 2050 and digital transformation agenda provide strong support for tech startups. Focus on solutions that address local challenges while being scalable regionally.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: What opportunities exist for startups in Rwanda's economy?\n### Response: Rwanda offers excellent opportunities in fintech (mobile payments, digital banking), agritech (supporting smallholder farmers), healthtech (telemedicine, health records), edtech (digital learning platforms), and tourism tech. The government's Vision 2050 and digital transformation agenda provide strong support for tech startups. Focus on solutions that address local challenges while being scalable regionally."
+  },
+  {
+    "instruction": "How can I access funding for my startup in East Africa?",
+    "input": "",
+    "output": "East Africa has a growing funding ecosystem. Consider: 1) Local VCs like Knife Capital, TLcom Capital, and Novastar Ventures. 2) Development finance institutions like IFC and CDC. 3) Accelerators such as Seedstars, GSMA Ecosystem Accelerator, and local programs. 4) Grants from organizations like USAID, GIZ, and the World Bank. 5) Regional startup competitions and pitch events. Build strong local networks and focus on solving problems relevant to the East African market.",
+    "category": "investment_ready",
+    "text": "### Instruction: How can I access funding for my startup in East Africa?\n### Response: East Africa has a growing funding ecosystem. Consider: 1) Local VCs like Knife Capital, TLcom Capital, and Novastar Ventures. 2) Development finance institutions like IFC and CDC. 3) Accelerators such as Seedstars, GSMA Ecosystem Accelerator, and local programs. 4) Grants from organizations like USAID, GIZ, and the World Bank. 5) Regional startup competitions and pitch events. Build strong local networks and focus on solving problems relevant to the East African market."
+  },
+  {
+    "instruction": "Should I build my MVP using no-code tools or custom development?",
+    "input": "",
+    "output": "For early validation, no-code tools like Bubble, Webflow, or Airtable can be excellent for MVPs. They allow rapid iteration and cost-effective testing. However, consider custom development if: 1) Your product requires complex algorithms, 2) You need specific integrations, 3) Performance is critical, or 4) You plan to scale rapidly. Many successful startups started with no-code MVPs and rebuilt later. Focus on learning about your customers first, optimize for technical elegance second.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: Should I build my MVP using no-code tools or custom development?\n### Response: For early validation, no-code tools like Bubble, Webflow, or Airtable can be excellent for MVPs. They allow rapid iteration and cost-effective testing. However, consider custom development if: 1) Your product requires complex algorithms, 2) You need specific integrations, 3) Performance is critical, or 4) You plan to scale rapidly. Many successful startups started with no-code MVPs and rebuilt later. Focus on learning about your customers first, optimize for technical elegance second."
+  },
+  {
+    "instruction": "How do I choose the right technology stack for my startup?",
+    "input": "",
+    "output": "Choose your tech stack based on: 1) Team expertise - use what your team knows well, 2) Speed to market - prioritize rapid development, 3) Scalability needs - plan for growth but don't over-engineer, 4) Community and support - choose popular, well-documented technologies, 5) Hiring considerations - pick technologies that make it easier to find developers. Popular modern stacks include React/Node.js, Python/Django, or cloud-native solutions. Remember, you can always refactor later - the best technology is the one that helps you validate your business faster.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I choose the right technology stack for my startup?\n### Response: Choose your tech stack based on: 1) Team expertise - use what your team knows well, 2) Speed to market - prioritize rapid development, 3) Scalability needs - plan for growth but don't over-engineer, 4) Community and support - choose popular, well-documented technologies, 5) Hiring considerations - pick technologies that make it easier to find developers. Popular modern stacks include React/Node.js, Python/Django, or cloud-native solutions. Remember, you can always refactor later - the best technology is the one that helps you validate your business faster."
+  },
+  {
+    "instruction": "How do I create an effective sales process for my B2B startup?",
+    "input": "",
+    "output": "Build a systematic B2B sales process: 1) Lead qualification using BANT (Budget, Authority, Need, Timeline), 2) Discovery calls to understand pain points, 3) Demo/presentation tailored to their specific needs, 4) Proposal with clear value proposition and ROI, 5) Negotiation and closing, 6) Onboarding and success tracking. Use a CRM to track every interaction. Start with a longer, consultative sales cycle and optimize for efficiency as you scale. Measure metrics like conversion rates at each stage, average deal size, and sales cycle length.",
+    "category": "investment_ready",
+    "text": "### Instruction: How do I create an effective sales process for my B2B startup?\n### Response: Build a systematic B2B sales process: 1) Lead qualification using BANT (Budget, Authority, Need, Timeline), 2) Discovery calls to understand pain points, 3) Demo/presentation tailored to their specific needs, 4) Proposal with clear value proposition and ROI, 5) Negotiation and closing, 6) Onboarding and success tracking. Use a CRM to track every interaction. Start with a longer, consultative sales cycle and optimize for efficiency as you scale. Measure metrics like conversion rates at each stage, average deal size, and sales cycle length."
+  },
+  {
+    "instruction": "My marketing campaigns aren't generating quality leads. What should I change?",
+    "input": "",
+    "output": "Your lead quality issues suggest misalignment between messaging and audience. Review: 1) Target audience definition - are you reaching decision-makers?, 2) Value proposition clarity - does it address specific pain points?, 3) Content quality - is it educational rather than promotional?, 4) Channel selection - are you where your customers spend time?, 5) Lead qualification criteria - are you properly scoring leads?. Consider focusing on one channel first, creating better lead magnets, and implementing lead nurturing sequences. Quality over quantity - better to have 10 qualified leads than 100 unqualified ones.",
+    "category": "needs_refinement",
+    "text": "### Instruction: My marketing campaigns aren't generating quality leads. What should I change?\n### Response: Your lead quality issues suggest misalignment between messaging and audience. Review: 1) Target audience definition - are you reaching decision-makers?, 2) Value proposition clarity - does it address specific pain points?, 3) Content quality - is it educational rather than promotional?, 4) Channel selection - are you where your customers spend time?, 5) Lead qualification criteria - are you properly scoring leads?. Consider focusing on one channel first, creating better lead magnets, and implementing lead nurturing sequences. Quality over quantity - better to have 10 qualified leads than 100 unqualified ones."
+  },
+  {
+    "instruction": "How do I structure equity distribution among co-founders?",
+    "input": "",
+    "output": "Founder equity should reflect contribution, risk, and future value. Consider: 1) Equal splits (25-25-25-25) for similar contributions, 2) Weighted splits based on role importance, experience, and time commitment, 3) Vesting schedules (typically 4 years with 1-year cliff) to protect against early departures, 4) Reserved equity pool (10-20%) for future employees, 5) Legal documentation through a lawyer. Common mistake: Don't wait too long to formalize. Use tools like the Founder Equity Calculator, but remember that fairness and team harmony are more important than perfect mathematical precision.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I structure equity distribution among co-founders?\n### Response: Founder equity should reflect contribution, risk, and future value. Consider: 1) Equal splits (25-25-25-25) for similar contributions, 2) Weighted splits based on role importance, experience, and time commitment, 3) Vesting schedules (typically 4 years with 1-year cliff) to protect against early departures, 4) Reserved equity pool (10-20%) for future employees, 5) Legal documentation through a lawyer. Common mistake: Don't wait too long to formalize. Use tools like the Founder Equity Calculator, but remember that fairness and team harmony are more important than perfect mathematical precision."
+  },
+  {
+    "instruction": "What financial metrics should I track at the seed stage?",
+    "input": "",
+    "output": "At seed stage, focus on: 1) Burn rate and runway - how long can you survive?, 2) Customer acquisition metrics - CAC, conversion rates, organic vs paid growth, 3) Revenue metrics - MRR/ARR for SaaS, transaction volume for marketplaces, 4) Product engagement - DAU/MAU, feature usage, retention cohorts, 5) Unit economics - gross margin, contribution margin per customer. Don't overcomplicate - choose 5-7 key metrics that directly relate to your business model. Track weekly/monthly and focus on trends rather than absolute numbers. These metrics will become crucial for fundraising conversations.",
+    "category": "investment_ready",
+    "text": "### Instruction: What financial metrics should I track at the seed stage?\n### Response: At seed stage, focus on: 1) Burn rate and runway - how long can you survive?, 2) Customer acquisition metrics - CAC, conversion rates, organic vs paid growth, 3) Revenue metrics - MRR/ARR for SaaS, transaction volume for marketplaces, 4) Product engagement - DAU/MAU, feature usage, retention cohorts, 5) Unit economics - gross margin, contribution margin per customer. Don't overcomplicate - choose 5-7 key metrics that directly relate to your business model. Track weekly/monthly and focus on trends rather than absolute numbers. These metrics will become crucial for fundraising conversations."
+  },
+  {
+    "instruction": "How do I prioritize features when everything seems important?",
+    "input": "",
+    "output": "Use a structured prioritization framework: 1) RICE scoring (Reach \u00d7 Impact \u00d7 Confidence \u00f7 Effort), 2) Kano Model to distinguish must-haves from delighters, 3) Customer feedback frequency and urgency, 4) Business impact on key metrics, 5) Strategic alignment with company goals. Start with features that are high impact, low effort, and requested by multiple customers. Remember the 80/20 rule - focus on features that solve core problems for most users. Regular customer interviews and usage analytics should guide decisions more than internal opinions or competitor copying.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: How do I prioritize features when everything seems important?\n### Response: Use a structured prioritization framework: 1) RICE scoring (Reach \u00d7 Impact \u00d7 Confidence \u00f7 Effort), 2) Kano Model to distinguish must-haves from delighters, 3) Customer feedback frequency and urgency, 4) Business impact on key metrics, 5) Strategic alignment with company goals. Start with features that are high impact, low effort, and requested by multiple customers. Remember the 80/20 rule - focus on features that solve core problems for most users. Regular customer interviews and usage analytics should guide decisions more than internal opinions or competitor copying."
+  },
+  {
+    "instruction": "Our product has low user engagement despite good initial signup rates. How do we fix this?",
+    "input": "",
+    "output": "Low engagement despite good signups suggests an onboarding or value realization problem. Investigate: 1) Time to value - how quickly do users see benefits?, 2) Onboarding friction - are there too many steps or confusing flows?, 3) Feature discovery - do users understand your core features?, 4) Value proposition alignment - does the product deliver on marketing promises?, 5) User segmentation - different user types may need different approaches. Implement user analytics, run usability tests, and interview both engaged and churned users. Focus on activation metrics and create guided onboarding experiences.",
+    "category": "needs_refinement",
+    "text": "### Instruction: Our product has low user engagement despite good initial signup rates. How do we fix this?\n### Response: Low engagement despite good signups suggests an onboarding or value realization problem. Investigate: 1) Time to value - how quickly do users see benefits?, 2) Onboarding friction - are there too many steps or confusing flows?, 3) Feature discovery - do users understand your core features?, 4) Value proposition alignment - does the product deliver on marketing promises?, 5) User segmentation - different user types may need different approaches. Implement user analytics, run usability tests, and interview both engaged and churned users. Focus on activation metrics and create guided onboarding experiences."
+  },
+  {
+    "instruction": "I got my first paying customer! What should I do next to build on this success?",
+    "input": "",
+    "output": "Congratulations! This is a huge milestone. Now focus on: 1) Customer Success - Ensure your first customer gets maximum value and becomes a reference, 2) Case Study - Document their problem, solution, and results for marketing, 3) Feedback Loop - Schedule regular check-ins to gather product feedback, 4) Referrals - Ask for introductions to similar prospects, 5) Optimize Operations - Use this experience to refine your onboarding and delivery processes. Don't immediately focus on scaling - get 5-10 more customers using similar approaches first. Each early customer is a learning opportunity to refine your product-market fit.",
+    "category": "mentorship_needed",
+    "text": "### Instruction: I got my first paying customer! What should I do next to build on this success?\n### Response: Congratulations! This is a huge milestone. Now focus on: 1) Customer Success - Ensure your first customer gets maximum value and becomes a reference, 2) Case Study - Document their problem, solution, and results for marketing, 3) Feedback Loop - Schedule regular check-ins to gather product feedback, 4) Referrals - Ask for introductions to similar prospects, 5) Optimize Operations - Use this experience to refine your onboarding and delivery processes. Don't immediately focus on scaling - get 5-10 more customers using similar approaches first. Each early customer is a learning opportunity to refine your product-market fit."
+  },
+  {
+    "instruction": "We've hit $100K MRR and want to expand our team. What roles should we hire first?",
+    "input": "",
+    "output": "At $100K MRR, you're entering a critical growth phase. Prioritize hiring based on your biggest constraints: 1) If sales is the bottleneck, hire a sales manager or BDRs, 2) If product development is slow, add senior engineers, 3) If customer success is suffering, hire a customer success manager, 4) If operations are chaotic, consider an operations manager. Generally, the sequence is: senior engineer \u2192 sales hire \u2192 customer success \u2192 marketing. Ensure each hire can pay for themselves within 6 months through increased revenue or efficiency. Focus on experienced hires who can work independently and eventually manage others.",
+    "category": "investment_ready",
+    "text": "### Instruction: We've hit $100K MRR and want to expand our team. What roles should we hire first?\n### Response: At $100K MRR, you're entering a critical growth phase. Prioritize hiring based on your biggest constraints: 1) If sales is the bottleneck, hire a sales manager or BDRs, 2) If product development is slow, add senior engineers, 3) If customer success is suffering, hire a customer success manager, 4) If operations are chaotic, consider an operations manager. Generally, the sequence is: senior engineer \u2192 sales hire \u2192 customer success \u2192 marketing. Ensure each hire can pay for themselves within 6 months through increased revenue or efficiency. Focus on experienced hires who can work independently and eventually manage others."
+  },
+  {
+    "instruction": "My co-founder wants to quit 6 months into our startup. How should I handle this situation?",
+    "input": "",
+    "output": "This is a critical situation requiring careful handling: 1) Understand their reasons - is it personal, financial, or disagreement about direction?, 2) Review your founder agreements - what does your vesting schedule and equity documentation say?, 3) Consider alternatives - reduced role, advisory position, or leave of absence, 4) Protect the business - ensure IP assignments, non-compete clauses, and customer relationships are secure, 5) Plan transition - knowledge transfer, team communication, and operational continuity. If they're determined to leave, negotiate fairly on equity clawback and ensure a professional transition that maintains team morale and company reputation.",
+    "category": "needs_refinement",
+    "text": "### Instruction: My co-founder wants to quit 6 months into our startup. How should I handle this situation?\n### Response: This is a critical situation requiring careful handling: 1) Understand their reasons - is it personal, financial, or disagreement about direction?, 2) Review your founder agreements - what does your vesting schedule and equity documentation say?, 3) Consider alternatives - reduced role, advisory position, or leave of absence, 4) Protect the business - ensure IP assignments, non-compete clauses, and customer relationships are secure, 5) Plan transition - knowledge transfer, team communication, and operational continuity. If they're determined to leave, negotiate fairly on equity clawback and ensure a professional transition that maintains team morale and company reputation."
+  },
+  {
+    "instruction": "A big corporation wants to acquire us after just 12 months. Should we consider it?",
+    "input": "",
+    "output": "Early acquisition offers require careful evaluation: 1) Valuation assessment - is the offer fair compared to your potential?, 2) Strategic fit - will the acquisition help you achieve your vision faster?, 3) Team considerations - what happens to your employees and culture?, 4) Financial analysis - compare immediate payout vs. long-term potential, 5) Market timing - could you build more value independently?. If the offer is substantial and aligns with your goals, it might make sense. However, if you believe you're building something transformative and the offer doesn't reflect that potential, consider it validation and keep building. Get multiple perspectives from advisors and ensure any decision aligns with your personal and professional goals.",
+    "category": "investment_ready",
+    "text": "### Instruction: A big corporation wants to acquire us after just 12 months. Should we consider it?\n### Response: Early acquisition offers require careful evaluation: 1) Valuation assessment - is the offer fair compared to your potential?, 2) Strategic fit - will the acquisition help you achieve your vision faster?, 3) Team considerations - what happens to your employees and culture?, 4) Financial analysis - compare immediate payout vs. long-term potential, 5) Market timing - could you build more value independently?. If the offer is substantial and aligns with your goals, it might make sense. However, if you believe you're building something transformative and the offer doesn't reflect that potential, consider it validation and keep building. Get multiple perspectives from advisors and ensure any decision aligns with your personal and professional goals."
+  }
+]

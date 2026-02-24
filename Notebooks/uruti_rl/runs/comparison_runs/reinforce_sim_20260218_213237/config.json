@@ -1,0 +1,8 @@
+{
+  "learning_rate": 0.0005,
+  "gamma": 0.99,
+  "n_steps": 2048,
+  "batch_size": 64,
+  "ent_coef": 0.01,
+  "total_timesteps": 128
+}
