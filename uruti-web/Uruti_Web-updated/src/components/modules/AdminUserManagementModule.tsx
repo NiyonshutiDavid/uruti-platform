@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -21,11 +21,15 @@ import { apiClient } from '../../lib/api-client';
 import { useAuth } from '../../lib/auth-context';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 type AdminUserRole = 'founder' | 'investor' | 'admin';
 
 export function AdminUserManagementModule() {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const addUserSectionRef = useRef<HTMLDivElement | null>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,6 +53,18 @@ export function AdminUserManagementModule() {
     is_active: true,
     password: '',
   });
+
+  const currentParams = new URLSearchParams(location.search);
+  const cameFromDashboard = currentParams.get('from') === 'admin-dashboard';
+  const returnTabParam = currentParams.get('tab');
+  const returnTab =
+    returnTabParam === 'overview' ||
+    returnTabParam === 'users' ||
+    returnTabParam === 'ventures' ||
+    returnTabParam === 'support'
+      ? returnTabParam
+      : 'users';
+  const returnSearch = currentParams.get('search') ?? '';
 
   const loadUsers = async (page: number = currentPage) => {
     setLoading(true);
@@ -167,6 +183,54 @@ export function AdminUserManagementModule() {
     setIsEditOpen(true);
   };
 
+  useEffect(() => {
+    if (location.hash !== '#add-user') return;
+    const timeout = window.setTimeout(() => {
+      addUserSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [location.hash]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const rawEditUserId = params.get('editUserId');
+    if (!rawEditUserId) return;
+
+    const editUserId = Number(rawEditUserId);
+    if (!Number.isFinite(editUserId)) {
+      params.delete('editUserId');
+      navigate({ search: params.toString() ? `?${params.toString()}` : '', hash: location.hash }, { replace: true });
+      return;
+    }
+
+    let cancelled = false;
+
+    const openRequestedUser = async () => {
+      try {
+        const existingUser = users.find((candidate) => Number(candidate.id) === editUserId);
+        const targetUser = existingUser ?? (await apiClient.getUserById(editUserId));
+        if (!cancelled && targetUser) {
+          openEditUser(targetUser);
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          toast.error(error?.message || 'Failed to open selected user');
+        }
+      } finally {
+        if (!cancelled) {
+          params.delete('editUserId');
+          navigate({ search: params.toString() ? `?${params.toString()}` : '', hash: location.hash }, { replace: true });
+        }
+      }
+    };
+
+    openRequestedUser();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location.hash, location.search, navigate, users]);
+
   const handleUpdateUser = async () => {
     if (!editingUser) return;
 
@@ -189,13 +253,31 @@ export function AdminUserManagementModule() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-          User Management
-        </h1>
-        <p className="text-muted-foreground mt-1" style={{ fontFamily: 'var(--font-body)' }}>
-          Add, search, and delete platform users
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+            User Management
+          </h1>
+          <p className="text-muted-foreground mt-1" style={{ fontFamily: 'var(--font-body)' }}>
+            Add, search, and delete platform users
+          </p>
+        </div>
+        {cameFromDashboard && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              const params = new URLSearchParams();
+              params.set('tab', returnTab);
+              if (returnSearch.trim()) {
+                params.set('search', returnSearch);
+              }
+              navigate(`/dashboard/admin-dashboard?${params.toString()}`);
+            }}
+            className="shrink-0"
+          >
+            Back to Dashboard
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -225,7 +307,8 @@ export function AdminUserManagementModule() {
         </Card>
       </div>
 
-      <Card className="glass-card border-black/10 dark:border-white/10">
+      <div id="add-user" ref={addUserSectionRef}>
+        <Card className="glass-card border-black/10 dark:border-white/10">
         <CardHeader>
           <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>Add New User</CardTitle>
           <CardDescription style={{ fontFamily: 'var(--font-body)' }}>Create a new account directly as admin</CardDescription>
@@ -234,15 +317,32 @@ export function AdminUserManagementModule() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <Label>Full Name</Label>
-              <Input value={newUser.full_name} onChange={(e) => setNewUser((p) => ({ ...p, full_name: e.target.value }))} />
+              <Input
+                name="new_user_full_name"
+                autoComplete="off"
+                value={newUser.full_name}
+                onChange={(e) => setNewUser((p) => ({ ...p, full_name: e.target.value }))}
+              />
             </div>
             <div>
               <Label>Email</Label>
-              <Input type="email" value={newUser.email} onChange={(e) => setNewUser((p) => ({ ...p, email: e.target.value }))} />
+              <Input
+                type="email"
+                name="new_user_email"
+                autoComplete="off"
+                value={newUser.email}
+                onChange={(e) => setNewUser((p) => ({ ...p, email: e.target.value }))}
+              />
             </div>
             <div>
               <Label>Password</Label>
-              <Input type="password" value={newUser.password} onChange={(e) => setNewUser((p) => ({ ...p, password: e.target.value }))} />
+              <Input
+                type="password"
+                name="new_user_password"
+                autoComplete="new-password"
+                value={newUser.password}
+                onChange={(e) => setNewUser((p) => ({ ...p, password: e.target.value }))}
+              />
             </div>
             <div>
               <Label>Role</Label>
@@ -263,7 +363,8 @@ export function AdminUserManagementModule() {
             {isCreating ? 'Creating...' : 'Add User'}
           </Button>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
 
       <Card className="glass-card border-black/10 dark:border-white/10">
         <CardHeader>
@@ -386,7 +487,13 @@ export function AdminUserManagementModule() {
             </div>
             <div>
               <Label>Email</Label>
-              <Input type="email" value={editForm.email} onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))} />
+              <Input
+                type="email"
+                name="edit_user_email"
+                autoComplete="off"
+                value={editForm.email}
+                onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
+              />
             </div>
             <div>
               <Label>Role</Label>
@@ -415,7 +522,14 @@ export function AdminUserManagementModule() {
             </div>
             <div>
               <Label>Reset Password (Optional)</Label>
-              <Input type="password" value={editForm.password} onChange={(e) => setEditForm((p) => ({ ...p, password: e.target.value }))} placeholder="Leave empty to keep current password" />
+              <Input
+                type="password"
+                name="edit_user_password"
+                autoComplete="new-password"
+                value={editForm.password}
+                onChange={(e) => setEditForm((p) => ({ ...p, password: e.target.value }))}
+                placeholder="Leave empty to keep current password"
+              />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>

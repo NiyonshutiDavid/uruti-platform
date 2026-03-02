@@ -118,6 +118,9 @@ export function AvailabilityModule() {
   };
 
   const handleDeleteSlot = async (id: number) => {
+    const confirmed = window.confirm('Delete this availability slot?');
+    if (!confirmed) return;
+
     try {
       await apiClient.deleteAvailability(id);
       setTimeSlots(timeSlots.filter(slot => slot.id !== id));

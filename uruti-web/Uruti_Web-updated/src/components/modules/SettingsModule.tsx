@@ -6,7 +6,7 @@ import { Label } from '../ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Switch } from '../ui/switch';
 import { useTheme } from '../../lib/theme-context';
-import { Bell, Lock, Palette, Save, Eye, EyeOff, Shield, TrendingUp, Briefcase, Building2, HelpCircle, BookOpen, Mail, Phone, RotateCcw } from 'lucide-react';
+import { Bell, Lock, Palette, Save, Eye, EyeOff, Shield, TrendingUp, Briefcase, Building2, HelpCircle, BookOpen, Mail, Phone, RotateCcw, Users, MessageCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
 import { useAuth } from '../../lib/auth-context';

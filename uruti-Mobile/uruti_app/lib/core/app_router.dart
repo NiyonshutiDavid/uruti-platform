@@ -25,6 +25,7 @@ import '../screens/connections/connections_screen.dart';
 import '../screens/discovery/startup_discovery_screen.dart';
 import '../screens/discovery/startup_leaderboard_screen.dart';
 import '../screens/settings/settings_screen.dart';
+import '../screens/settings/linked_device_screen.dart';
 import '../screens/notifications/notifications_screen.dart';
 import '../screens/advisory/advisory_tracks_screen.dart';
 import '../screens/founder/founder_snapshot_screen.dart';
@@ -255,6 +256,10 @@ GoRouter createRouter(AuthProvider authProvider) {
           GoRoute(
             path: '/settings',
             builder: (_, __) => const SettingsScreen(),
+          ),
+          GoRoute(
+            path: '/settings/linked-device',
+            builder: (_, __) => const LinkedDeviceScreen(),
           ),
           GoRoute(
             path: '/notifications',

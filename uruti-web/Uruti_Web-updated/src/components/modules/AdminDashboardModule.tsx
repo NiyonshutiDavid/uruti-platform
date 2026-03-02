@@ -14,9 +14,22 @@ import {
 import { toast } from 'sonner';
 import { apiClient } from '../../lib/api-client';
 import { useAuth } from '../../lib/auth-context';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export function AdminDashboardModule() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const initialParams = new URLSearchParams(location.search);
+  const initialTabParam = initialParams.get('tab');
+  const initialTab =
+    initialTabParam === 'overview' ||
+    initialTabParam === 'users' ||
+    initialTabParam === 'ventures' ||
+    initialTabParam === 'support'
+      ? initialTabParam
+      : 'overview';
+  const initialSearch = initialParams.get('search') ?? '';
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -30,12 +43,49 @@ export function AdminDashboardModule() {
   const [users, setUsers] = useState<any[]>([]);
   const [ventures, setVentures] = useState<any[]>([]);
   const [supportMessages, setSupportMessages] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('overview');
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    params.set('tab', activeTab);
+    if (searchTerm.trim()) {
+      params.set('search', searchTerm.trim());
+    } else {
+      params.delete('search');
+    }
+
+    const nextSearch = params.toString();
+    const currentSearch = location.search.startsWith('?') ? location.search.slice(1) : location.search;
+    if (nextSearch !== currentSearch) {
+      navigate(
+        {
+          pathname: location.pathname,
+          search: nextSearch ? `?${nextSearch}` : '',
+        },
+        { replace: true }
+      );
+    }
+  }, [activeTab, searchTerm, location.pathname, location.search, navigate]);
+
+  const buildUserManagementPath = (extra?: Record<string, string>) => {
+    const params = new URLSearchParams();
+    params.set('from', 'admin-dashboard');
+    params.set('tab', activeTab);
+    if (searchTerm.trim()) {
+      params.set('search', searchTerm.trim());
+    }
+    if (extra) {
+      Object.entries(extra).forEach(([key, value]) => {
+        params.set(key, value);
+      });
+    }
+    return `/dashboard/user-management?${params.toString()}`;
+  };
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -312,7 +362,7 @@ export function AdminDashboardModule() {
                     Manage all platform users
                   </CardDescription>
                 </div>
-                <Button onClick={() => toast.info('Add user feature coming soon')}>
+                <Button onClick={() => navigate(`${buildUserManagementPath()}#add-user`)}>
                   <UserPlus className="h-4 w-4 mr-2" />
                   Add User
                 </Button>
@@ -357,7 +407,11 @@ export function AdminDashboardModule() {
                           <Badge variant="outline" className="bg-[#76B947]/20 text-[#76B947]">
                             {user.role}
                           </Badge>
-                          <Button variant="ghost" size="sm">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(buildUserManagementPath({ editUserId: String(user.id) }))}
+                          >
                             Manage
                           </Button>
                         </div>

@@ -192,7 +192,33 @@ class _DocList extends StatelessWidget {
                   color: context.colors.textSecondary,
                   size: 18,
                 ),
-                onSelected: (_) {},
+                onSelected: (value) async {
+                  if (value != 'delete') return;
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Delete Document?'),
+                      content: Text('Delete "${d['name']}"?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Delete action coming soon'),
+                      ),
+                    );
+                  }
+                },
                 itemBuilder: (_) => [
                   const PopupMenuItem(value: 'view', child: Text('View')),
                   const PopupMenuItem(value: 'share', child: Text('Share')),

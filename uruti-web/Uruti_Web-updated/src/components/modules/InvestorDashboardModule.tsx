@@ -63,6 +63,9 @@ export function InvestorDashboardModule() {
       const isBookmarked = bookmarkedVentures.some(v => v.id === ventureId);
       
       if (isBookmarked) {
+        const confirmed = window.confirm('Remove this startup from your bookmarks?');
+        if (!confirmed) return;
+
         await apiClient.removeBookmark(ventureId);
         setBookmarkedVentures(prev => prev.filter(v => v.id !== ventureId));
         toast.success('Removed from bookmarks');

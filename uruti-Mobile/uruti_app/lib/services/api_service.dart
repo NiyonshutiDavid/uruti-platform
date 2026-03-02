@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/app_constants.dart';
 import '../models/models.dart';
@@ -43,6 +45,16 @@ class ApiService {
       return null;
     }
     return value;
+  }
+
+  MediaType _imageMediaTypeFromPath(String filePath) {
+    final ext = filePath.toLowerCase();
+    if (ext.endsWith('.png')) return MediaType('image', 'png');
+    if (ext.endsWith('.gif')) return MediaType('image', 'gif');
+    if (ext.endsWith('.webp')) return MediaType('image', 'webp');
+    if (ext.endsWith('.heic')) return MediaType('image', 'heic');
+    if (ext.endsWith('.heif')) return MediaType('image', 'heif');
+    return MediaType('image', 'jpeg');
   }
 
   Future<Map<String, dynamic>> _handleResponse(http.Response response) async {
@@ -208,13 +220,45 @@ class ApiService {
       Uri.parse('${AppConstants.apiV1}/profile/avatar'),
     );
     if (token != null) request.headers['Authorization'] = 'Bearer $token';
-    request.files.add(await http.MultipartFile.fromPath('file', filePath));
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'file',
+        filePath,
+        contentType: _imageMediaTypeFromPath(filePath),
+        filename: File(filePath).uri.pathSegments.last,
+      ),
+    );
     final streamed = await request.send();
     final body = await streamed.stream.bytesToString();
     if (streamed.statusCode != 200 && streamed.statusCode != 201) {
       throw Exception('Upload failed (${streamed.statusCode}): $body');
     }
     // Returns {avatar_url: ...} — refresh current user
+    return getCurrentUser();
+  }
+
+  /// Upload profile cover image, returns updated UserModel.
+  Future<UserModel> uploadCoverImage(String filePath) async {
+    final token = await this.token;
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${AppConstants.apiV1}/profile/cover'),
+    );
+    if (token != null) request.headers['Authorization'] = 'Bearer $token';
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'file',
+        filePath,
+        contentType: _imageMediaTypeFromPath(filePath),
+        filename: File(filePath).uri.pathSegments.last,
+      ),
+    );
+
+    final streamed = await request.send();
+    final body = await streamed.stream.bytesToString();
+    if (streamed.statusCode != 200 && streamed.statusCode != 201) {
+      throw Exception('Cover upload failed (${streamed.statusCode}): $body');
+    }
     return getCurrentUser();
   }
 
@@ -962,6 +1006,18 @@ class ApiService {
       );
     } catch (_) {}
     _token = null;
+  }
+
+  Future<Map<String, dynamic>> approveQrLogin({
+    required String requestId,
+    required String code,
+  }) async {
+    final res = await http.post(
+      Uri.parse('${AppConstants.apiV1}/auth/qr/approve'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({'request_id': requestId, 'code': code}),
+    );
+    return _handleResponse(res);
   }
 }
 

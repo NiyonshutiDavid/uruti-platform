@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 interface Startup {
   id: string;
   name: string;
+  logoUrl?: string;
   sector: string;
   problemStatement: string;
   solutionHypothesis: string;
@@ -60,6 +61,7 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
   const mapVentureToStartup = (venture: any): Startup => ({
     id: String(venture.id),
     name: venture.name,
+    logoUrl: venture.logo_url || '',
     sector: venture.industry || 'other',
     problemStatement: venture.problem_statement || '',
     solutionHypothesis: venture.solution || '',
@@ -264,6 +266,7 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
             const venturePayload = {
               name: ventureData.name,
               tagline: ventureData.tagline,
+              logo_url: ventureData.logoUrl || undefined,
               industry: mapIndustryToEnum(ventureData.sector),
               problem_statement: ventureData.problem,
               solution: ventureData.solution,
@@ -272,7 +275,11 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
               stage: 'ideation', // Default to ideation stage
             };
 
-            const newVenture = await apiClient.createVenture(venturePayload);
+            let newVenture = await apiClient.createVenture(venturePayload);
+
+            if (ventureData.logoFile instanceof File) {
+              newVenture = await apiClient.uploadVentureLogo(Number(newVenture.id), ventureData.logoFile);
+            }
 
             setStartups((prev) => [mapVentureToStartup(newVenture), ...prev]);
             setIsAddDialogOpen(false);
@@ -518,7 +525,16 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="hover:bg-destructive/10 text-destructive">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="hover:bg-destructive/10 text-destructive"
+                          onClick={() => {
+                            const confirmed = window.confirm(`Delete "${startup.name}"?`);
+                            if (!confirmed) return;
+                            toast.info('Delete from this list is not wired yet.');
+                          }}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>

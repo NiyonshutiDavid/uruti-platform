@@ -30,12 +30,15 @@ interface EnhancedCaptureIdeaDialogProps {
 export function EnhancedCaptureIdeaDialog({ open, onOpenChange, onSave }: EnhancedCaptureIdeaDialogProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string>('');
 
   const [formData, setFormData] = useState({
     // Step 1: Basic Information
     name: '',
     tagline: '',
     sector: '',
+    logoUrl: '',
     
     // Step 2: Problem & Solution
     problem: '',
@@ -101,6 +104,7 @@ export function EnhancedCaptureIdeaDialog({ open, onOpenChange, onSave }: Enhanc
 
     const ventureData = {
       ...formData,
+      logoFile,
       highlights: cleanedHighlights,
       milestones: cleanedMilestones,
       createdAt: new Date().toISOString()
@@ -112,10 +116,13 @@ export function EnhancedCaptureIdeaDialog({ open, onOpenChange, onSave }: Enhanc
     
     // Reset form
     setCurrentStep(1);
+    setLogoFile(null);
+    setLogoPreview('');
     setFormData({
       name: '',
       tagline: '',
       sector: '',
+      logoUrl: '',
       problem: '',
       solution: '',
       competitiveEdge: '',
@@ -145,6 +152,24 @@ export function EnhancedCaptureIdeaDialog({ open, onOpenChange, onSave }: Enhanc
     const newMilestones = [...formData.milestones];
     newMilestones[index] = { ...newMilestones[index], [field]: value };
     setFormData({ ...formData, milestones: newMilestones });
+  };
+
+  const handleLogoFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Logo file must be less than 5MB');
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select a valid image file');
+      return;
+    }
+
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
   };
 
   const progressPercentage = (currentStep / totalSteps) * 100;
@@ -237,6 +262,39 @@ export function EnhancedCaptureIdeaDialog({ open, onOpenChange, onSave }: Enhanc
                   placeholder="e.g., 5 members"
                   className="mt-1"
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="logoUrl">Startup Logo URL (Landscape)</Label>
+                <Input
+                  id="logoUrl"
+                  value={formData.logoUrl}
+                  onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
+                  placeholder="https://example.com/logo-landscape.png"
+                  className="mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Use a landscape logo (recommended ratio: 3:1) to stand out in Startup Discovery.
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="logoFile">Upload Startup Logo</Label>
+                <Input
+                  id="logoFile"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoFileChange}
+                  className="mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Prefer a landscape logo for better card presentation.
+                </p>
+                {logoPreview && (
+                  <div className="mt-3 p-3 rounded-md border border-black/10 dark:border-white/10 bg-white/60 dark:bg-black/20">
+                    <img src={logoPreview} alt="Logo preview" className="max-h-20 max-w-full object-contain" />
+                  </div>
+                )}
               </div>
             </div>
           )}

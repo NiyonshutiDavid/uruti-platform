@@ -15,7 +15,6 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _notifications = true;
   bool _emailAlerts = true;
-  bool _biometric = false;
 
   @override
   Widget build(BuildContext context) {
@@ -50,11 +49,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: 'Change Password',
             onTap: () => _showChangePassword(context, auth),
           ),
-          _SettingsTile(
-            icon: Icons.verified_user_outlined,
-            title: 'Verify Account',
-            onTap: () => context.push('/profile'),
-          ),
           const Divider(height: 24),
           _SectionHeader('Notifications'),
           _SwitchTile(
@@ -71,11 +65,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const Divider(height: 24),
           _SectionHeader('Security'),
-          _SwitchTile(
-            icon: Icons.fingerprint,
-            title: 'Biometric Login',
-            value: _biometric,
-            onChanged: (v) => setState(() => _biometric = v),
+          _SettingsTile(
+            icon: Icons.qr_code_scanner_rounded,
+            title: 'Linked Device Login',
+            onTap: () => context.push('/settings/linked-device'),
           ),
           const Divider(height: 24),
           _SectionHeader('Support'),

@@ -122,7 +122,7 @@ class HelpSupportScreen extends StatelessWidget {
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: () async {
-                final uri = Uri.parse('https://uruti.rw/help');
+                final uri = Uri.parse('https://uruti.rw/help-center');
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 }

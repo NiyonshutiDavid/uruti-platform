@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
@@ -7,6 +7,7 @@ import { Label } from '../ui/label';
 import { UrutiLogo } from '../UrutiLogo';
 import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../lib/auth-context';
+import apiClient from '../../lib/api-client';
 
 interface LoginPageProps {
   onNavigate: (page: string) => void;
@@ -15,7 +16,7 @@ interface LoginPageProps {
 
 export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, loginWithToken } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -23,6 +24,23 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState('');
+  const [qrData, setQrData] = useState<{
+    request_id: string;
+    code: string;
+    expires_at: string;
+    qr_payload: string;
+  } | null>(null);
+  const pollRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) {
+        window.clearInterval(pollRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +49,7 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
     
     try {
       console.log('🔐 Login attempt:', { email: formData.email, passwordLength: formData.password.length });
-      console.log('🌐 API URL:', import.meta.env.VITE_API_URL || 'http://localhost:8000');
+      console.log('🌐 Starting login request');
       
       // Login will automatically detect user role and redirect
       await login(formData.email, formData.password);
@@ -53,6 +71,60 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const stopPolling = () => {
+    if (pollRef.current) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  };
+
+  const startQrPolling = (requestId: string, code: string, expiresAt: string) => {
+    stopPolling();
+    pollRef.current = window.setInterval(async () => {
+      try {
+        if (new Date(expiresAt).getTime() <= Date.now()) {
+          stopPolling();
+          setQrError('QR login request expired. Generate a new code.');
+          return;
+        }
+
+        const status = await apiClient.getQrLoginStatus(requestId, code);
+        if (status.status === 'approved' && status.access_token) {
+          stopPolling();
+          await loginWithToken(status.access_token);
+          navigate('/dashboard');
+          return;
+        }
+
+        if (status.status === 'failed' || status.status === 'expired') {
+          stopPolling();
+          setQrError(status.detail || 'QR login failed. Please generate a new code.');
+        }
+      } catch {
+        // keep polling unless request has expired locally
+      }
+    }, 2000);
+  };
+
+  const handleGenerateQr = async () => {
+    setQrLoading(true);
+    setQrError('');
+    try {
+      const response = await apiClient.requestQrLogin();
+      setQrData({
+        request_id: response.request_id,
+        code: response.code,
+        expires_at: response.expires_at,
+        qr_payload: response.qr_payload,
+      });
+      startQrPolling(response.request_id, response.code, response.expires_at);
+    } catch (err) {
+      setQrError(err instanceof Error ? err.message : 'Could not generate QR code.');
+    } finally {
+      setQrLoading(false);
+    }
   };
 
   return (
@@ -240,6 +312,41 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
               >
                 Create Account
               </Button>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-black/5 dark:border-white/10">
+              <p className="text-sm text-muted-foreground mb-3" style={{ fontFamily: 'var(--font-body)' }}>
+                Login with linked device
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleGenerateQr}
+                disabled={qrLoading}
+                className="w-full border-[#76B947] text-[#76B947] hover:bg-[#76B947]/10"
+                style={{ fontFamily: 'var(--font-body)' }}
+              >
+                {qrLoading ? 'Generating QR...' : 'Generate Login QR'}
+              </Button>
+
+              {qrError && (
+                <p className="mt-3 text-sm text-red-600 dark:text-red-400" style={{ fontFamily: 'var(--font-body)' }}>
+                  {qrError}
+                </p>
+              )}
+
+              {qrData && (
+                <div className="mt-4 flex flex-col items-center">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrData.qr_payload)}`}
+                    alt="Login QR"
+                    className="rounded-lg border border-black/10 dark:border-white/10"
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                    Open your uruti mobile app → Settings → Linked Device, then scan this QR.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="mt-8 pt-6 border-t border-black/5 dark:border-white/10">

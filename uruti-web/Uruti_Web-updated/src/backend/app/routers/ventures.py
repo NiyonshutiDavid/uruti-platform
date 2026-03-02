@@ -22,6 +22,15 @@ ALLOWED_VIDEO_TYPES = {
     "video/quicktime",
 }
 
+ALLOWED_IMAGE_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+}
+
 
 @router.post("/", response_model=VentureResponse, status_code=status.HTTP_201_CREATED)
 async def create_venture(
@@ -31,8 +40,12 @@ async def create_venture(
 ):
     """Create a new venture"""
     
+    # Auto-publish ventures so they're visible to investors immediately
+    venture_dict = venture_data.model_dump()
+    venture_dict['is_published'] = True
+    
     db_venture = Venture(
-        **venture_data.model_dump(),
+        **venture_dict,
         founder_id=current_user.id
     )
     
@@ -213,6 +226,42 @@ def get_leaderboard(
     ).order_by(desc(Venture.uruti_score)).limit(limit).all()
     
     return ventures
+
+
+@router.post("/{venture_id}/logo", response_model=VentureResponse)
+async def upload_venture_logo(
+    venture_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Upload or replace venture logo image."""
+    venture = db.query(Venture).filter(Venture.id == venture_id).first()
+    if not venture:
+        raise HTTPException(status_code=404, detail="Venture not found")
+
+    if venture.founder_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this venture")
+
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid image format")
+
+    extension = Path(file.filename or "logo.png").suffix or ".png"
+    filename = f"venture_logo_{venture_id}_{uuid.uuid4().hex}{extension}"
+    file_path = UPLOAD_DIR / filename
+
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        venture.logo_url = f"/api/v1/profile/uploads/{filename}"
+        db.commit()
+        db.refresh(venture)
+        return venture
+    except Exception as exc:
+        if file_path.exists():
+            file_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail=f"Failed to upload venture logo: {exc}")
 
 
 @router.post("/{venture_id}/pitch-video")

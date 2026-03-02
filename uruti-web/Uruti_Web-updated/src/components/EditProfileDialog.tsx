@@ -98,8 +98,8 @@ export function EditProfileDialog({ open, onOpenChange, profile, onSave, userTyp
       }
 
       // Validate file type
-      if (!file.type.match(/image\/(jpeg|jpg|png|gif)/)) {
-        toast.error('Only JPG, PNG, and GIF images are allowed');
+      if (!file.type.match(/image\/(jpeg|jpg|png|gif|webp|heic|heif)/)) {
+        toast.error('Only JPG, PNG, GIF, WEBP, HEIC, and HEIF images are allowed');
         return;
       }
 
@@ -125,8 +125,8 @@ export function EditProfileDialog({ open, onOpenChange, profile, onSave, userTyp
       }
 
       // Validate file type
-      if (!file.type.match(/image\/(jpeg|jpg|png|gif)/)) {
-        toast.error('Only JPG, PNG, and GIF images are allowed');
+      if (!file.type.match(/image\/(jpeg|jpg|png|gif|webp|heic|heif)/)) {
+        toast.error('Only JPG, PNG, GIF, WEBP, HEIC, and HEIF images are allowed');
         return;
       }
 
@@ -143,12 +143,12 @@ export function EditProfileDialog({ open, onOpenChange, profile, onSave, userTyp
   };
 
   const handleRemoveProfileImage = () => {
-    setProfileImage(null);
+    setProfileImage('');
     toast.success('Profile photo removed');
   };
 
   const handleRemoveCoverImage = () => {
-    setCoverImage(null);
+    setCoverImage('');
     toast.success('Cover photo removed');
   };
 
@@ -213,10 +213,10 @@ export function EditProfileDialog({ open, onOpenChange, profile, onSave, userTyp
                 type="file"
                 ref={profileImageInputRef}
                 className="hidden"
-                accept="image/jpeg, image/png, image/gif"
+                accept="image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif"
                 onChange={handleProfileImageChange}
               />
-              {profileImage && (
+              {(profileImage ?? profile?.avatar) && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -247,10 +247,10 @@ export function EditProfileDialog({ open, onOpenChange, profile, onSave, userTyp
                 type="file"
                 ref={coverImageInputRef}
                 className="hidden"
-                accept="image/jpeg, image/png, image/gif"
+                accept="image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif"
                 onChange={handleCoverImageChange}
               />
-              {coverImage && (
+              {(coverImage ?? profile?.coverImage) && (
                 <Button
                   variant="outline"
                   size="sm"

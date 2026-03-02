@@ -349,6 +349,9 @@ export function DealFlowModule() {
                     <Button
                       onClick={async (e) => {
                         e.stopPropagation();
+                        const confirmed = window.confirm('Remove this startup from deal flow bookmarks?');
+                        if (!confirmed) return;
+
                         try {
                           await apiClient.removeBookmark(venture.id);
                           toast.success('Removed from bookmarks');

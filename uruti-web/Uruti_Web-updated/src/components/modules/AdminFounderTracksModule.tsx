@@ -128,6 +128,11 @@ export function AdminFounderTracksModule() {
   const handleRemoveTrack = async (track: Track) => {
     if (!selectedFounder) return;
 
+    const confirmed = window.confirm(
+      `Remove track "${track.title}" from ${selectedFounder.full_name}?`
+    );
+    if (!confirmed) return;
+
     setIsRemoving(true);
     try {
       await apiClient.removeTrackFromFounder(selectedFounder.id, track.id);

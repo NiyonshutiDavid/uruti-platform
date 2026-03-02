@@ -236,11 +236,13 @@ def unregister_device_token(
     return {"status": "removed"}
 
 
+@router.get("", response_model=List[NotificationResponse], include_in_schema=False)
+@router.get("/", response_model=List[NotificationResponse])
 def get_notifications(
-    skip: int = 0,
-    limit: int = 100,
-    is_read: bool = None,
-    notification_type: str = None,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=200),
+    is_read: Optional[bool] = Query(default=None),
+    notification_type: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):

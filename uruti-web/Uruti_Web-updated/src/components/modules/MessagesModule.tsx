@@ -305,6 +305,9 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
   };
 
   const handleDeleteChat = (conversationId: string) => {
+    const confirmed = window.confirm('Delete this chat conversation?');
+    if (!confirmed) return;
+
     setConversations(prev => prev.filter(conv => conv.id !== conversationId));
     if (selectedConversation?.id === conversationId) {
       setSelectedConversation(null);

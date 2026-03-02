@@ -42,7 +42,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   bool _saving = false;
   bool _uploadingPhoto = false;
+  bool _uploadingCover = false;
   File? _localAvatar;
+  File? _localCover;
 
   static const _stages = ['idea', 'pre-seed', 'seed', 'series-a', 'growth'];
 
@@ -104,6 +106,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       raw.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
 
   Future<void> _pickAndUploadPhoto() async {
+    final auth = context.read<AuthProvider>();
     final picker = ImagePicker();
     final picked = await picker.pickImage(
       source: ImageSource.gallery,
@@ -118,7 +121,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       final updated = await ApiService.instance.uploadAvatar(picked.path);
       if (!mounted) return;
-      context.read<AuthProvider>().updateUserLocally(updated);
+      await auth.updateUserLocally(updated);
+      if (!mounted) return;
+      await auth.refreshUser();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -127,6 +132,84 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
     } finally {
       if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
+
+  Future<void> _pickAndUploadCover() async {
+    final auth = context.read<AuthProvider>();
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      maxWidth: 1600,
+    );
+    if (picked == null) return;
+
+    setState(() {
+      _localCover = File(picked.path);
+      _uploadingCover = true;
+    });
+
+    try {
+      final updated = await ApiService.instance.uploadCoverImage(picked.path);
+      if (!mounted) return;
+      await auth.updateUserLocally(updated);
+      if (!mounted) return;
+      await auth.refreshUser();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Cover upload failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingCover = false);
+    }
+  }
+
+  Future<void> _removeProfilePhoto() async {
+    final auth = context.read<AuthProvider>();
+    setState(() => _uploadingPhoto = true);
+    try {
+      final updated = await ApiService.instance.updateProfile({
+        'avatar_url': null,
+      });
+      if (!mounted) return;
+      setState(() => _localAvatar = null);
+      await auth.updateUserLocally(updated);
+      if (!mounted) return;
+      await auth.refreshUser();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to remove photo: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
+
+  Future<void> _removeCoverPhoto() async {
+    final auth = context.read<AuthProvider>();
+    setState(() => _uploadingCover = true);
+    try {
+      final updated = await ApiService.instance.updateProfile({
+        'cover_image_url': null,
+      });
+      if (!mounted) return;
+      setState(() => _localCover = null);
+      await auth.updateUserLocally(updated);
+      if (!mounted) return;
+      await auth.refreshUser();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to remove cover: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingCover = false);
     }
   }
 
@@ -162,7 +245,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       final updated = await ApiService.instance.updateProfile(payload);
       if (!mounted) return;
-      auth.updateUserLocally(updated);
+      await auth.updateUserLocally(updated);
+      if (!mounted) return;
+      await auth.refreshUser();
+      if (!mounted) return;
       context.canPop() ? context.pop() : context.go('/profile');
     } catch (e) {
       if (mounted) {
@@ -180,6 +266,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final user = context.watch<AuthProvider>().user;
     final role = user?.role ?? '';
     final avatarUrl = user?.resolvedAvatarUrl;
+    final coverUrl = user?.resolvedCoverImageUrl;
 
     return Scaffold(
       backgroundColor: context.colors.background,
@@ -281,10 +368,114 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     ),
                   ),
+                  if (_localAvatar != null || avatarUrl != null)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: _uploadingPhoto ? null : _removeProfilePhoto,
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: context.colors.background,
+                              width: 2,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
             const SizedBox(height: 28),
+
+            // ── Cover photo ────────────────────────────────────────────
+            _sectionLabel('Cover Photo'),
+            Container(
+              height: 140,
+              decoration: BoxDecoration(
+                color: context.colors.card,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: context.colors.divider),
+                image: (_localCover != null || coverUrl != null)
+                    ? DecorationImage(
+                        image: _localCover != null
+                            ? FileImage(_localCover!) as ImageProvider
+                            : NetworkImage(coverUrl!),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+                gradient: (_localCover == null && coverUrl == null)
+                    ? LinearGradient(
+                        colors: [const Color(0xFF1A3A0A), context.colors.card],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
+              ),
+              child: Stack(
+                children: [
+                  Positioned(
+                    right: 10,
+                    bottom: 10,
+                    child: ElevatedButton.icon(
+                      onPressed: _uploadingCover ? null : _pickAndUploadCover,
+                      icon: _uploadingCover
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.upload_rounded, size: 16),
+                      label: const Text('Upload'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                  if (_localCover != null || coverUrl != null)
+                    Positioned(
+                      right: 10,
+                      top: 10,
+                      child: GestureDetector(
+                        onTap: _uploadingCover ? null : _removeCoverPhoto,
+                        child: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
 
             // ── Basic info ─────────────────────────────────────────────
             _sectionLabel('Basic Info'),

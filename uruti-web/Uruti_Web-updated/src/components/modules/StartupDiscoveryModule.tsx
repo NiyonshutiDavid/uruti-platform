@@ -87,6 +87,9 @@ export function StartupDiscoveryModule() {
     e.stopPropagation(); // Prevent card click
     try {
       if (bookmarkedVentures.has(ventureId)) {
+        const confirmed = window.confirm('Remove this startup from your bookmarks?');
+        if (!confirmed) return;
+
         await apiClient.removeBookmark(ventureId);
         setBookmarkedVentures(prev => {
           const newSet = new Set(prev);
@@ -336,13 +339,15 @@ export function StartupDiscoveryModule() {
             >
               <CardContent className="p-0">
                 {/* Venture Image/Thumbnail */}
-                <div className="relative h-48 bg-gradient-to-br from-[#76B947]/20 to-black/5 overflow-hidden">
+                <div className="relative h-48 bg-gradient-to-br from-[#76B947]/20 to-black/5 dark:from-[#76B947]/10 dark:to-white/5 overflow-hidden">
                   {venture.logo_url ? (
-                    <img 
-                      src={venture.logo_url} 
-                      alt={venture.name}
-                      className="w-full h-full object-cover"
-                    />
+                    <div className="w-full h-full p-4 flex items-center justify-center bg-white/70 dark:bg-slate-900/70">
+                      <img 
+                        src={venture.logo_url} 
+                        alt={venture.name}
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Rocket className="h-16 w-16 text-[#76B947] opacity-50" />

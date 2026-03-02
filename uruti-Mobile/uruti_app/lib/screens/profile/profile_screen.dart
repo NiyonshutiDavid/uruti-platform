@@ -21,8 +21,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _refreshProfileData();
     _loadVentures();
     _loadStats();
+  }
+
+  Future<void> _refreshProfileData() async {
+    try {
+      await context.read<AuthProvider>().refreshUser();
+    } catch (_) {}
   }
 
   Future<void> _loadStats() async {
@@ -89,7 +96,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => context.go('/profile/edit'),
+                onPressed: () async {
+                  await context.push('/profile/edit');
+                  if (!mounted) return;
+                  await _refreshProfileData();
+                  await _loadVentures();
+                  await _loadStats();
+                },
                 child: Text(
                   'Edit',
                   style: TextStyle(
@@ -229,78 +242,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 20),
                 ],
 
-                // ── Ventures ──────────────────────────────────────────
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _section(context, 'My Ventures'),
-                    TextButton.icon(
-                      onPressed: _goAddVenture,
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                      ),
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text(
-                        'Add',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                if (_loadingVentures)
-                  const Center(
-                    child: SizedBox(
-                      height: 32,
-                      width: 32,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  )
-                else if (_ventures.isEmpty)
-                  GestureDetector(
-                    onTap: _goAddVenture,
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: context.colors.card,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.25),
-                          style: BorderStyle.solid,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.rocket_launch_rounded,
-                            color: context.colors.textSecondary,
-                            size: 20,
+                // ── Ventures (Founder only) ──────────────────────────
+                if (user.role == 'founder') ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _section(context, 'My Ventures'),
+                      TextButton.icon(
+                        onPressed: _goAddVenture,
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
                           ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Add your first venture',
-                            style: TextStyle(
+                        ),
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text(
+                          'Add',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (_loadingVentures)
+                    const Center(
+                      child: SizedBox(
+                        height: 32,
+                        width: 32,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    )
+                  else if (_ventures.isEmpty)
+                    GestureDetector(
+                      onTap: _goAddVenture,
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: context.colors.card,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.25),
+                            style: BorderStyle.solid,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.rocket_launch_rounded,
                               color: context.colors.textSecondary,
-                              fontSize: 14,
+                              size: 20,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 10),
+                            Text(
+                              'Add your first venture',
+                              style: TextStyle(
+                                color: context.colors.textSecondary,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  )
-                else
-                  ..._ventures.map((v) => _VentureCard(venture: v)),
+                    )
+                  else
+                    ..._ventures.map((v) => _VentureCard(venture: v)),
+                  const SizedBox(height: 20),
+                ],
                 const SizedBox(height: 20),
 
                 _section(context, 'Contact'),

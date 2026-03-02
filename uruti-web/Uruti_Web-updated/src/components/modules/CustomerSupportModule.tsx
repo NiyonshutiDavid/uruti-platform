@@ -129,20 +129,8 @@ export function CustomerSupportModule() {
   }, [filteredThreads, selectedThreadEmail]);
 
   useEffect(() => {
-    if (selectedThread) {
-      const pending = selectedThread.messages.find((m) => m.status === 'pending');
-      if (pending) {
-        setResponseText('');
-      } else {
-        const lastRespondedWithText = [...selectedThread.messages]
-          .reverse()
-          .find((m) => m.response);
-        setResponseText(lastRespondedWithText?.response || '');
-      }
-    } else {
-      setResponseText('');
-    }
-  }, [selectedThreadEmail, messages]);
+    setResponseText('');
+  }, [selectedThreadEmail]);
 
   const handleCloseThread = async () => {
     if (!selectedThread) return;

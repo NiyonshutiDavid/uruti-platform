@@ -135,6 +135,27 @@ class _DealFlowScreenState extends State<DealFlowScreen> {
     final bookmarkId = (venture['bookmark_id'] as num?)?.toInt();
     if (bookmarkId == null) return;
 
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove Bookmark?'),
+        content: const Text(
+          'Remove this startup from your deal flow bookmarks?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
     await ApiService.instance.deleteBookmark(bookmarkId);
     if (!mounted) return;
     setState(() {

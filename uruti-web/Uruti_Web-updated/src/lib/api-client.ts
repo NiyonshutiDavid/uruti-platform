@@ -65,6 +65,20 @@ class ApiClient {
     };
   }
 
+  private normalizeVentureMedia<T extends Record<string, any>>(payload: T): T {
+    if (!payload || typeof payload !== 'object') {
+      return payload;
+    }
+
+    return {
+      ...payload,
+      logo_url: this.toAbsoluteMediaUrl(payload.logo_url) || payload.logo_url,
+      banner_url: this.toAbsoluteMediaUrl(payload.banner_url) || payload.banner_url,
+      pitch_deck_url: this.toAbsoluteMediaUrl(payload.pitch_deck_url) || payload.pitch_deck_url,
+      demo_video_url: this.toAbsoluteMediaUrl(payload.demo_video_url) || payload.demo_video_url,
+    };
+  }
+
   private async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'An error occurred' }));
@@ -156,6 +170,31 @@ class ApiClient {
     }
   }
 
+  async requestQrLogin() {
+    return this.request<{
+      request_id: string;
+      code: string;
+      status: string;
+      expires_at: string;
+      qr_payload: string;
+    }>('/api/v1/auth/qr/request', {
+      method: 'POST',
+    });
+  }
+
+  async getQrLoginStatus(requestId: string, code: string) {
+    return this.request<{
+      request_id: string;
+      status: string;
+      expires_at?: string;
+      access_token?: string;
+      token_type?: string;
+      detail?: string;
+    }>(`/api/v1/auth/qr/status/${encodeURIComponent(requestId)}?code=${encodeURIComponent(code)}`, {
+      method: 'GET',
+    });
+  }
+
   async signup(data: {
     email: string;
     full_name: string;
@@ -194,9 +233,10 @@ class ApiClient {
   }
 
   async getUserById(userId: number) {
-    return this.request<any>(`/api/v1/users/${userId}`, {
+    const user = await this.request<any>(`/api/v1/users/${userId}`, {
       requiresAuth: true,
     });
+    return this.normalizeUserMedia(user);
   }
 
   async updateUser(userId: number, data: any) {
@@ -257,37 +297,42 @@ class ApiClient {
 
   // Venture endpoints
   async getVentures(skip: number = 0, limit: number = 100) {
-    return this.request<any[]>(`/api/v1/ventures/?skip=${skip}&limit=${limit}`, {
+    const ventures = await this.request<any[]>(`/api/v1/ventures/?skip=${skip}&limit=${limit}`, {
       requiresAuth: true,
     });
+    return (ventures || []).map((venture) => this.normalizeVentureMedia(venture));
   }
 
   async getVentureById(ventureId: number) {
-    return this.request<any>(`/api/v1/ventures/${ventureId}`, {
+    const venture = await this.request<any>(`/api/v1/ventures/${ventureId}`, {
       requiresAuth: true,
     });
+    return this.normalizeVentureMedia(venture);
   }
 
   async createVenture(data: any) {
-    return this.request<any>('/api/v1/ventures/', {
+    const venture = await this.request<any>('/api/v1/ventures/', {
       method: 'POST',
       requiresAuth: true,
       body: JSON.stringify(data),
     });
+    return this.normalizeVentureMedia(venture);
   }
 
   async getMyVentures(skip: number = 0, limit: number = 100) {
-    return this.request<any[]>(`/api/v1/ventures/my-ventures?skip=${skip}&limit=${limit}`, {
+    const ventures = await this.request<any[]>(`/api/v1/ventures/my-ventures?skip=${skip}&limit=${limit}`, {
       requiresAuth: true,
     });
+    return (ventures || []).map((venture) => this.normalizeVentureMedia(venture));
   }
 
   async updateVenture(ventureId: number, data: any) {
-    return this.request<any>(`/api/v1/ventures/${ventureId}`, {
+    const venture = await this.request<any>(`/api/v1/ventures/${ventureId}`, {
       method: 'PUT',
       requiresAuth: true,
       body: JSON.stringify(data),
     });
+    return this.normalizeVentureMedia(venture);
   }
 
   async deleteVenture(ventureId: number) {
@@ -438,7 +483,7 @@ class ApiClient {
 
   // Notifications endpoints
   async getNotifications(skip: number = 0, limit: number = 50) {
-    return this.request<any[]>(`/api/v1/notifications/?skip=${skip}&limit=${limit}`, {
+    return this.request<any[]>(`/api/v1/notifications?skip=${skip}&limit=${limit}`, {
       requiresAuth: true,
     });
   }
@@ -758,6 +803,23 @@ class ApiClient {
     });
 
     return this.handleResponse<any>(response);
+  }
+
+  async uploadVentureLogo(ventureId: number, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = this.getAuthToken();
+    const response = await fetch(`${this.baseUrl}/api/v1/ventures/${ventureId}/logo`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const result = await this.handleResponse<any>(response);
+    return this.normalizeVentureMedia(result);
   }
 
   // Support endpoints (Customer Support)

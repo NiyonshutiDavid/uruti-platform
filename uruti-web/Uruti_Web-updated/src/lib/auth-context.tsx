@@ -20,6 +20,7 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithToken: (accessToken: string) => Promise<void>;
   signup: (email: string, fullName: string, password: string, role: UserRole) => Promise<void>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
@@ -95,6 +96,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.setItem('uruti_user', JSON.stringify(currentUser));
   };
 
+  const loginWithToken = async (accessToken: string) => {
+    sessionStorage.setItem('uruti_token', accessToken);
+    const currentUser = await apiClient.getCurrentUser();
+    setToken(accessToken);
+    setUser(currentUser);
+    sessionStorage.setItem('uruti_user', JSON.stringify(currentUser));
+  };
+
   const signup = async (
     email: string,
     fullName: string,
@@ -143,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         token,
         isAuthenticated: !!user && !!token,
         login,
+        loginWithToken,
         signup,
         logout,
         updateUser,

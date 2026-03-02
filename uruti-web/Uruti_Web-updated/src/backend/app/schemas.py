@@ -158,6 +158,11 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class QrLoginApproveRequest(BaseModel):
+    request_id: str
+    code: str
+
+
 # Venture Schemas
 class VentureBase(BaseModel):
     name: str
@@ -169,6 +174,7 @@ class VentureBase(BaseModel):
     industry: IndustryType
     target_market: Optional[str] = None
     business_model: Optional[str] = None
+    logo_url: Optional[str] = None
 
 
 class VentureCreate(VentureBase):

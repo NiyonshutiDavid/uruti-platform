@@ -199,6 +199,9 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
   };
 
   const handleRemoveConnection = async (userId: number) => {
+    const confirmed = window.confirm('Remove this connection from your network?');
+    if (!confirmed) return;
+
     try {
       await apiClient.removeConnection(userId);
       toast.success('Connection removed');
@@ -490,10 +493,10 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
               </div>
             </div>
             <Tabs value={filterRole} onValueChange={setFilterRole} className="w-full md:w-auto">
-              <TabsList className="glass-card">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="founder">Founders</TabsTrigger>
-                <TabsTrigger value="investor">Investors</TabsTrigger>
+              <TabsList className="glass-card border border-black/5 dark:border-white/10 bg-white/70 dark:bg-slate-900/70">
+                <TabsTrigger value="all" className="data-[state=active]:bg-[#76B947] data-[state=active]:text-white dark:text-gray-300">All</TabsTrigger>
+                <TabsTrigger value="founder" className="data-[state=active]:bg-[#76B947] data-[state=active]:text-white dark:text-gray-300">Founders</TabsTrigger>
+                <TabsTrigger value="investor" className="data-[state=active]:bg-[#76B947] data-[state=active]:text-white dark:text-gray-300">Investors</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
@@ -502,16 +505,16 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="discover" className="space-y-6">
-        <TabsList className="glass-card">
-          <TabsTrigger value="discover">
+        <TabsList className="glass-card border border-black/5 dark:border-white/10 bg-white/70 dark:bg-slate-900/70">
+          <TabsTrigger value="discover" className="data-[state=active]:bg-[#76B947] data-[state=active]:text-white dark:text-gray-300">
             <Search className="mr-2 h-4 w-4" />
             Discover People
           </TabsTrigger>
-          <TabsTrigger value="connections">
+          <TabsTrigger value="connections" className="data-[state=active]:bg-[#76B947] data-[state=active]:text-white dark:text-gray-300">
             <Users className="mr-2 h-4 w-4" />
             My Connections ({connections.length})
           </TabsTrigger>
-          <TabsTrigger value="requests">
+          <TabsTrigger value="requests" className="data-[state=active]:bg-[#76B947] data-[state=active]:text-white dark:text-gray-300">
             <Clock className="mr-2 h-4 w-4" />
             Pending Requests ({totalPendingCount})
           </TabsTrigger>
@@ -560,7 +563,7 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
                   return (
                     <div
                       key={`directory-${person.id}`}
-                      className="rounded-lg border border-black/5 dark:border-white/10 bg-white dark:bg-slate-900/50 overflow-hidden hover:shadow-lg dark:hover:shadow-lg dark:hover:shadow-green-600/20 transition-all duration-200"
+                      className="glass-card rounded-lg border border-black/5 dark:border-white/10 bg-white/80 dark:bg-slate-900/70 overflow-hidden hover:shadow-lg dark:hover:shadow-lg dark:hover:shadow-green-600/20 transition-all duration-200"
                     >
                       {/* Uruti Banner - Black to Green Gradient */}
                       <div className="bg-gradient-to-r from-black via-green-800 to-green-600 h-24 relative"></div>

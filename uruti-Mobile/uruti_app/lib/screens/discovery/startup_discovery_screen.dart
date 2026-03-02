@@ -145,6 +145,25 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
 
     try {
       if (_bookmarkedVentureIds.contains(ventureId)) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Remove Bookmark?'),
+            content: const Text('Remove this startup from your bookmarks?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Remove'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+
         final bookmarkId = _bookmarkIdByVenture[ventureId];
         if (bookmarkId == null) return;
         await ApiService.instance.deleteBookmark(bookmarkId);

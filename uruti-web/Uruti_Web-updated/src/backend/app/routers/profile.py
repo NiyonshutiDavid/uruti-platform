@@ -19,7 +19,14 @@ UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 # Allowed file types for images
-ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+ALLOWED_IMAGE_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
 
@@ -127,7 +134,12 @@ async def update_current_profile(
     """Update current user's profile (without file upload)"""
     update_data = profile_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
-        if hasattr(current_user, field) and value is not None:
+        if not hasattr(current_user, field):
+            continue
+        if field in {"avatar_url", "cover_image_url"}:
+            setattr(current_user, field, value)
+            continue
+        if value is not None:
             setattr(current_user, field, value)
     
     db.commit()

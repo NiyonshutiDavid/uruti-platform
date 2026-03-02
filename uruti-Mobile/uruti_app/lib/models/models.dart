@@ -76,6 +76,12 @@ class UserModel {
     return '${AppConstants.apiBaseUrl}$avatarUrl';
   }
 
+  String? get resolvedCoverImageUrl {
+    if (coverImageUrl == null) return null;
+    if (coverImageUrl!.startsWith('http')) return coverImageUrl;
+    return '${AppConstants.apiBaseUrl}$coverImageUrl';
+  }
+
   String get initials {
     final parts = fullName.trim().split(' ');
     if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();

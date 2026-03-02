@@ -135,9 +135,9 @@ class AuthProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
-  void updateUserLocally(UserModel updated) {
+  Future<void> updateUserLocally(UserModel updated) async {
     _user = updated;
-    _saveUser(updated);
+    await _saveUser(updated);
     notifyListeners();
   }
 

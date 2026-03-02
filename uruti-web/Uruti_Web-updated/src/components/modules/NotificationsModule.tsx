@@ -132,6 +132,9 @@ export function NotificationsModule() {
   };
 
   const deleteNotification = async (id: number) => {
+    const confirmed = window.confirm('Delete this notification?');
+    if (!confirmed) return;
+
     try {
       // Delete via API
       await apiClient.deleteNotification(id);

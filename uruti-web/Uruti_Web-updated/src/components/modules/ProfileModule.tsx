@@ -53,6 +53,33 @@ export function ProfileModule({
   onMessage 
 }: ProfileModuleProps) {
   const { user, updateUser } = useAuth();
+  const isPersistableMediaUrl = (value?: string) => {
+    if (!value) return false;
+    return value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/');
+  };
+
+  const mapUserToProfile = (source: any) => ({
+    id: source?.id || '1',
+    name: source?.full_name || source?.name || 'User',
+    role: source?.role === 'founder' ? 'Entrepreneur' : source?.role === 'investor' ? 'Investor' : 'User',
+    location: source?.location || '',
+    avatar: source?.avatar_url || '',
+    coverImage: source?.cover_image_url || '',
+    bio: source?.bio || '',
+    email: source?.email || '',
+    phone: source?.phone || '',
+    website: source?.website_url || '',
+    linkedIn: source?.linkedin_url || '',
+    company: source?.company || '',
+    skills: source?.expertise || [],
+    achievements: source?.achievements || [],
+    investmentFocus: source?.investment_focus || [],
+    preferredSectors: source?.preferred_sectors || [],
+    industry: source?.industry || '',
+    stage: source?.stage || '',
+    funding_amount: source?.funding_amount || '',
+  });
+
   const [activeTab, setActiveTab] = useState('overview');
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [addExperienceOpen, setAddExperienceOpen] = useState(false);
@@ -65,51 +92,37 @@ export function ProfileModule({
   
   // Initialize profile with data from account creation
   const [profile, setProfile] = useState({
-    id: user?.id || '1',
-    name: user?.full_name || 'User',
-    role: user?.role === 'founder' ? 'Entrepreneur' : 'Investor',
-    location: user?.location || '',
-    avatar: user?.avatar_url || '',
-    coverImage: (user as any)?.cover_image_url || '',
-    bio: user?.bio || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    website: '',
-    linkedIn: '',
+    ...mapUserToProfile(user),
     connections: 0,
     followers: 0,
     verified: false,
-    skills: [],
+    skills: mapUserToProfile(user).skills,
     experience: [],
     education: [],
     startups: [],
-    achievements: [],
+    achievements: mapUserToProfile(user).achievements,
     activity: [],
     investments: [],
     portfolio: [],
     investmentThesis: '',
     ticketSize: '',
-    preferredSectors: []
+    preferredSectors: mapUserToProfile(user).preferredSectors,
+    investmentFocus: mapUserToProfile(user).investmentFocus,
+    company: mapUserToProfile(user).company,
+    industry: mapUserToProfile(user).industry,
+    stage: mapUserToProfile(user).stage,
+    funding_amount: mapUserToProfile(user).funding_amount,
   });
 
   const hydrateProfile = async () => {
     if (!user) return;
     try {
       const latestUser = await apiClient.getCurrentUser();
+      const mapped = mapUserToProfile(latestUser);
 
       setProfile((prev) => ({
         ...prev,
-        id: latestUser.id || prev.id,
-        name: latestUser.full_name || prev.name,
-        role: latestUser.role === 'founder' ? 'Entrepreneur' : latestUser.role === 'investor' ? 'Investor' : prev.role,
-        location: latestUser.location || '',
-        avatar: latestUser.avatar_url || '',
-        coverImage: latestUser.cover_image_url || '',
-        bio: latestUser.bio || '',
-        email: latestUser.email || prev.email,
-        phone: latestUser.phone || '',
-        website: latestUser.website_url || '',
-        linkedIn: latestUser.linkedin_url || '',
+        ...mapped,
       }));
 
       updateUser({
@@ -228,28 +241,42 @@ export function ProfileModule({
         }
       }
 
-      profileData.avatar_url = updatedProfile.avatar || null;
-      profileData.cover_image_url = updatedProfile.coverImage || null;
+      if (updatedProfile.avatar === '' || updatedProfile.avatar === null) {
+        profileData.avatar_url = null;
+      } else if (isPersistableMediaUrl(updatedProfile.avatar)) {
+        profileData.avatar_url = updatedProfile.avatar;
+      } else if (isPersistableMediaUrl(profile.avatar)) {
+        profileData.avatar_url = profile.avatar;
+      }
+
+      if (updatedProfile.coverImage === '' || updatedProfile.coverImage === null) {
+        profileData.cover_image_url = null;
+      } else if (isPersistableMediaUrl(updatedProfile.coverImage)) {
+        profileData.cover_image_url = updatedProfile.coverImage;
+      } else if (isPersistableMediaUrl(profile.coverImage)) {
+        profileData.cover_image_url = profile.coverImage;
+      }
 
       // Update profile data on backend
       console.log('Saving profile data to backend:', profileData);
       const savedUser = await apiClient.updateProfile(profileData);
+      const mapped = mapUserToProfile(savedUser);
       
       // Update local state
-      setProfile({ ...profile, ...updatedProfile });
+      setProfile((prev) => ({ ...prev, ...updatedProfile, ...mapped }));
 
       updateUser({
-        full_name: savedUser?.full_name || updatedProfile.name,
-        avatar_url: savedUser?.avatar_url || updatedProfile.avatar,
-        bio: savedUser?.bio || updatedProfile.bio,
+        full_name: savedUser?.full_name,
+        avatar_url: savedUser?.avatar_url,
+        bio: savedUser?.bio,
       });
       
       // Dispatch event to update avatar in header and everywhere else
       window.dispatchEvent(new CustomEvent('profile-updated', { 
         detail: { 
-          avatar: updatedProfile.avatar,
-          name: updatedProfile.name,
-          fullProfile: { ...profile, ...updatedProfile }
+          avatar: mapped.avatar,
+          name: mapped.name,
+          fullProfile: { ...profile, ...updatedProfile, ...mapped }
         } 
       }));
 
