@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/app_colors.dart';
 import '../../screens/main_scaffold.dart';
@@ -41,8 +42,19 @@ class HelpSupportScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: context.colors.background,
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
-          onPressed: () => MainScaffold.scaffoldKey.currentState?.openDrawer(),
+          icon: Icon(
+            context.canPop()
+                ? Icons.arrow_back_ios_new_rounded
+                : Icons.menu_rounded,
+            color: context.colors.textPrimary,
+          ),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+              return;
+            }
+            MainScaffold.scaffoldKey.currentState?.openDrawer();
+          },
         ),
         title: Text(
           'Help & Support',
@@ -93,7 +105,11 @@ class HelpSupportScreen extends StatelessWidget {
                   children: [
                     _ContactBtn(Icons.email_outlined, 'Email Us', () {}),
                     const SizedBox(width: 12),
-                    _ContactBtn(Icons.chat_outlined, 'Live Chat', () {}),
+                    _ContactBtn(
+                      Icons.chat_outlined,
+                      'Live Chat',
+                      () => context.push('/support-chat'),
+                    ),
                   ],
                 ),
               ],
@@ -106,7 +122,7 @@ class HelpSupportScreen extends StatelessWidget {
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: () async {
-                final uri = Uri.parse('https://uruti.io/help');
+                final uri = Uri.parse('https://uruti.rw/help');
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 }

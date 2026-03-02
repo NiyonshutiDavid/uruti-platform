@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../screens/splash_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
+import '../screens/auth/mobile_unsupported_screen.dart';
 import '../screens/main_scaffold.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/chat/chat_screen.dart';
@@ -34,6 +35,7 @@ import '../screens/analytics/analytics_screen.dart';
 import '../screens/support/help_support_screen.dart';
 import '../screens/calendar/readiness_calendar_screen.dart';
 import '../screens/auth/forgot_password_screen.dart';
+import '../screens/calls/call_demo_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -48,6 +50,8 @@ GoRouter createRouter(AuthProvider authProvider) {
       final isInit = authProvider.status == AuthStatus.initial;
       final isLoading = authProvider.isLoading;
       final location = state.matchedLocation;
+      final role = authProvider.user?.role.toLowerCase();
+      const unsupportedRoute = '/mobile-unsupported';
 
       if (location == '/splash') return null;
       if (isInit || isLoading) return '/splash';
@@ -56,6 +60,13 @@ GoRouter createRouter(AuthProvider authProvider) {
       if (!isAuth && !publicRoutes.contains(location)) return '/login';
       if (isAuth && publicRoutes.contains(location)) return '/home';
 
+      if (isAuth && role == 'admin' && location != unsupportedRoute) {
+        return unsupportedRoute;
+      }
+      if (isAuth && role != 'admin' && location == unsupportedRoute) {
+        return '/home';
+      }
+
       return null;
     },
     routes: [
@@ -63,14 +74,37 @@ GoRouter createRouter(AuthProvider authProvider) {
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
       GoRoute(
+        path: '/mobile-unsupported',
+        builder: (_, __) => const MobileUnsupportedScreen(),
+      ),
+      GoRoute(
         path: '/forgot-password',
-        builder: (_, __) => const ForgotPasswordScreen(),
+        builder: (_, __) =>
+            const ForgotPasswordScreen(mode: ForgotPasswordMode.passwordReset),
+      ),
+      GoRoute(
+        path: '/support-chat',
+        builder: (_, __) =>
+            const ForgotPasswordScreen(mode: ForgotPasswordMode.support),
       ),
 
       // ── True full-screen routes (no bottom nav) ─────────────────────────
-      GoRoute(path: '/recording', builder: (_, __) => const RecordingScreen()),
+      GoRoute(
+        path: '/recording',
+        redirect: (_, __) {
+          final role = authProvider.user?.role.toLowerCase();
+          if (role == 'founder') return null;
+          return '/home';
+        },
+        builder: (_, __) => const RecordingScreen(),
+      ),
       GoRoute(
         path: '/pitch-performance',
+        redirect: (_, __) {
+          final role = authProvider.user?.role.toLowerCase();
+          if (role == 'founder') return null;
+          return '/home';
+        },
         builder: (_, __) => const PitchPerformanceScreen(),
       ),
 
@@ -79,15 +113,35 @@ GoRouter createRouter(AuthProvider authProvider) {
         navigatorKey: _shellNavigatorKey,
         builder: (context, state, child) {
           final loc = state.matchedLocation;
-          final tabs = ['/home', '/chat', '/coach', '/inbox'];
-          final idx = tabs.indexWhere((t) => loc.startsWith(t));
-          return MainScaffold(child: child, currentIndex: idx < 0 ? 0 : idx);
+          final role = authProvider.user?.role.toLowerCase() ?? '';
+          final isFounder = role == 'founder';
+          int idx;
+          if (loc.startsWith('/messages') || loc.startsWith('/inbox')) {
+            idx = 3;
+          } else if (loc.startsWith('/chat')) {
+            idx = 1;
+          } else if (isFounder && loc.startsWith('/coach')) {
+            idx = 2;
+          } else if (!isFounder && loc.startsWith('/discovery')) {
+            idx = 2;
+          } else {
+            idx = 0;
+          }
+          return MainScaffold(currentIndex: idx < 0 ? 0 : idx, child: child);
         },
         routes: [
           // Bottom-nav tabs
           GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
           GoRoute(path: '/chat', builder: (_, __) => const AiChatScreen()),
-          GoRoute(path: '/coach', builder: (_, __) => const PitchCoachScreen()),
+          GoRoute(
+            path: '/coach',
+            redirect: (_, __) {
+              final role = authProvider.user?.role.toLowerCase();
+              if (role == 'founder') return null;
+              return '/home';
+            },
+            builder: (_, __) => const PitchCoachScreen(),
+          ),
           GoRoute(path: '/inbox', builder: (_, __) => const InboxScreen()),
           // Peer-to-peer messages (accessed from Inbox tab)
           GoRoute(path: '/messages', builder: (_, __) => const ChatScreen()),
@@ -117,10 +171,20 @@ GoRouter createRouter(AuthProvider authProvider) {
           // Ventures
           GoRoute(
             path: '/ventures',
+            redirect: (_, __) {
+              final role = authProvider.user?.role.toLowerCase();
+              if (role == 'founder') return null;
+              return '/home';
+            },
             builder: (_, __) => const VentureHubScreen(),
           ),
           GoRoute(
             path: '/ventures/new',
+            redirect: (_, __) {
+              final role = authProvider.user?.role.toLowerCase();
+              if (role == 'founder') return null;
+              return '/home';
+            },
             builder: (_, __) => const AddVentureScreen(),
           ),
           // Connections & discovery
@@ -130,10 +194,20 @@ GoRouter createRouter(AuthProvider authProvider) {
           ),
           GoRoute(
             path: '/discovery',
+            redirect: (_, __) {
+              final role = authProvider.user?.role.toLowerCase();
+              if (role == 'investor') return null;
+              return '/home';
+            },
             builder: (_, __) => const StartupDiscoveryScreen(),
           ),
           GoRoute(
             path: '/leaderboard',
+            redirect: (_, __) {
+              final role = authProvider.user?.role.toLowerCase();
+              if (role == 'investor') return null;
+              return '/home';
+            },
             builder: (_, __) => const StartupLeaderboardScreen(),
           ),
           // Meetings
@@ -161,10 +235,20 @@ GoRouter createRouter(AuthProvider authProvider) {
           // Investor
           GoRoute(
             path: '/deal-flow',
+            redirect: (_, __) {
+              final role = authProvider.user?.role.toLowerCase();
+              if (role == 'investor') return null;
+              return '/home';
+            },
             builder: (_, __) => const DealFlowScreen(),
           ),
           GoRoute(
             path: '/investor-dashboard',
+            redirect: (_, __) {
+              final role = authProvider.user?.role.toLowerCase();
+              if (role == 'investor') return null;
+              return '/home';
+            },
             builder: (_, __) => const InvestorDashboardScreen(),
           ),
           // Misc
@@ -188,7 +272,16 @@ GoRouter createRouter(AuthProvider authProvider) {
           ),
           GoRoute(
             path: '/founder-snapshot',
+            redirect: (_, __) {
+              final role = authProvider.user?.role.toLowerCase();
+              if (role == 'founder') return null;
+              return '/home';
+            },
             builder: (_, __) => const FounderSnapshotScreen(),
+          ),
+          GoRoute(
+            path: '/call-demo',
+            builder: (_, __) => const CallDemoScreen(),
           ),
         ],
       ),

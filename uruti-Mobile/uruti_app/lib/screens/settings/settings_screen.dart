@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../screens/main_scaffold.dart';
@@ -42,7 +43,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _SettingsTile(
             icon: Icons.person_outline,
             title: 'Edit Profile',
-            onTap: () => context.go('/profile/edit'),
+            onTap: () => context.push('/profile/edit'),
           ),
           _SettingsTile(
             icon: Icons.lock_outline,
@@ -52,7 +53,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _SettingsTile(
             icon: Icons.verified_user_outlined,
             title: 'Verify Account',
-            onTap: () {},
+            onTap: () => context.push('/profile'),
           ),
           const Divider(height: 24),
           _SectionHeader('Notifications'),
@@ -81,17 +82,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _SettingsTile(
             icon: Icons.help_outline,
             title: 'Help & Support',
-            onTap: () => context.go('/help'),
+            onTap: () => context.push('/help'),
+          ),
+          _SettingsTile(
+            icon: Icons.chat_outlined,
+            title: 'Live Chat',
+            onTap: () => context.push('/support-chat'),
           ),
           _SettingsTile(
             icon: Icons.privacy_tip_outlined,
             title: 'Privacy Policy',
-            onTap: () {},
+            onTap: () => _openExternalUrl('https://uruti.rw/privacy'),
           ),
           _SettingsTile(
             icon: Icons.description_outlined,
             title: 'Terms of Service',
-            onTap: () {},
+            onTap: () => _openExternalUrl('https://uruti.rw/terms'),
           ),
           const Divider(height: 24),
           ListTile(
@@ -121,6 +127,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 40),
         ],
       ),
+    );
+  }
+
+  Future<void> _openExternalUrl(String url) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
+    if (!mounted) return;
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Could not open link right now')),
     );
   }
 

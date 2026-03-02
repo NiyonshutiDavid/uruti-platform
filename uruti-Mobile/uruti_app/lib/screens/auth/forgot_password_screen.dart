@@ -7,8 +7,15 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/app_colors.dart';
 import '../../core/app_constants.dart';
 
+enum ForgotPasswordMode { passwordReset, support }
+
 class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({super.key});
+  final ForgotPasswordMode mode;
+
+  const ForgotPasswordScreen({
+    super.key,
+    this.mode = ForgotPasswordMode.passwordReset,
+  });
 
   @override
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
@@ -43,7 +50,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final Set<int> _shownReplyIds = {};
   Timer? _pollTimer;
 
-  static const String _helpCenterUrl = 'https://uruti.io/help';
+  static const String _helpCenterUrl = 'https://uruti.rw/help';
+
+  bool get _isSupportMode => widget.mode == ForgotPasswordMode.support;
 
   @override
   void initState() {
@@ -75,8 +84,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _startingChat = false;
       _messages.add(
         _ChatMessage(
-          text:
-              "Hi $name! 👋 I'm from the Uruti Support Team.\n\nTo reset your password, please describe your issue below. We'll verify your identity and help you regain access within 1–2 business hours.",
+          text: _isSupportMode
+              ? "Hi $name! 👋 I'm from the Uruti Support Team.\n\nPlease describe your issue below and we’ll get back to you within 1–2 business hours."
+              : "Hi $name! 👋 I'm from the Uruti Support Team.\n\nTo reset your password, please describe your issue below. We'll verify your identity and help you regain access within 1–2 business hours.",
           isUser: false,
           time: DateTime.now(),
         ),
@@ -209,6 +219,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return '$h:$m $period';
   }
 
+  void _onBack() {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    context.go(_isSupportMode ? '/home' : '/login');
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -225,8 +243,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             color: colors.textPrimary,
             size: 20,
           ),
-          onPressed: () =>
-              context.canPop() ? context.pop() : context.go('/login'),
+          onPressed: _onBack,
         ),
         titleSpacing: 0,
         title: Row(
@@ -251,7 +268,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Password Reset Support',
+                  _isSupportMode ? 'Support Chat' : 'Password Reset Support',
                   style: TextStyle(
                     color: colors.textPrimary,
                     fontSize: 15,
@@ -327,7 +344,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Describe your issue below. Our team will reset your password manually after verifying your identity.',
+                          _isSupportMode
+                              ? 'Describe your issue below. Our team will review and respond as soon as possible.'
+                              : 'Describe your issue below. Our team will reset your password manually after verifying your identity.',
                           style: TextStyle(
                             color: AppColors.primary,
                             fontSize: 12,
@@ -430,7 +449,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.lock_reset_rounded,
+                  _isSupportMode
+                      ? Icons.support_agent_rounded
+                      : Icons.lock_reset_rounded,
                   color: AppColors.primary,
                   size: 36,
                 ),
@@ -440,7 +461,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             SizedBox(
               width: double.infinity,
               child: Text(
-                'Password Reset Request',
+                _isSupportMode ? 'Support Request' : 'Password Reset Request',
                 style: TextStyle(
                   color: colors.textPrimary,
                   fontSize: 22,
@@ -454,7 +475,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             SizedBox(
               width: double.infinity,
               child: Text(
-                'Since password resets are handled manually by our team, please tell us who you are and we\'ll verify your account and help you within 1–2 hours.',
+                _isSupportMode
+                    ? 'Tell us who you are and what you need help with. Our team will review your request and assist you as quickly as possible.'
+                    : 'Since password resets are handled manually by our team, please tell us who you are and we\'ll verify your account and help you within 1–2 hours.',
                 style: TextStyle(
                   color: colors.textSecondary,
                   fontSize: 13,
@@ -486,7 +509,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             const SizedBox(height: 16),
             // Email field
             Text(
-              'Registered Email',
+              _isSupportMode ? 'Email' : 'Registered Email',
               style: TextStyle(
                 color: colors.textPrimary,
                 fontWeight: FontWeight.w600,
@@ -500,8 +523,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               style: TextStyle(color: colors.textPrimary),
               decoration: _inputDecoration('your@email.com', colors),
               validator: (v) {
-                if (v == null || v.trim().isEmpty)
+                if (v == null || v.trim().isEmpty) {
                   return 'Please enter your email';
+                }
                 if (!v.contains('@')) return 'Enter a valid email address';
                 return null;
               },
@@ -541,10 +565,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             const SizedBox(height: 16),
             Center(
               child: GestureDetector(
-                onTap: () =>
-                    context.canPop() ? context.pop() : context.go('/login'),
+                onTap: _onBack,
                 child: Text(
-                  'Back to Login',
+                  _isSupportMode ? 'Back' : 'Back to Login',
                   style: TextStyle(
                     color: colors.textSecondary,
                     fontSize: 13,

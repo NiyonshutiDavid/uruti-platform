@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/realtime_service.dart';
 import '../../screens/main_scaffold.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -14,11 +17,35 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   List _notifs = [];
   bool _loading = true;
+  StreamSubscription<Map<String, dynamic>>? _realtimeSub;
 
   @override
   void initState() {
     super.initState();
     _load();
+
+    _realtimeSub = RealtimeService.instance.events.listen((event) {
+      if (!mounted || event['event'] != 'notification_created') return;
+      final raw = event['data'];
+      if (raw is! Map) return;
+      final next = Map<String, dynamic>.from(raw.cast<dynamic, dynamic>());
+      final id = '${next['id'] ?? ''}';
+      setState(() {
+        _notifs.removeWhere((n) => '${(n as Map)['id'] ?? ''}' == id);
+        _notifs.insert(0, next);
+      });
+    });
+
+    final token = (context.read<AuthProvider>().token ?? '').trim();
+    if (token.isNotEmpty) {
+      RealtimeService.instance.connect(token);
+    }
+  }
+
+  @override
+  void dispose() {
+    _realtimeSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -55,7 +82,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () {},
+            onPressed: () async {
+              await ApiService.instance.markAllNotificationsRead();
+              if (!mounted) return;
+              setState(() {
+                _notifs = _notifs.map((n) {
+                  final map = Map<String, dynamic>.from(
+                    (n as Map).cast<String, dynamic>(),
+                  );
+                  map['is_read'] = true;
+                  return map;
+                }).toList();
+              });
+            },
             child: Text(
               'Mark all read',
               style: TextStyle(color: AppColors.primary, fontSize: 12),
@@ -76,8 +115,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               padding: const EdgeInsets.all(12),
               itemCount: _notifs.length,
               separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (_, i) =>
-                  _NotifCard(data: _notifs[i] as Map<String, dynamic>),
+              itemBuilder: (_, i) {
+                final data = _notifs[i] as Map<String, dynamic>;
+                return GestureDetector(
+                  onTap: () async {
+                    final id = (data['id'] as num?)?.toInt();
+                    if (id == null || data['is_read'] == true) return;
+                    await ApiService.instance.markNotificationRead(id);
+                    if (!mounted) return;
+                    setState(() {
+                      data['is_read'] = true;
+                    });
+                  },
+                  child: _NotifCard(data: data),
+                );
+              },
             ),
     );
   }
@@ -89,8 +141,13 @@ class _NotifCard extends StatelessWidget {
 
   IconData get _icon {
     final type = data['type'] as String? ?? '';
-    return type == 'connection'
+    final kind = (data['data'] is Map)
+        ? ((data['data'] as Map)['kind']?.toString() ?? '')
+        : '';
+    return kind.startsWith('connection') || type == 'connection'
         ? Icons.people_outline
+        : kind == 'new_venture'
+        ? Icons.rocket_launch_outlined
         : type == 'message'
         ? Icons.message_outlined
         : type == 'score'
@@ -100,8 +157,13 @@ class _NotifCard extends StatelessWidget {
 
   Color _color(BuildContext context) {
     final type = data['type'] as String? ?? '';
-    return type == 'connection'
+    final kind = (data['data'] is Map)
+        ? ((data['data'] as Map)['kind']?.toString() ?? '')
+        : '';
+    return kind.startsWith('connection') || type == 'connection'
         ? AppColors.primary
+        : kind == 'new_venture'
+        ? const Color(0xFF8B5CF6)
         : type == 'message'
         ? const Color(0xFF3B82F6)
         : type == 'score'

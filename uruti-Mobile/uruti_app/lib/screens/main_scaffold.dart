@@ -1,10 +1,13 @@
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../core/app_colors.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
+import '../services/api_service.dart';
+import '../services/realtime_service.dart';
 
 // ─── Nav item data ─────────────────────────────────────────────────────────
 class _NavItem {
@@ -18,6 +21,20 @@ const _navItems = [
   _NavItem(Icons.home_outlined, Icons.home_rounded, 'Home'),
   _NavItem(Icons.auto_awesome_outlined, Icons.auto_awesome_rounded, 'Chat'),
   _NavItem(Icons.mic_none_rounded, Icons.mic_rounded, 'Coach'),
+  _NavItem(Icons.inbox_outlined, Icons.inbox_rounded, 'Inbox'),
+];
+
+const _founderNavItems = _navItems;
+const _investorNavItems = [
+  _NavItem(Icons.home_outlined, Icons.home_rounded, 'Home'),
+  _NavItem(Icons.auto_awesome_outlined, Icons.auto_awesome_rounded, 'Chat'),
+  _NavItem(Icons.explore_outlined, Icons.explore_rounded, 'Discover'),
+  _NavItem(Icons.inbox_outlined, Icons.inbox_rounded, 'Inbox'),
+];
+const _generalNavItems = [
+  _NavItem(Icons.home_outlined, Icons.home_rounded, 'Home'),
+  _NavItem(Icons.auto_awesome_outlined, Icons.auto_awesome_rounded, 'Chat'),
+  _NavItem(Icons.people_outline, Icons.people_rounded, 'Network'),
   _NavItem(Icons.inbox_outlined, Icons.inbox_rounded, 'Inbox'),
 ];
 
@@ -45,6 +62,9 @@ class _MainScaffoldState extends State<MainScaffold>
   late AnimationController _indicatorCtrl;
   late Animation<double> _indicatorPos;
   late Animation<double> _indicatorStretch;
+  StreamSubscription<Map<String, dynamic>>? _realtimeSub;
+  String? _connectedRealtimeToken;
+  int _inboxUnreadCount = 0;
 
   @override
   void initState() {
@@ -54,6 +74,8 @@ class _MainScaffoldState extends State<MainScaffold>
       duration: const Duration(milliseconds: 380),
     );
     _resetAnimations(widget.currentIndex, widget.currentIndex);
+    _realtimeSub = RealtimeService.instance.events.listen(_handleRealtimeEvent);
+    _refreshInboxUnread(showNotification: false);
   }
 
   @override
@@ -81,19 +103,128 @@ class _MainScaffoldState extends State<MainScaffold>
 
   @override
   void dispose() {
+    _realtimeSub?.cancel();
     _indicatorCtrl.dispose();
     super.dispose();
   }
 
+  void _handleRealtimeEvent(Map<String, dynamic> event) {
+    if (event['event'] == 'message_created') {
+      _refreshInboxUnread(showNotification: true);
+      return;
+    }
+
+    if (event['event'] == 'notification_created') {
+      final data = event['data'];
+      if (data is Map) {
+        final notification = Map<String, dynamic>.from(
+          data.cast<dynamic, dynamic>(),
+        );
+        _showInAppNotification(notification);
+      }
+    }
+  }
+
+  void _showInAppNotification(Map<String, dynamic> notification) {
+    final title = (notification['title'] ?? '').toString().trim();
+    final message = (notification['message'] ?? '').toString().trim();
+    final text = title.isNotEmpty
+        ? '$title${message.isNotEmpty ? '\n$message' : ''}'
+        : (message.isNotEmpty ? message : 'New update');
+
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.showSnackBar(
+      SnackBar(
+        content: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _syncRealtimeConnection(AuthProvider auth) {
+    final token = (auth.token ?? '').trim();
+    final shouldConnect = auth.isAuthenticated && token.isNotEmpty;
+
+    if (!shouldConnect) {
+      if (_connectedRealtimeToken != null) {
+        _connectedRealtimeToken = null;
+        RealtimeService.instance.disconnect();
+      }
+      if (_inboxUnreadCount != 0 && mounted) {
+        setState(() => _inboxUnreadCount = 0);
+      }
+      return;
+    }
+
+    if (_connectedRealtimeToken != token) {
+      _connectedRealtimeToken = token;
+      RealtimeService.instance.connect(token);
+      _refreshInboxUnread(showNotification: false);
+    }
+  }
+
+  Future<void> _refreshInboxUnread({required bool showNotification}) async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isAuthenticated) {
+      if (!mounted) return;
+      if (_inboxUnreadCount != 0) {
+        setState(() => _inboxUnreadCount = 0);
+      }
+      return;
+    }
+
+    try {
+      final data = await ApiService.instance.getConversations(auth.token);
+      int unread = 0;
+      for (final item in data) {
+        if (item is Map) {
+          final dynamic count = item['unread_count'];
+          unread += count is int ? count : int.tryParse('$count') ?? 0;
+        }
+      }
+
+      if (!mounted) return;
+      final hadUnread = _inboxUnreadCount;
+      if (unread != _inboxUnreadCount) {
+        setState(() => _inboxUnreadCount = unread);
+      }
+
+      final isInboxTab = widget.currentIndex == 3;
+      if (showNotification && unread > hadUnread && !isInboxTab) {
+        final messenger = ScaffoldMessenger.maybeOf(context);
+        messenger?.showSnackBar(
+          const SnackBar(content: Text('New message received')),
+        );
+      }
+    } catch (_) {}
+  }
+
   void _onTabTap(int i) {
-    const tabs = ['/home', '/chat', '/coach', '/inbox'];
+    final user = context.read<AuthProvider>().user;
+    final tabs = _tabsForUser(user);
     if (i != widget.currentIndex) context.go(tabs[i]);
+  }
+
+  List<_NavItem> _navItemsForUser(user) {
+    if (user?.isFounder == true) return _founderNavItems;
+    if (user?.isInvestor == true) return _investorNavItems;
+    return _generalNavItems;
+  }
+
+  List<String> _tabsForUser(user) {
+    if (user?.isFounder == true)
+      return const ['/home', '/chat', '/coach', '/inbox'];
+    if (user?.isInvestor == true) {
+      return const ['/home', '/chat', '/discovery', '/inbox'];
+    }
+    return const ['/home', '/chat', '/connections', '/inbox'];
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.user;
+    _syncRealtimeConnection(auth);
 
     return Scaffold(
       key: MainScaffold.scaffoldKey,
@@ -107,6 +238,9 @@ class _MainScaffoldState extends State<MainScaffold>
   // ─── Animated bottom nav ─────────────────────────────────────────────────
 
   Widget _buildBottomNav(BuildContext context) {
+    final user = context.watch<AuthProvider>().user;
+    final navItems = _navItemsForUser(user);
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
@@ -128,7 +262,7 @@ class _MainScaffoldState extends State<MainScaffold>
             child: LayoutBuilder(
               builder: (ctx, constraints) {
                 final totalW = constraints.maxWidth;
-                final tabW = totalW / 4;
+                final tabW = totalW / navItems.length;
                 return AnimatedBuilder(
                   animation: _indicatorCtrl,
                   builder: (_, __) {
@@ -156,9 +290,9 @@ class _MainScaffoldState extends State<MainScaffold>
                         ),
                         // Tab items
                         Row(
-                          children: List.generate(4, (i) {
+                          children: List.generate(navItems.length, (i) {
                             final active = i == widget.currentIndex;
-                            final item = _navItems[i];
+                            final item = navItems[i];
                             return Expanded(
                               child: GestureDetector(
                                 onTap: () => _onTabTap(i),
@@ -166,18 +300,57 @@ class _MainScaffoldState extends State<MainScaffold>
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    AnimatedSwitcher(
-                                      duration: const Duration(
-                                        milliseconds: 200,
-                                      ),
-                                      child: Icon(
-                                        active ? item.activeIcon : item.icon,
-                                        key: ValueKey(active),
-                                        color: active
-                                            ? AppColors.primary
-                                            : context.colors.navInactive,
-                                        size: 22,
-                                      ),
+                                    Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        AnimatedSwitcher(
+                                          duration: const Duration(
+                                            milliseconds: 200,
+                                          ),
+                                          child: Icon(
+                                            active
+                                                ? item.activeIcon
+                                                : item.icon,
+                                            key: ValueKey(active),
+                                            color: active
+                                                ? AppColors.primary
+                                                : context.colors.navInactive,
+                                            size: 22,
+                                          ),
+                                        ),
+                                        if (i == 3 && _inboxUnreadCount > 0)
+                                          Positioned(
+                                            top: -6,
+                                            right: -10,
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 5,
+                                                    vertical: 2,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.redAccent,
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                              ),
+                                              constraints: const BoxConstraints(
+                                                minWidth: 16,
+                                                minHeight: 14,
+                                              ),
+                                              child: Text(
+                                                _inboxUnreadCount > 99
+                                                    ? '99+'
+                                                    : '$_inboxUnreadCount',
+                                                textAlign: TextAlign.center,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                     const SizedBox(height: 3),
                                     Text(
@@ -213,7 +386,7 @@ class _MainScaffoldState extends State<MainScaffold>
   // ─── Drawer ───────────────────────────────────────────────────────────────
 
   Widget _buildDrawer(BuildContext context, user, AuthProvider auth) {
-    final tabs = ['/home', '/chat', '/coach', '/inbox'];
+    final tabs = _tabsForUser(user);
     final currentRoute = tabs.length > widget.currentIndex
         ? tabs[widget.currentIndex]
         : '/home';
@@ -635,9 +808,55 @@ class _MainScaffoldState extends State<MainScaffold>
                               ),
                             ),
                             onTap: () async {
-                              Navigator.pop(context);
-                              await auth.logout();
-                              if (context.mounted) context.go('/login');
+                              final shouldLogout = await showDialog<bool>(
+                                context: context,
+                                builder: (dialogContext) => AlertDialog(
+                                  backgroundColor: context.colors.surface,
+                                  title: Text(
+                                    'Log out?',
+                                    style: TextStyle(
+                                      color: context.colors.textPrimary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  content: Text(
+                                    'Are you sure you want to log out of Uruti?',
+                                    style: TextStyle(
+                                      color: context.colors.textSecondary,
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(dialogContext, false),
+                                      child: Text(
+                                        'Cancel',
+                                        style: TextStyle(
+                                          color: context.colors.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(dialogContext, true),
+                                      child: const Text(
+                                        'Yes, Logout',
+                                        style: TextStyle(
+                                          color: Colors.redAccent,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (!context.mounted) return;
+
+                              if (shouldLogout == true) {
+                                Navigator.pop(context);
+                                await auth.logout();
+                                if (!context.mounted) return;
+                                context.go('/login');
+                              }
                             },
                           ),
                         ],

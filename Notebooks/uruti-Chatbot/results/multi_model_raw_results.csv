@@ -1,0 +1,46 @@
+model,error,response,latency_ms,prompt_preview,response_len,quality_score
+gemini-3-flash-preview,google-genai package missing,,0,You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk ,0,0
+llama3.2-11b,,"[LLAMA STUB:llama3.2-11b] You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk warning.
+
+Record source: investments_vc
+Data: {""permalink"": ""/organization/a-b-productions"", ""name"": ""A.B Productions"", ""homepage_url"": null, ""category_list"": ""|Music|Media|News|"", ""market"": "" News "", ""funding_total_usd"": "" -   "", ""status"": ""operating"", ""country_code"": ""USA"", ""st",0,You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk ,426,4
+llama3.2-90b,,"[LLAMA STUB:llama3.2-90b] You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk warning.
+
+Record source: investments_vc
+Data: {""permalink"": ""/organization/a-b-productions"", ""name"": ""A.B Productions"", ""homepage_url"": null, ""category_list"": ""|Music|Media|News|"", ""market"": "" News "", ""funding_total_usd"": "" -   "", ""status"": ""operating"", ""country_code"": ""USA"", ""st",0,You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk ,426,4
+gemini-3-flash-preview,google-genai package missing,,0,You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk ,0,0
+llama3.2-11b,,"[LLAMA STUB:llama3.2-11b] You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk warning.
+
+Record source: startup_data
+Data: {""unnamed:_0"": 996, ""state_code"": ""NY"", ""latitude"": 40.750519, ""longitude"": -73.993494, ""zip_code"": ""10001"", ""id"": ""c:64959"", ""city"": ""New York"", ""unnamed:_6"": ""New York NY 10001"", ""name"": ""Visual Revenue"", ""labels"": 1, ""founded_at"": ""3",0,You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk ,426,2
+llama3.2-90b,,"[LLAMA STUB:llama3.2-90b] You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk warning.
+
+Record source: startup_data
+Data: {""unnamed:_0"": 996, ""state_code"": ""NY"", ""latitude"": 40.750519, ""longitude"": -73.993494, ""zip_code"": ""10001"", ""id"": ""c:64959"", ""city"": ""New York"", ""unnamed:_6"": ""New York NY 10001"", ""name"": ""Visual Revenue"", ""labels"": 1, ""founded_at"": ""3",0,You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk ,426,2
+gemini-3-flash-preview,google-genai package missing,,0,You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk ,0,0
+llama3.2-11b,,"[LLAMA STUB:llama3.2-11b] You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk warning.
+
+Record source: investments_vc
+Data: {""permalink"": ""/organization/80-20-solutions"", ""name"": ""80/20 Solutions"", ""homepage_url"": ""http://www.8020solutions.com"", ""category_list"": ""|Email|Social Media|Mobile|Loyalty Programs|Sales and Marketing|Software|SaaS|Advertising|"", """,0,You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk ,426,3
+llama3.2-90b,,"[LLAMA STUB:llama3.2-90b] You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk warning.
+
+Record source: investments_vc
+Data: {""permalink"": ""/organization/80-20-solutions"", ""name"": ""80/20 Solutions"", ""homepage_url"": ""http://www.8020solutions.com"", ""category_list"": ""|Email|Social Media|Mobile|Loyalty Programs|Sales and Marketing|Software|SaaS|Advertising|"", """,0,You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk ,426,3
+gemini-3-flash-preview,google-genai package missing,,0,You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk ,0,0
+llama3.2-11b,,"[LLAMA STUB:llama3.2-11b] You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk warning.
+
+Record source: startup_data
+Data: {""unnamed:_0"": 52, ""state_code"": ""MA"", ""latitude"": 42.492256, ""longitude"": -71.13454899999998, ""zip_code"": ""1864"", ""id"": ""c:12052"", ""city"": ""North Reading"", ""unnamed:_6"": null, ""name"": ""Kiva Systems"", ""labels"": 1, ""founded_at"": ""1/1/200",0,You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk ,426,2
+llama3.2-90b,,"[LLAMA STUB:llama3.2-90b] You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk warning.
+
+Record source: startup_data
+Data: {""unnamed:_0"": 52, ""state_code"": ""MA"", ""latitude"": 42.492256, ""longitude"": -71.13454899999998, ""zip_code"": ""1864"", ""id"": ""c:12052"", ""city"": ""North Reading"", ""unnamed:_6"": null, ""name"": ""Kiva Systems"", ""labels"": 1, ""founded_at"": ""1/1/200",0,You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk ,426,2
+gemini-3-flash-preview,google-genai package missing,,0,You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk ,0,0
+llama3.2-11b,,"[LLAMA STUB:llama3.2-11b] You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk warning.
+
+Record source: investments_vc
+Data: {""permalink"": ""/organization/2theloo"", ""name"": ""2theloo"", ""homepage_url"": ""http://www.2theloo.com"", ""category_list"": ""|Hospitality|"", ""market"": "" Hospitality "", ""funding_total_usd"": "" -   "", ""status"": ""operating"", ""country_code"": null",0,You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk ,426,4
+llama3.2-90b,,"[LLAMA STUB:llama3.2-90b] You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk warning.
+
+Record source: investments_vc
+Data: {""permalink"": ""/organization/2theloo"", ""name"": ""2theloo"", ""homepage_url"": ""http://www.2theloo.com"", ""category_list"": ""|Hospitality|"", ""market"": "" Hospitality "", ""funding_total_usd"": "" -   "", ""status"": ""operating"", ""country_code"": null",0,You are a startup advisor. Analyze this startup/investment record and provide 3 actionable recommendations and one risk ,426,4

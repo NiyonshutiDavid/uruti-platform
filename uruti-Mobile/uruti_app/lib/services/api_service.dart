@@ -34,26 +34,84 @@ class ApiService {
     return headers;
   }
 
+  String? _safeAvatarUrl(dynamic raw) {
+    final value = raw?.toString().trim() ?? '';
+    if (value.isEmpty) return null;
+    final uri = Uri.tryParse(value);
+    if (uri == null) return null;
+    if (uri.hasScheme && (uri.path.isEmpty || uri.path == '/')) {
+      return null;
+    }
+    return value;
+  }
+
   Future<Map<String, dynamic>> _handleResponse(http.Response response) async {
-    final body = utf8.decode(response.bodyBytes);
-    final json = jsonDecode(body);
-    if (response.statusCode >= 200 && response.statusCode < 300) return json;
-    throw ApiException(
-      statusCode: response.statusCode,
-      message: json['detail']?.toString() ?? 'Request failed',
-    );
+    final body = utf8.decode(response.bodyBytes).trim();
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (body.isEmpty) return <String, dynamic>{};
+      try {
+        final decoded = jsonDecode(body);
+        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+        return <String, dynamic>{'data': decoded};
+      } catch (_) {
+        return <String, dynamic>{};
+      }
+    }
+
+    String message = 'Request failed';
+    if (body.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(body);
+        if (decoded is Map) {
+          message =
+              decoded['detail']?.toString() ??
+              decoded['message']?.toString() ??
+              message;
+        } else if (decoded is String && decoded.trim().isNotEmpty) {
+          message = decoded;
+        }
+      } catch (_) {}
+    }
+
+    throw ApiException(statusCode: response.statusCode, message: message);
   }
 
   Future<List<dynamic>> _handleListResponse(http.Response response) async {
-    final body = utf8.decode(response.bodyBytes);
+    final body = utf8.decode(response.bodyBytes).trim();
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      return jsonDecode(body);
+      if (body.isEmpty) return <dynamic>[];
+      try {
+        final decoded = jsonDecode(body);
+        if (decoded is List<dynamic>) return decoded;
+        if (decoded is Map && decoded['items'] is List<dynamic>) {
+          return decoded['items'] as List<dynamic>;
+        }
+        return <dynamic>[];
+      } catch (_) {
+        return <dynamic>[];
+      }
     }
-    final json = jsonDecode(body);
-    throw ApiException(
-      statusCode: response.statusCode,
-      message: json['detail']?.toString() ?? 'Request failed',
-    );
+
+    String message = 'Request failed';
+    if (body.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(body);
+        if (decoded is Map) {
+          message =
+              decoded['detail']?.toString() ??
+              decoded['message']?.toString() ??
+              message;
+        } else if (decoded is String && decoded.trim().isNotEmpty) {
+          message = decoded;
+        }
+      } catch (_) {}
+    }
+
+    throw ApiException(statusCode: response.statusCode, message: message);
   }
 
   // ──────────────────── AUTH ────────────────────
@@ -200,11 +258,122 @@ class ApiService {
 
   // ──────────────────── MESSAGES ────────────────────
   Future<List<dynamic>> getConversations([String? token]) async {
-    final res = await http.get(
-      Uri.parse('${AppConstants.apiV1}/messages/inbox'),
-      headers: await _headers(auth: true),
-    );
-    return _handleListResponse(res);
+    try {
+      final results = await Future.wait([
+        http.get(
+          Uri.parse('${AppConstants.apiV1}/connections/'),
+          headers: await _headers(auth: true),
+        ),
+        http.get(
+          Uri.parse('${AppConstants.apiV1}/messages/inbox'),
+          headers: await _headers(auth: true),
+        ),
+        http.get(
+          Uri.parse('${AppConstants.apiV1}/messages/sent'),
+          headers: await _headers(auth: true),
+        ),
+      ]);
+
+      final connections = await _handleListResponse(results[0]);
+      final inbox = await _handleListResponse(results[1]);
+      final sent = await _handleListResponse(results[2]);
+
+      bool isOnline(Map<String, dynamic> connection) {
+        final isActive = connection['is_active'] == true;
+        final rawLastLogin = connection['last_login']?.toString();
+        if (!isActive || rawLastLogin == null || rawLastLogin.isEmpty) {
+          return false;
+        }
+        final lastLogin = DateTime.tryParse(rawLastLogin);
+        if (lastLogin == null) return false;
+        return DateTime.now().difference(lastLogin).inMinutes <= 10;
+      }
+
+      String roleLabel(dynamic role) {
+        final value = (role ?? '').toString().trim().toLowerCase();
+        if (value.isEmpty) return '';
+        return value[0].toUpperCase() + value.substring(1);
+      }
+
+      String fmtTime(dynamic isoTs) {
+        final parsed = DateTime.tryParse((isoTs ?? '').toString());
+        if (parsed == null) return '';
+        final hour = parsed.hour % 12 == 0 ? 12 : parsed.hour % 12;
+        final minute = parsed.minute.toString().padLeft(2, '0');
+        final ampm = parsed.hour >= 12 ? 'PM' : 'AM';
+        return '$hour:$minute $ampm';
+      }
+
+      final conversations = connections.map<Map<String, dynamic>>((connection) {
+        final uid = int.tryParse('${connection['id'] ?? 0}') ?? 0;
+        final thread = [
+          ...inbox.where(
+            (m) => m['sender_id'] == uid || m['receiver_id'] == uid,
+          ),
+          ...sent.where(
+            (m) => m['sender_id'] == uid || m['receiver_id'] == uid,
+          ),
+        ];
+
+        thread.sort((a, b) {
+          final ta =
+              DateTime.tryParse((a['created_at'] ?? '').toString()) ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+          final tb =
+              DateTime.tryParse((b['created_at'] ?? '').toString()) ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+          return ta.compareTo(tb);
+        });
+
+        final last = thread.isNotEmpty ? thread.last : null;
+        final unread = inbox
+            .where((m) => m['sender_id'] == uid && m['is_read'] != true)
+            .length;
+        final displayNameRaw = (connection['display_name'] ?? '')
+            .toString()
+            .trim();
+        final fullNameRaw = (connection['full_name'] ?? '').toString().trim();
+        final emailRaw = (connection['email'] ?? '').toString().trim();
+        final displayName = displayNameRaw.isNotEmpty
+            ? displayNameRaw
+            : (fullNameRaw.isNotEmpty
+                  ? fullNameRaw
+                  : (emailRaw.isNotEmpty ? emailRaw : 'Connection'));
+
+        return {
+          'other_user': {
+            'id': uid,
+            'full_name': displayName,
+            'display_name': connection['display_name'],
+            'role': roleLabel(connection['role']),
+            'avatar_url':
+                _safeAvatarUrl(connection['avatar_url']) ??
+                _safeAvatarUrl(connection['avatar']),
+            'phone': connection['phone'],
+            'is_online': isOnline(Map<String, dynamic>.from(connection)),
+          },
+          'last_message': (last?['body'] ?? '').toString(),
+          'last_message_time': (last?['created_at'] ?? '').toString(),
+          'last_message_time_label': fmtTime(last?['created_at']),
+          'unread_count': unread,
+          'is_starred': false,
+        };
+      }).toList();
+
+      conversations.sort((a, b) {
+        final ta =
+            DateTime.tryParse((a['last_message_time'] ?? '').toString()) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final tb =
+            DateTime.tryParse((b['last_message_time'] ?? '').toString()) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return tb.compareTo(ta);
+      });
+
+      return conversations;
+    } catch (_) {
+      return [];
+    }
   }
 
   Future<List<dynamic>> getMessages(int userId, [String? token]) async {
@@ -244,15 +413,77 @@ class ApiService {
 
   Future<void> sendMessage(
     int receiverId,
-    String content, [
+    String content, {
+    List<String>? attachments,
     String? token,
-  ]) async {
+  }) async {
+    final body = <String, dynamic>{'receiver_id': receiverId, 'body': content};
+    if (attachments != null && attachments.isNotEmpty) {
+      body['attachments'] = attachments;
+    }
+
+    final headers = await _headers(auth: true);
+    if (token != null && token.trim().isNotEmpty) {
+      headers['Authorization'] = 'Bearer ${token.trim()}';
+    }
+
     final res = await http.post(
-      Uri.parse('${AppConstants.apiV1}/messages'),
-      headers: await _headers(auth: true),
-      body: jsonEncode({'receiver_id': receiverId, 'body': content}),
+      Uri.parse('${AppConstants.apiV1}/messages/'),
+      headers: headers,
+      body: jsonEncode(body),
     );
+
+    if (res.statusCode == 307 || res.statusCode == 308) {
+      final retry = await http.post(
+        Uri.parse('${AppConstants.apiV1}/messages'),
+        headers: headers,
+        body: jsonEncode(body),
+      );
+      await _handleResponse(retry);
+      return;
+    }
+
     _handleResponse(res);
+  }
+
+  Future<Map<String, dynamic>> uploadMessageAttachment(String filePath) async {
+    final tok = await token;
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${AppConstants.apiV1}/messages/attachments/upload'),
+    );
+
+    if (tok != null) {
+      request.headers['Authorization'] = 'Bearer $tok';
+    }
+
+    request.files.add(await http.MultipartFile.fromPath('file', filePath));
+
+    final streamed = await request.send();
+    final body = await streamed.stream.bytesToString();
+    final json = jsonDecode(body) as Map<String, dynamic>;
+
+    if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+      throw ApiException(
+        statusCode: streamed.statusCode,
+        message: json['detail']?.toString() ?? 'Attachment upload failed',
+      );
+    }
+
+    return json;
+  }
+
+  Future<int> markThreadAsRead(int otherUserId) async {
+    try {
+      final res = await http.put(
+        Uri.parse('${AppConstants.apiV1}/messages/read/thread/$otherUserId'),
+        headers: await _headers(auth: true),
+      );
+      final data = await _handleResponse(res);
+      return int.tryParse('${data['updated_count'] ?? 0}') ?? 0;
+    } catch (_) {
+      return 0;
+    }
   }
 
   // ──────────────────── NOTIFICATIONS ────────────────────
@@ -270,6 +501,45 @@ class ApiService {
       headers: await _headers(auth: true),
     );
     _handleResponse(res);
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    final res = await http.put(
+      Uri.parse('${AppConstants.apiV1}/notifications/read-all'),
+      headers: await _headers(auth: true),
+    );
+    _handleResponse(res);
+  }
+
+  Future<void> registerDeviceToken(
+    String token, {
+    String platform = 'unknown',
+    String? deviceId,
+  }) async {
+    final res = await http.post(
+      Uri.parse('${AppConstants.apiV1}/notifications/device-token'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({
+        'token': token,
+        'platform': platform,
+        if (deviceId != null && deviceId.trim().isNotEmpty)
+          'device_id': deviceId,
+      }),
+    );
+    _handleResponse(res);
+  }
+
+  Future<void> unregisterDeviceToken(String token) async {
+    final req = http.Request(
+      'DELETE',
+      Uri.parse('${AppConstants.apiV1}/notifications/device-token'),
+    );
+    req.headers.addAll(await _headers(auth: true));
+    req.body = jsonEncode({'token': token});
+
+    final streamed = await req.send();
+    final response = await http.Response.fromStream(streamed);
+    _handleResponse(response);
   }
 
   // ──────────────────── PITCH COACH ────────────────────
@@ -291,6 +561,42 @@ class ApiService {
       headers: await _headers(auth: true),
     );
     return _handleResponse(res);
+  }
+
+  Future<Map<String, dynamic>> uploadPitchVideo(
+    int ventureId,
+    String filePath, {
+    required String pitchType,
+    required int durationSeconds,
+    required int targetDurationSeconds,
+  }) async {
+    final tok = await token;
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${AppConstants.apiV1}/ventures/$ventureId/pitch-video'),
+    );
+
+    if (tok != null) {
+      request.headers['Authorization'] = 'Bearer $tok';
+    }
+
+    request.files.add(await http.MultipartFile.fromPath('file', filePath));
+    request.fields['pitch_type'] = pitchType;
+    request.fields['duration'] = durationSeconds.toString();
+    request.fields['target_duration'] = targetDurationSeconds.toString();
+
+    final streamed = await request.send();
+    final body = await streamed.stream.bytesToString();
+    final json = jsonDecode(body) as Map<String, dynamic>;
+
+    if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+      throw ApiException(
+        statusCode: streamed.statusCode,
+        message: json['detail']?.toString() ?? 'Pitch upload failed',
+      );
+    }
+
+    return json;
   }
 
   // ──────────────────── AI CHAT ────────────────────

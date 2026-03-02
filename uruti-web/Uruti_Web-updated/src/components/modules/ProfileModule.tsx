@@ -1,0 +1,958 @@
+import { useEffect, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { EditProfileDialog } from '../EditProfileDialog';
+import { AddExperienceDialog, AddAchievementDialog, AddActivityDialog } from '../AddProfileContentDialogs';
+import { StartupDetailsDialog } from '../StartupDetailsDialog';
+import { ShareProfileDialog } from '../ShareProfileDialog';
+import { useAuth } from '../../lib/auth-context';
+import { apiClient } from '../../lib/api-client';
+import { toast } from 'sonner';
+import { 
+  MapPin, 
+  Link as LinkIcon, 
+  Mail, 
+  Phone,
+  Edit,
+  Share2,
+  MessageSquare,
+  Star,
+  Briefcase,
+  GraduationCap,
+  Award,
+  TrendingUp,
+  Users,
+  FileText,
+  ExternalLink,
+  Calendar,
+  CheckCircle2,
+  Building2,
+  Rocket,
+  DollarSign,
+  Target,
+  Globe,
+  Plus
+} from 'lucide-react';
+
+interface ProfileModuleProps {
+  userId?: string;
+  userType?: 'founder' | 'investor';
+  isOwnProfile?: boolean;
+  onEdit?: () => void;
+  onMessage?: () => void;
+}
+
+export function ProfileModule({ 
+  userId, 
+  userType = 'founder', 
+  isOwnProfile = true,
+  onEdit,
+  onMessage 
+}: ProfileModuleProps) {
+  const { user, updateUser } = useAuth();
+  const [activeTab, setActiveTab] = useState('overview');
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [addExperienceOpen, setAddExperienceOpen] = useState(false);
+  const [addAchievementOpen, setAddAchievementOpen] = useState(false);
+  const [addActivityOpen, setAddActivityOpen] = useState(false);
+  const [shareProfileOpen, setShareProfileOpen] = useState(false);
+  const [refreshingProfile, setRefreshingProfile] = useState(false);
+  const [startupDetailsOpen, setStartupDetailsOpen] = useState(false);
+  const [selectedStartup, setSelectedStartup] = useState<any>(null);
+  
+  // Initialize profile with data from account creation
+  const [profile, setProfile] = useState({
+    id: user?.id || '1',
+    name: user?.full_name || 'User',
+    role: user?.role === 'founder' ? 'Entrepreneur' : 'Investor',
+    location: user?.location || '',
+    avatar: user?.avatar_url || '',
+    coverImage: (user as any)?.cover_image_url || '',
+    bio: user?.bio || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    website: '',
+    linkedIn: '',
+    connections: 0,
+    followers: 0,
+    verified: false,
+    skills: [],
+    experience: [],
+    education: [],
+    startups: [],
+    achievements: [],
+    activity: [],
+    investments: [],
+    portfolio: [],
+    investmentThesis: '',
+    ticketSize: '',
+    preferredSectors: []
+  });
+
+  const hydrateProfile = async () => {
+    if (!user) return;
+    try {
+      const latestUser = await apiClient.getCurrentUser();
+
+      setProfile((prev) => ({
+        ...prev,
+        id: latestUser.id || prev.id,
+        name: latestUser.full_name || prev.name,
+        role: latestUser.role === 'founder' ? 'Entrepreneur' : latestUser.role === 'investor' ? 'Investor' : prev.role,
+        location: latestUser.location || '',
+        avatar: latestUser.avatar_url || '',
+        coverImage: latestUser.cover_image_url || '',
+        bio: latestUser.bio || '',
+        email: latestUser.email || prev.email,
+        phone: latestUser.phone || '',
+        website: latestUser.website_url || '',
+        linkedIn: latestUser.linkedin_url || '',
+      }));
+
+      updateUser({
+        full_name: latestUser.full_name,
+        avatar_url: latestUser.avatar_url,
+        bio: latestUser.bio,
+      });
+    } catch (error) {
+      console.error('Error hydrating profile data:', error);
+    }
+  };
+
+  useEffect(() => {
+    hydrateProfile();
+  }, [user?.id]);
+
+  const handleRefreshProfile = async () => {
+    setRefreshingProfile(true);
+    try {
+      await hydrateProfile();
+      toast.success('Profile refreshed');
+    } finally {
+      setRefreshingProfile(false);
+    }
+  };
+
+  const handleSaveProfile = async (updatedProfile: any) => {
+    try {
+      // Prepare profile data for backend
+      const profileData: any = {
+        full_name: updatedProfile.name,
+        bio: updatedProfile.bio,
+        location: updatedProfile.location,
+        phone: updatedProfile.phone,
+        website_url: updatedProfile.website,
+        linkedin_url: updatedProfile.linkedIn,
+        twitter_url: updatedProfile.twitter,
+        expertise: updatedProfile.skills || [],
+        company: updatedProfile.company || '',
+      };
+
+      // Add founder-specific fields
+      if (userType === 'founder') {
+        if (updatedProfile.industry) profileData.industry = updatedProfile.industry;
+        if (updatedProfile.stage) profileData.stage = updatedProfile.stage;
+        if (updatedProfile.funding_amount) profileData.funding_amount = updatedProfile.funding_amount;
+      }
+
+      // Add investor-specific fields if user is investor
+      if (userType === 'investor') {
+        if (updatedProfile.organizationName) profileData.company = updatedProfile.organizationName;
+        if (updatedProfile.investorType) profileData.investor_type = updatedProfile.investorType;
+        if (updatedProfile.investmentRange) profileData.investment_range = updatedProfile.investmentRange;
+        if (updatedProfile.investmentStage) profileData.investment_stage = updatedProfile.investmentStage;
+        if (updatedProfile.portfolioSize) profileData.portfolio_size = updatedProfile.portfolioSize;
+        if (updatedProfile.investmentThesis) profileData.investment_thesis = updatedProfile.investmentThesis;
+        if (updatedProfile.ticketSize) profileData.ticket_size = updatedProfile.ticketSize;
+        if (updatedProfile.preferredSectors && updatedProfile.preferredSectors.length > 0) {
+          profileData.preferred_sectors = updatedProfile.preferredSectors;
+        }
+        if (updatedProfile.investmentFocus && updatedProfile.investmentFocus.length > 0) {
+          profileData.investment_focus = updatedProfile.investmentFocus;
+        }
+      }
+
+      // Common fields for both roles
+      if (updatedProfile.achievements && updatedProfile.achievements.length > 0) {
+        profileData.achievements = updatedProfile.achievements;
+      }
+
+      // Upload avatar if it's a new image (base64 data)
+      if (updatedProfile.avatar && updatedProfile.avatar.startsWith('data:image')) {
+        try {
+          console.log('Uploading avatar image...');
+          // Convert base64 to blob
+          const response = await fetch(updatedProfile.avatar);
+          const blob = await response.blob();
+          const file = new File([blob], 'avatar.png', { type: blob.type });
+          
+          // Upload to backend
+          const avatarResponse = await apiClient.uploadAvatar(file);
+          console.log('Avatar upload response:', avatarResponse);
+          if (avatarResponse && avatarResponse.avatar_url) {
+            console.log('Avatar URL set to:', avatarResponse.avatar_url);
+            updatedProfile.avatar = avatarResponse.avatar_url;
+          } else {
+            console.warn('Avatar upload response missing avatar_url field:', avatarResponse);
+          }
+        } catch (avatarError) {
+          console.error('Avatar upload error:', avatarError);
+          toast.error('Failed to upload avatar. Profile saved without avatar update.');
+        }
+      }
+
+      // Upload cover image if it's a new image (base64 data)
+      if (updatedProfile.coverImage && updatedProfile.coverImage.startsWith('data:image')) {
+        try {
+          console.log('Uploading cover image...');
+          // Convert base64 to blob
+          const response = await fetch(updatedProfile.coverImage);
+          const blob = await response.blob();
+          const file = new File([blob], 'cover.png', { type: blob.type });
+          
+          // Upload to backend
+          const coverResponse = await apiClient.uploadCoverImage(file);
+          console.log('Cover image upload response:', coverResponse);
+          if (coverResponse && coverResponse.cover_image_url) {
+            console.log('Cover image URL set to:', coverResponse.cover_image_url);
+            updatedProfile.coverImage = coverResponse.cover_image_url;
+          } else {
+            console.warn('Cover image upload response missing cover_image_url field:', coverResponse);
+          }
+        } catch (coverError) {
+          console.error('Cover image upload error:', coverError);
+          toast.error('Failed to upload cover image. Profile saved without cover update.');
+        }
+      }
+
+      profileData.avatar_url = updatedProfile.avatar || null;
+      profileData.cover_image_url = updatedProfile.coverImage || null;
+
+      // Update profile data on backend
+      console.log('Saving profile data to backend:', profileData);
+      const savedUser = await apiClient.updateProfile(profileData);
+      
+      // Update local state
+      setProfile({ ...profile, ...updatedProfile });
+
+      updateUser({
+        full_name: savedUser?.full_name || updatedProfile.name,
+        avatar_url: savedUser?.avatar_url || updatedProfile.avatar,
+        bio: savedUser?.bio || updatedProfile.bio,
+      });
+      
+      // Dispatch event to update avatar in header and everywhere else
+      window.dispatchEvent(new CustomEvent('profile-updated', { 
+        detail: { 
+          avatar: updatedProfile.avatar,
+          name: updatedProfile.name,
+          fullProfile: { ...profile, ...updatedProfile }
+        } 
+      }));
+
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      toast.error('Failed to update profile. Please try again.');
+      throw error;
+    }
+  };
+
+  const handleAddExperience = (experience: any) => {
+    setProfile({
+      ...profile,
+      experience: [experience, ...profile.experience]
+    });
+  };
+
+  const handleAddAchievement = (achievement: any) => {
+    setProfile({
+      ...profile,
+      achievements: [achievement, ...profile.achievements]
+    });
+  };
+
+  const handleAddActivity = (activity: any) => {
+    setProfile({
+      ...profile,
+      activity: [activity, ...profile.activity]
+    });
+  };
+
+  const handleViewStartupDetails = (startup: any) => {
+    setSelectedStartup(startup);
+    setStartupDetailsOpen(true);
+  };
+
+  const profileUrl = `https://uruti.rw/profile/${profile.id}/${profile.name.replace(/\s+/g, '-').toLowerCase()}`;
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto">
+      {/* Cover Image & Profile Header */}
+      <Card className="glass-card border-black/5 dark:border-white/10 overflow-hidden">
+        {/* Cover Photo */}
+        <div className="relative h-48 bg-gradient-to-r from-black via-gray-800 to-[#76B947]">
+          {profile.coverImage && (
+            <img 
+              src={profile.coverImage} 
+              alt="Cover" 
+              className="w-full h-full object-cover opacity-40"
+            />
+          )}
+        </div>
+
+        <CardContent className="pt-0">
+          <div className="flex flex-col md:flex-row items-start md:items-end justify-between -mt-16 md:-mt-20 gap-4">
+            {/* Avatar & Basic Info */}
+            <div className="flex flex-col md:flex-row items-center md:items-end gap-4">
+              <div className="relative">
+                <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-white dark:border-gray-900 shadow-xl">
+                  <AvatarImage src={profile.avatar} />
+                  <AvatarFallback className="bg-[#76B947]/20 text-[#76B947] text-4xl">
+                    {profile.name.split(' ').map(n => n[0]).join('')}
+                  </AvatarFallback>
+                </Avatar>
+                {profile.verified && (
+                  <div className="absolute bottom-2 right-2 bg-[#76B947] rounded-full p-1.5">
+                    <CheckCircle2 className="h-5 w-5 text-white" />
+                  </div>
+                )}
+              </div>
+
+              <div className="text-center md:text-left space-y-2 mb-4">
+                <div>
+                  <h1 className="text-3xl font-bold dark:text-white flex items-center justify-center md:justify-start gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                    {profile.name}
+                  </h1>
+                  <p className="text-lg text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                    {profile.role}
+                  </p>
+                </div>
+                <div className="flex items-center justify-center md:justify-start gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <MapPin className="h-4 w-4" />
+                    <span>{profile.location}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Users className="h-4 w-4" />
+                    <span>{profile.connections} connections</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Star className="h-4 w-4 text-[#76B947] fill-[#76B947]" />
+                    <span>{profile.followers} followers</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {isOwnProfile ? (
+                <>
+                  <Button
+                    onClick={() => setEditProfileOpen(true)}
+                    className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Profile
+                  </Button>
+                  <Button variant="outline" onClick={handleRefreshProfile} disabled={refreshingProfile}>
+                    {refreshingProfile ? 'Refreshing...' : 'Refresh Profile'}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent('navigate-to-messages'));
+                    }}
+                    className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Message
+                  </Button>
+                  <Button variant="outline">
+                    <Users className="h-4 w-4 mr-2" />
+                    Connect
+                  </Button>
+                </>
+              )}
+              <Button variant="outline" onClick={() => setShareProfileOpen(true)}>
+                <Share2 className="h-4 w-4 mr-2" />
+                Share
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Main Content Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Card className="glass-card border-black/5 dark:border-white/10">
+          <TabsList className="w-full justify-start border-b rounded-none bg-transparent p-0">
+            <TabsTrigger value="overview" className="data-[state=active]:border-b-2 data-[state=active]:border-[#76B947] rounded-none">
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="experience" className="data-[state=active]:border-b-2 data-[state=active]:border-[#76B947] rounded-none">
+              Experience
+            </TabsTrigger>
+            <TabsTrigger value={userType === 'founder' ? 'startups' : 'portfolio'} className="data-[state=active]:border-b-2 data-[state=active]:border-[#76B947] rounded-none">
+              {userType === 'founder' ? 'Startups' : 'Portfolio'}
+            </TabsTrigger>
+            <TabsTrigger value="activity" className="data-[state=active]:border-b-2 data-[state=active]:border-[#76B947] rounded-none">
+              Activity
+            </TabsTrigger>
+          </TabsList>
+        </Card>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* About Section */}
+              <Card className="glass-card border-black/5 dark:border-white/10">
+                <CardHeader>
+                  <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>About</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>
+                    {profile.bio}
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Skills */}
+              <Card className="glass-card border-black/5 dark:border-white/10">
+                <CardHeader>
+                  <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>Skills & Expertise</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {profile.skills.map((skill, index) => (
+                      <Badge 
+                        key={index} 
+                        className="bg-[#76B947]/10 text-[#76B947] hover:bg-[#76B947]/20 border border-[#76B947]/30"
+                      >
+                        {skill}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Experience Preview */}
+              <Card className="glass-card border-black/5 dark:border-white/10">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>Experience</CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setActiveTab('experience')}>
+                    View all
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {profile.experience.slice(0, 2).map((exp, index) => (
+                    <div key={index} className="flex gap-4">
+                      <Avatar className="h-12 w-12 border border-[#76B947]/30">
+                        <AvatarImage src={exp.logo} />
+                        <AvatarFallback className="bg-[#76B947]/10 text-[#76B947]">
+                          {exp.company.substring(0, 2)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <h4 className="font-semibold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                          {exp.title}
+                        </h4>
+                        <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                          {exp.company}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {exp.startDate} - {exp.endDate} • {exp.location}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              {/* Contact Info */}
+              <Card className="glass-card border-black/5 dark:border-white/10">
+                <CardHeader>
+                  <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>Contact Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center gap-3 text-sm">
+                    <Mail className="h-4 w-4 text-[#76B947]" />
+                    <span className="text-muted-foreground">{profile.email}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <Phone className="h-4 w-4 text-[#76B947]" />
+                    <span className="text-muted-foreground">{profile.phone}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <Globe className="h-4 w-4 text-[#76B947]" />
+                    <a href={`https://${profile.website}`} className="text-[#76B947] hover:underline">
+                      {profile.website}
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <LinkIcon className="h-4 w-4 text-[#76B947]" />
+                    <a href={`https://${profile.linkedIn}`} className="text-[#76B947] hover:underline">
+                      LinkedIn Profile
+                    </a>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Investment Focus (for investors) or Startup Info (for founders) */}
+              {userType === 'investor' ? (
+                <Card className="glass-card border-black/5 dark:border-white/10">
+                  <CardHeader>
+                    <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>Investment Focus</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2">INDUSTRIES</p>
+                      <div className="flex flex-wrap gap-2">
+                        {profile.preferredSectors.length > 0 ? (
+                          profile.preferredSectors.map((sector, index) => (
+                            <Badge key={index} variant="outline" className="border-[#76B947] text-[#76B947]">
+                              {sector}
+                            </Badge>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No sectors specified</p>
+                        )}
+                      </div>
+                    </div>
+                    {profile.ticketSize && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">CHECK SIZE</p>
+                        <p className="font-semibold text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>
+                          {profile.ticketSize}
+                        </p>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">TOTAL INVESTMENTS</p>
+                        <p className="text-2xl font-bold text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>
+                          {profile.investments.length}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">ACTIVE</p>
+                        <p className="text-2xl font-bold text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>
+                          {profile.investments.filter((inv: any) => inv.status === 'Active').length}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                profile.startups.length > 0 ? (
+                  <Card className="glass-card border-black/5 dark:border-white/10">
+                    <CardHeader>
+                      <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>Current Venture</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-12 w-12 border border-[#76B947]/30">
+                            <AvatarImage src={profile.startups[0].logo} />
+                            <AvatarFallback className="bg-[#76B947]/10 text-[#76B947]">
+                              {profile.startups[0].name.substring(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h4 className="font-semibold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                              {profile.startups[0].name}
+                            </h4>
+                            <p className="text-xs text-muted-foreground">
+                              {profile.startups[0].industry}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Readiness Score</span>
+                            <span className="font-semibold text-[#76B947]">
+                              {profile.startups[0].readinessScore}%
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Stage</span>
+                            <Badge className="bg-[#76B947] text-white">
+                              {profile.startups[0].stage}
+                            </Badge>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Funding Raised</span>
+                            <span className="font-semibold dark:text-white">
+                              {profile.startups[0].fundingRaised}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="glass-card border-black/5 dark:border-white/10">
+                    <CardHeader>
+                      <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>Current Venture</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No startups added yet
+                      </p>
+                    </CardContent>
+                  </Card>
+                )
+              )}
+
+              {/* Achievements */}
+              <Card className="glass-card border-black/5 dark:border-white/10">
+                <CardHeader>
+                  <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>
+                    <Award className="h-5 w-5 inline mr-2 text-[#76B947]" />
+                    Achievements
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {profile.achievements.length > 0 ? (
+                    profile.achievements.map((achievement, index) => (
+                      <div key={index} className="flex gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-[#76B947]/10 flex items-center justify-center flex-shrink-0">
+                          <Award className="h-5 w-5 text-[#76B947]" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                            {achievement.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {achievement.issuer} • {achievement.date}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No achievements added yet
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Experience Tab */}
+        <TabsContent value="experience" className="space-y-6">
+          {/* Experience */}
+          <Card className="glass-card border-black/5 dark:border-white/10">
+            <CardHeader>
+              <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>
+                <Briefcase className="h-5 w-5 inline mr-2 text-[#76B947]" />
+                Professional Experience
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {profile.experience.map((exp, index) => (
+                <div key={index} className="flex gap-4 pb-6 border-b last:border-b-0 dark:border-gray-700">
+                  <Avatar className="h-14 w-14 border border-[#76B947]/30">
+                    <AvatarImage src={exp.logo} />
+                    <AvatarFallback className="bg-[#76B947]/10 text-[#76B947]">
+                      {exp.company.substring(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <h4 className="font-semibold text-lg dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                          {exp.title}
+                        </h4>
+                        <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                          {exp.company}
+                        </p>
+                      </div>
+                      {exp.current && (
+                        <Badge className="bg-[#76B947] text-white">Current</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      {exp.startDate} - {exp.endDate} • {exp.location}
+                    </p>
+                    <p className="text-sm text-muted-foreground leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>
+                      {exp.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Education */}
+          <Card className="glass-card border-black/5 dark:border-white/10">
+            <CardHeader>
+              <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>
+                <GraduationCap className="h-5 w-5 inline mr-2 text-[#76B947]" />
+                Education
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {profile.education.map((edu, index) => (
+                <div key={index} className="flex gap-4">
+                  <Avatar className="h-14 w-14 border border-[#76B947]/30">
+                    <AvatarImage src={edu.logo} />
+                    <AvatarFallback className="bg-[#76B947]/10 text-[#76B947]">
+                      {edu.institution.substring(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <h4 className="font-semibold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                      {edu.institution}
+                    </h4>
+                    <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                      {edu.degree} in {edu.field}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {edu.startDate} - {edu.endDate}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Startups/Portfolio Tab */}
+        <TabsContent value={userType === 'founder' ? 'startups' : 'portfolio'} className="space-y-6">
+          <Card className="glass-card border-black/5 dark:border-white/10">
+            <CardHeader>
+              <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>
+                {userType === 'founder' ? (
+                  <>
+                    <Rocket className="h-5 w-5 inline mr-2 text-[#76B947]" />
+                    My Startups
+                  </>
+                ) : (
+                  <>
+                    <DollarSign className="h-5 w-5 inline mr-2 text-[#76B947]" />
+                    Investment Portfolio
+                  </>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {userType === 'founder' ? (
+                profile.startups.length > 0 ? (
+                  profile.startups.map((startup, index) => (
+                    <div key={index} className="glass-panel p-6 rounded-xl hover:bg-[#76B947]/5 transition-all">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex gap-4">
+                          <Avatar className="h-16 w-16 border border-[#76B947]/30">
+                            <AvatarImage src={startup.logo} />
+                            <AvatarFallback className="bg-[#76B947]/10 text-[#76B947]">
+                              {startup.name.substring(0, 2)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h4 className="font-semibold text-lg dark:text-white mb-1" style={{ fontFamily: 'var(--font-heading)' }}>
+                              {startup.name}
+                            </h4>
+                            <p className="text-sm text-muted-foreground mb-2" style={{ fontFamily: 'var(--font-body)' }}>
+                              {startup.description}
+                            </p>
+                            <div className="flex gap-2">
+                              <Badge variant="outline" className="border-[#76B947] text-[#76B947]">
+                                {startup.industry}
+                              </Badge>
+                              <Badge className="bg-[#76B947] text-white">
+                                {startup.stage}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">FUNDING RAISED</p>
+                          <p className="text-lg font-bold text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>
+                            {startup.fundingRaised}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">READINESS SCORE</p>
+                          <p className="text-lg font-bold text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>
+                            {startup.readinessScore}%
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-4">
+                        <Button variant="outline" size="sm" onClick={() => handleViewStartupDetails(startup)}>
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          View Details
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12">
+                    <Rocket className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                      No startups added yet. Add your first venture to get started!
+                    </p>
+                  </div>
+                )
+              ) : (
+                profile.portfolio.length > 0 ? (
+                  profile.portfolio.map((investment, index) => (
+                    <div key={index} className="glass-panel p-6 rounded-xl hover:bg-[#76B947]/5 transition-all">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex gap-4">
+                          <Avatar className="h-16 w-16 border border-[#76B947]/30">
+                            <AvatarImage src={investment.logo} />
+                            <AvatarFallback className="bg-[#76B947]/10 text-[#76B947]">
+                              {investment.name.substring(0, 2)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h4 className="font-semibold text-lg dark:text-white mb-1" style={{ fontFamily: 'var(--font-heading)' }}>
+                              {investment.name}
+                            </h4>
+                            <div className="flex gap-2 mb-2">
+                              <Badge variant="outline" className="border-[#76B947] text-[#76B947]">
+                                {investment.industry}
+                              </Badge>
+                              <Badge className={investment.status === 'Active' ? 'bg-[#76B947] text-white' : 'bg-gray-500 text-white'}>
+                                {investment.status}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">INVESTMENT</p>
+                          <p className="text-lg font-bold text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>
+                            {investment.investmentAmount}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">EQUITY</p>
+                          <p className="text-lg font-bold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                            {investment.equity}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">DATE</p>
+                          <p className="text-sm font-semibold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                            {investment.investmentDate}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-4">
+                        <Button variant="outline" size="sm">
+                          <Target className="h-4 w-4 mr-2" />
+                          View Startup
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12">
+                    <DollarSign className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                      No investments in portfolio yet.
+                    </p>
+                  </div>
+                )
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Activity Tab */}
+        <TabsContent value="activity" className="space-y-4">
+          <Card className="glass-card border-black/5 dark:border-white/10">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>
+                <TrendingUp className="h-5 w-5 inline mr-2 text-[#76B947]" />
+                Recent Activity
+              </CardTitle>
+              {isOwnProfile && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setAddActivityOpen(true)}
+                  className="hover:bg-[#76B947]/10 hover:text-[#76B947]"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Activity
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {profile.activity.length === 0 ? (
+                <div className="text-center py-12">
+                  <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-4" style={{ fontFamily: 'var(--font-body)' }}>
+                    No activity yet. Start tracking your entrepreneurial journey!
+                  </p>
+                  {isOwnProfile && (
+                    <Button 
+                      onClick={() => setAddActivityOpen(true)}
+                      className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Your First Activity
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                profile.activity.map((item, index) => (
+                  <div key={index} className="glass-panel p-4 rounded-lg hover:bg-[#76B947]/5 transition-all">
+                    <div className="flex items-start gap-4">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        item.type === 'pitch' ? 'bg-blue-500/10' :
+                        item.type === 'milestone' ? 'bg-[#76B947]/10' :
+                        item.type === 'funding' ? 'bg-purple-500/10' :
+                        item.type === 'investment' ? 'bg-green-500/10' :
+                        'bg-gray-500/10'
+                      }`}>
+                        {item.type === 'pitch' && <FileText className="h-5 w-5 text-blue-500" />}
+                        {item.type === 'milestone' && <Target className="h-5 w-5 text-[#76B947]" />}
+                        {item.type === 'funding' && <DollarSign className="h-5 w-5 text-purple-500" />}
+                        {item.type === 'investment' && <TrendingUp className="h-5 w-5 text-green-500" />}
+                        {item.type === 'event' && <Calendar className="h-5 w-5 text-orange-500" />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm dark:text-white" style={{ fontFamily: 'var(--font-body)' }}>
+                          {item.content}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">{item.date}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Dialogs */}
+      <EditProfileDialog
+        open={editProfileOpen}
+        onOpenChange={setEditProfileOpen}
+        profile={profile}
+        onSave={handleSaveProfile}
+        userType={userType}
+      />
+    </div>
+  );
+}

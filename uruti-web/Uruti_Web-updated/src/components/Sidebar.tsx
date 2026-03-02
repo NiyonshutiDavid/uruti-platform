@@ -1,0 +1,258 @@
+import { LayoutDashboard, Lightbulb, TrendingUp, GraduationCap, Users, Calendar, Video, BarChart3, Briefcase, DollarSign, Home, BookOpen, Mic, Target, Sparkles, MessageSquare, User, X, Clock, Shield, Headphones } from 'lucide-react';
+import { Button } from './ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Badge } from './ui/badge';
+import { EnhancedCaptureIdeaDialog } from './EnhancedCaptureIdeaDialog';
+import { useState, useEffect } from 'react';
+import { UserRole } from '../lib/auth-context';
+import { apiClient } from '../lib/api-client';
+import { useSupport } from '../lib/support-context';
+
+interface SidebarProps {
+  activeModule: string;
+  onModuleChange: (module: string) => void;
+  userType?: UserRole;
+  isMobileSidebarOpen?: boolean;
+  setIsMobileSidebarOpen?: (open: boolean) => void;
+}
+
+const founderNavItems = [
+  { id: 'dashboard', label: 'Founder Snapshot', icon: Home },
+  { id: 'profile', label: 'My Profile', icon: User },
+  { id: 'startups', label: 'Startup Hub', icon: Lightbulb },
+  { id: 'pitch-performance', label: 'Pitch Performance', icon: TrendingUp },
+  { id: 'ai-chat', label: 'Uruti AI Chat', icon: Sparkles },
+  { id: 'advisory-tracks', label: 'AI Advisory Tracks', icon: BookOpen },
+  { id: 'connections', label: 'Build Connections', icon: Users },
+  { id: 'calendar', label: 'Readiness Calendar', icon: Calendar },
+  { id: 'availability', label: 'My Availability', icon: Clock },
+  { id: 'pitch-coach', label: 'Pitch Coach', icon: Mic },
+  { id: 'messages', label: 'Messages', icon: MessageSquare },
+];
+
+const investorMenuItems = [
+  { id: 'investor-dashboard', label: 'Investor Dashboard', icon: Home },
+  { id: 'profile', label: 'My Profile', icon: User },
+  { id: 'startup-discovery', label: 'Startup Discovery', icon: Target },
+  { id: 'connections', label: 'Build Connections', icon: Users },
+  { id: 'ai-chat', label: 'Uruti AI Chat', icon: Sparkles },
+  { id: 'deal-flow', label: 'Deal Flow', icon: TrendingUp },
+  { id: 'calendar', label: 'Meeting Calendar', icon: Calendar },
+  { id: 'availability', label: 'Availability & Booking', icon: Clock },
+  { id: 'messages', label: 'Messages', icon: MessageSquare },
+];
+
+const adminMenuItems = [
+  { id: 'admin-dashboard', label: 'Admin Dashboard', icon: Shield },
+  { id: 'user-management', label: 'User Management', icon: Users },
+  { id: 'startup-discovery', label: 'All Startups', icon: Target },
+  { id: 'admin-advisory-tracks', label: 'Advisory Tracks', icon: BookOpen },
+  { id: 'customer-support', label: 'Customer Support', icon: Headphones },
+  { id: 'settings', label: 'Admin Credentials', icon: User },
+];
+
+export function Sidebar({ activeModule, onModuleChange, userType = 'founder', isMobileSidebarOpen, setIsMobileSidebarOpen }: SidebarProps) {
+  const { unreadCount: pendingSupportCount } = useSupport();
+  // Get navigation items based on user role
+  const getNavigationItems = () => {
+    switch (userType) {
+      case 'founder':
+        return founderNavItems;
+      case 'investor':
+        return investorMenuItems;
+      case 'admin':
+        return adminMenuItems;
+      default:
+        return founderNavItems;
+    }
+  };
+
+  const navigationItems = getNavigationItems();
+  const [captureDialogOpen, setCaptureDialogOpen] = useState(false);
+  const [startupCount, setStartupCount] = useState(0);
+  const [investmentReady, setInvestmentReady] = useState(0);
+  const [newIdea, setNewIdea] = useState({
+    name: '',
+    sector: '',
+    problem: '',
+    solution: '',
+    targetMarket: ''
+  });
+
+  // Fetch real startup count from backend
+  useEffect(() => {
+    const fetchStartupData = async () => {
+      try {
+        const ventures = await apiClient.getVentures(0, 100);
+        setStartupCount(ventures.length);
+        
+        // Calculate investment ready percentage (ventures with high readiness scores)
+        // This is a simplified calculation - adjust based on your actual readiness criteria
+        const readyCount = ventures.filter((v: any) => v.investment_readiness_score >= 70).length;
+        setInvestmentReady(ventures.length > 0 ? Math.round((readyCount / ventures.length) * 100) : 0);
+      } catch (error) {
+        // Silently handle error - keep default values of 0
+        console.log('Ventures not yet loaded from backend');
+      }
+    };
+
+    fetchStartupData();
+  }, []);
+
+  const handleCaptureIdea = () => {
+    // Save the new idea (in a real app, this would save to a database)
+    console.log('New Idea Captured:', newIdea);
+    setCaptureDialogOpen(false);
+    setNewIdea({
+      name: '',
+      sector: '',
+      problem: '',
+      solution: '',
+      targetMarket: ''
+    });
+    // Navigate to startup hub to show the new idea
+    onModuleChange('startups');
+  };
+
+  useEffect(() => {
+    if (isMobileSidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+  }, [isMobileSidebarOpen]);
+
+  // Get role display name
+  const getRoleDisplayName = () => {
+    switch (userType) {
+      case 'founder':
+        return 'Founder';
+      case 'investor':
+        return 'Investor';
+      case 'admin':
+        return 'Administrator';
+      default:
+        return 'User';
+    }
+  };
+
+  return (
+    <>
+      {/* Mobile Overlay */}
+      {isMobileSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setIsMobileSidebarOpen?.(false)}
+        />
+      )}
+
+      <aside className={`fixed left-0 top-16 h-[calc(100vh-4rem)] w-64 glass-panel border-r border-black/10 dark:border-white/10 p-4 overflow-y-auto hide-scrollbar z-50 transition-transform duration-300 lg:translate-x-0 ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        {/* Close button for mobile */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsMobileSidebarOpen?.(false)}
+          className="lg:hidden absolute top-2 right-2 hover:bg-[#76B947]/10"
+        >
+          <X className="h-5 w-5 text-black dark:text-white" />
+        </Button>
+
+        {/* User Role Badge */}
+        <div className="mb-4 p-3 glass-card dark:bg-transparent dark:border dark:border-white/20 rounded-lg">
+          <p className="text-xs text-muted-foreground mb-2" style={{ fontFamily: 'var(--font-body)' }}>ACCOUNT TYPE</p>
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-lg bg-[#76B947]/10 flex items-center justify-center">
+              {userType === 'admin' && <Shield className="h-5 w-5 text-[#76B947]" />}
+              {userType === 'investor' && <DollarSign className="h-5 w-5 text-[#76B947]" />}
+              {userType === 'founder' && <Lightbulb className="h-5 w-5 text-[#76B947]" />}
+            </div>
+            <div>
+              <p className="text-sm font-bold text-black dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                {getRoleDisplayName()}
+              </p>
+              <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                Dashboard
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <nav className="space-y-2">
+          {navigationItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeModule === item.id;
+            return (
+              <Button
+                key={item.id}
+                data-module={item.id}
+                variant={isActive ? 'default' : 'ghost'}
+                className={`w-full justify-start ${
+                  isActive
+                    ? 'bg-black dark:bg-[#76B947] text-white hover:bg-black/90 dark:hover:bg-[#76B947]/90'
+                    : 'hover:bg-transparent hover:text-[#76B947] hover:border hover:border-[#76B947] text-black dark:text-white'
+                }`}
+                onClick={() => onModuleChange(item.id)}
+              >
+                <Icon className="mr-2 h-5 w-5" />
+                <span style={{ fontFamily: 'var(--font-body)' }}>{item.label}</span>
+                {userType === 'admin' && item.id === 'customer-support' && pendingSupportCount > 0 && (
+                  <Badge className="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0 rounded-full min-w-[20px] justify-center">
+                    {pendingSupportCount > 99 ? '99+' : pendingSupportCount}
+                  </Badge>
+                )}
+              </Button>
+            );
+          })}
+        </nav>
+        
+        <div className="mt-8 p-4 glass-card dark:bg-transparent dark:border dark:border-white/20 rounded-lg">
+          <div className="flex items-center space-x-2 mb-2">
+            <BarChart3 className="h-5 w-5 text-[#76B947]" />
+            <span className="text-sm text-black dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+              {userType === 'founder' ? 'Innovation Network' : 'Deal Flow'}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+            {userType === 'founder' ? `${startupCount} active startups` : `${startupCount} opportunities`}
+          </p>
+          <div className="mt-3 w-full bg-[#76B947]/20 rounded-full h-2">
+            <div 
+              className="bg-[#76B947] h-2 rounded-full transition-all duration-300"
+              style={{ width: `${investmentReady}%` }}
+            ></div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2" style={{ fontFamily: 'var(--font-body)' }}>
+            {userType === 'founder' ? `${investmentReady}% Investment Ready` : `${investmentReady}% Evaluated`}
+          </p>
+        </div>
+        
+        {userType === 'founder' && (
+          <>
+            <div 
+              onClick={() => setCaptureDialogOpen(true)}
+              className="mt-4 p-4 glass-button rounded-lg cursor-pointer hover:scale-105 transition-transform"
+            >
+              <div className="text-center">
+                <Lightbulb className="h-8 w-8 text-[#76B947] mx-auto mb-2" />
+                <p className="text-xs text-black dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>Capture New Idea</p>
+              </div>
+            </div>
+            
+            <EnhancedCaptureIdeaDialog 
+              open={captureDialogOpen}
+              onOpenChange={setCaptureDialogOpen}
+              onSave={(ventureData) => {
+                console.log('New Venture Captured:', ventureData);
+                onModuleChange('startups');
+              }}
+            />
+          </>
+        )}
+      </aside>
+    </>
+  );
+}

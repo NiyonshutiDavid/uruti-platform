@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/app_constants.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 
 enum AuthStatus { initial, loading, authenticated, unauthenticated }
 
@@ -40,6 +41,7 @@ class AuthProvider extends ChangeNotifier {
         _user = await _api.getCurrentUser();
         _status = AuthStatus.authenticated;
         await _saveUser(_user!);
+        await NotificationService.instance.syncTokenWithBackend();
       } catch (_) {
         await _clearSession();
       }
@@ -65,6 +67,7 @@ class AuthProvider extends ChangeNotifier {
 
       _user = await _api.getCurrentUser();
       await _saveUser(_user!);
+      await NotificationService.instance.syncTokenWithBackend();
 
       _status = AuthStatus.authenticated;
       notifyListeners();
@@ -75,7 +78,8 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _error = 'Connection error. Check your internet.';
+      _error =
+          'Cannot reach server at ${AppConstants.apiBaseUrl}. Ensure backend is running and URL is correct.';
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
@@ -114,6 +118,9 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    try {
+      await NotificationService.instance.unregisterCurrentToken();
+    } catch (_) {}
     await _api.logout();
     await _clearSession();
     _status = AuthStatus.unauthenticated;

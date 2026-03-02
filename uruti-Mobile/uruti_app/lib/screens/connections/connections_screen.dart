@@ -141,10 +141,7 @@ class _ConnectionsScreenState extends State<ConnectionsScreen>
           : TabBarView(
               controller: _tab,
               children: [
-                _ConnectedTab(
-                  connections: _connections,
-                  onRefresh: _load,
-                ),
+                _ConnectedTab(connections: _connections, onRefresh: _load),
                 _PendingTab(pending: _pending, onRefresh: _load),
                 _DiscoverTab(onRefresh: _load),
               ],
@@ -176,7 +173,8 @@ class _ConnectedTabState extends State<_ConnectedTab> {
       final company = (c['company'] as String? ?? '').toLowerCase();
       final bio = (c['bio'] as String? ?? '').toLowerCase();
       final q = _search.toLowerCase();
-      final matchSearch = q.isEmpty ||
+      final matchSearch =
+          q.isEmpty ||
           name.contains(q) ||
           role.contains(q) ||
           company.contains(q) ||
@@ -201,8 +199,10 @@ class _ConnectedTabState extends State<_ConnectedTab> {
             decoration: InputDecoration(
               hintText: 'Search connections...',
               hintStyle: TextStyle(color: context.colors.textSecondary),
-              prefixIcon:
-                  Icon(Icons.search, color: context.colors.textSecondary),
+              prefixIcon: Icon(
+                Icons.search,
+                color: context.colors.textSecondary,
+              ),
               filled: true,
               fillColor: context.colors.card,
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -241,15 +241,15 @@ class _ConnectedTabState extends State<_ConnectedTab> {
                       color: sel ? AppColors.primary : context.colors.card,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color:
-                            sel ? AppColors.primary : context.colors.divider,
+                        color: sel ? AppColors.primary : context.colors.divider,
                       ),
                     ),
                     child: Text(
                       _capitalize(r),
                       style: TextStyle(
-                        color:
-                            sel ? Colors.white : context.colors.textSecondary,
+                        color: sel
+                            ? Colors.white
+                            : context.colors.textSecondary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -277,14 +277,16 @@ class _ConnectedTabState extends State<_ConnectedTab> {
                     padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                      mainAxisExtent: 270,
-                    ),
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          mainAxisExtent: 270,
+                        ),
                     itemCount: list.length,
-                    itemBuilder: (_, i) =>
-                        _ConnectedCard(conn: list[i], onRefresh: widget.onRefresh),
+                    itemBuilder: (_, i) => _ConnectedCard(
+                      conn: list[i],
+                      onRefresh: widget.onRefresh,
+                    ),
                   ),
                 ),
         ),
@@ -304,34 +306,31 @@ class _ConnectedCard extends StatefulWidget {
 class _ConnectedCardState extends State<_ConnectedCard> {
   bool _removing = false;
 
-  Future<void> _remove(BuildContext ctx) async {
+  Future<void> _remove() async {
     final connId = widget.conn['connection_id'] as int? ?? 0;
     final confirmed = await showDialog<bool>(
-      context: ctx,
-      builder: (_) => AlertDialog(
-        backgroundColor: ctx.colors.card,
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: context.colors.card,
         title: Text(
           'Remove Connection',
-          style: TextStyle(color: ctx.colors.textPrimary),
+          style: TextStyle(color: context.colors.textPrimary),
         ),
         content: Text(
           'Remove ${widget.conn['full_name'] ?? 'this person'} from your network?',
-          style: TextStyle(color: ctx.colors.textSecondary),
+          style: TextStyle(color: context.colors.textSecondary),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: () => Navigator.pop(dialogCtx, false),
             child: Text(
               'Cancel',
-              style: TextStyle(color: ctx.colors.textSecondary),
+              style: TextStyle(color: context.colors.textSecondary),
             ),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Remove',
-              style: TextStyle(color: Colors.red),
-            ),
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Remove', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -344,7 +343,7 @@ class _ConnectedCardState extends State<_ConnectedCard> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _removing = false);
-      ScaffoldMessenger.of(ctx).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not remove connection')),
       );
     }
@@ -357,10 +356,7 @@ class _ConnectedCardState extends State<_ConnectedCard> {
       context: ctx,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _BookSessionSheet(
-        userId: uid,
-        userName: name,
-      ),
+      builder: (_) => _BookSessionSheet(userId: uid, userName: name),
     );
   }
 
@@ -374,8 +370,7 @@ class _ConnectedCardState extends State<_ConnectedCard> {
     final company = c['company'] as String? ?? '';
     final bio = c['bio'] as String? ?? '';
     final avatarUrl = c['avatar_url'] as String?;
-    final subtitle =
-        [title, company].where((s) => s.isNotEmpty).join(' @ ');
+    final subtitle = [title, company].where((s) => s.isNotEmpty).join(' @ ');
 
     return Container(
       decoration: BoxDecoration(
@@ -437,7 +432,9 @@ class _ConnectedCardState extends State<_ConnectedCard> {
                       const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.primary.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
@@ -470,7 +467,7 @@ class _ConnectedCardState extends State<_ConnectedCard> {
                         icon: Icons.message_outlined,
                         label: 'Msg',
                         color: AppColors.primary,
-                        onTap: () => context.go('/messages/$uid'),
+                        onTap: () => context.push('/messages/$uid'),
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -489,8 +486,7 @@ class _ConnectedCardState extends State<_ConnectedCard> {
                 SizedBox(
                   width: double.infinity,
                   child: TextButton.icon(
-                    onPressed:
-                        _removing ? null : () => _remove(context),
+                    onPressed: _removing ? null : _remove,
                     icon: _removing
                         ? const SizedBox(
                             width: 12,
@@ -500,12 +496,14 @@ class _ConnectedCardState extends State<_ConnectedCard> {
                               color: Colors.red,
                             ),
                           )
-                        : const Icon(Icons.person_remove_outlined,
-                            size: 13, color: Colors.red),
+                        : const Icon(
+                            Icons.person_remove_outlined,
+                            size: 13,
+                            color: Colors.red,
+                          ),
                     label: Text(
                       _removing ? '...' : 'Remove',
-                      style: const TextStyle(
-                          color: Colors.red, fontSize: 11),
+                      style: const TextStyle(color: Colors.red, fontSize: 11),
                     ),
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -550,7 +548,8 @@ class _PendingTabState extends State<_PendingTab> {
       final q = _search.toLowerCase();
       final matchSearch = q.isEmpty || name.contains(q) || role.contains(q);
       final dir = p['direction'] as String? ?? '';
-      final matchDir = _direction == 'All' ||
+      final matchDir =
+          _direction == 'All' ||
           (_direction == 'Received' && dir == 'received') ||
           (_direction == 'Sent' && dir == 'sent');
       return matchSearch && matchDir;
@@ -571,8 +570,10 @@ class _PendingTabState extends State<_PendingTab> {
             decoration: InputDecoration(
               hintText: 'Search pending requests...',
               hintStyle: TextStyle(color: context.colors.textSecondary),
-              prefixIcon:
-                  Icon(Icons.search, color: context.colors.textSecondary),
+              prefixIcon: Icon(
+                Icons.search,
+                color: context.colors.textSecondary,
+              ),
               filled: true,
               fillColor: context.colors.card,
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -604,14 +605,14 @@ class _PendingTabState extends State<_PendingTab> {
                   onTap: () => setState(() => _direction = d),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 6),
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: sel ? AppColors.primary : context.colors.card,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: sel
-                            ? AppColors.primary
-                            : context.colors.divider,
+                        color: sel ? AppColors.primary : context.colors.divider,
                       ),
                     ),
                     child: Text(
@@ -641,15 +642,22 @@ class _PendingTabState extends State<_PendingTab> {
               : RefreshIndicator(
                   color: AppColors.primary,
                   onRefresh: () async => widget.onRefresh(),
-                  child: ListView.separated(
+                  child: GridView.builder(
                     padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          mainAxisExtent: 270,
+                        ),
                     itemCount: list.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (_, i) {
                       final p = list[i];
                       final reqId = p['id'] as int? ?? 0;
                       final direction = p['direction'] as String? ?? '';
-                      final cp = p['counterpart'] as Map<String, dynamic>? ?? {};
+                      final cp =
+                          p['counterpart'] as Map<String, dynamic>? ?? {};
                       final uid = cp['id'] as int? ?? 0;
                       final name = cp['full_name'] as String? ?? 'User';
                       final role = cp['role'] as String? ?? '';
@@ -660,143 +668,42 @@ class _PendingTabState extends State<_PendingTab> {
                         company,
                       ].where((s) => s.isNotEmpty).join(' @ ');
 
-                      return Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: context.colors.card,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: context.colors.divider),
-                        ),
-                        child: Row(
-                          children: [
-                            // Avatar – tappable for profile
-                            GestureDetector(
-                              onTap: () => context.go('/profile/view/$uid'),
-                              child: _avatar(context, avatarUrl, name, 24),
-                            ),
-                            const SizedBox(width: 12),
-                            // Info
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => context.go('/profile/view/$uid'),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            name,
-                                            style: TextStyle(
-                                              color:
-                                                  context.colors.textPrimary,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: direction == 'received'
-                                                ? AppColors.primary
-                                                    .withValues(alpha: 0.12)
-                                                : Colors.orange
-                                                    .withValues(alpha: 0.12),
-                                            borderRadius:
-                                                BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            direction == 'received'
-                                                ? 'Incoming'
-                                                : 'Outgoing',
-                                            style: TextStyle(
-                                              color: direction == 'received'
-                                                  ? AppColors.primary
-                                                  : Colors.orange,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    if (subtitle.isNotEmpty)
-                                      Text(
-                                        subtitle,
-                                        style: TextStyle(
-                                          color:
-                                              context.colors.textSecondary,
-                                          fontSize: 11,
-                                        ),
-                                      )
-                                    else if (role.isNotEmpty)
-                                      Text(
-                                        _capitalize(role),
-                                        style: TextStyle(
-                                          color:
-                                              context.colors.textSecondary,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            // Action buttons
-                            if (direction == 'received')
-                              Row(
-                                children: [
-                                  _ActionChip(
-                                    label: 'Accept',
-                                    color: AppColors.primary,
-                                    onTap: () async {
-                                      try {
-                                        await ApiService.instance
-                                            .respondToConnection(
-                                                reqId, 'accept');
-                                        setState(() =>
-                                            _actedIds.add(reqId));
-                                        widget.onRefresh();
-                                      } catch (_) {}
-                                    },
-                                  ),
-                                  const SizedBox(width: 6),
-                                  _ActionChip(
-                                    label: 'Decline',
-                                    color: Colors.red,
-                                    onTap: () async {
-                                      try {
-                                        await ApiService.instance
-                                            .respondToConnection(
-                                                reqId, 'reject');
-                                        setState(() =>
-                                            _actedIds.add(reqId));
-                                        widget.onRefresh();
-                                      } catch (_) {}
-                                    },
-                                  ),
-                                ],
-                              )
-                            else
-                              _ActionChip(
-                                label: 'Cancel',
-                                color: Colors.orange,
-                                onTap: () async {
-                                  try {
-                                    await ApiService.instance
-                                        .cancelConnectionRequest(reqId);
-                                    setState(
-                                        () => _actedIds.add(reqId));
-                                    widget.onRefresh();
-                                  } catch (_) {}
-                                },
-                              ),
-                          ],
-                        ),
+                      return _PendingCard(
+                        uid: uid,
+                        name: name,
+                        role: role,
+                        subtitle: subtitle,
+                        avatarUrl: avatarUrl,
+                        direction: direction,
+                        onAccept: () async {
+                          try {
+                            await ApiService.instance.respondToConnection(
+                              reqId,
+                              'accept',
+                            );
+                            setState(() => _actedIds.add(reqId));
+                            widget.onRefresh();
+                          } catch (_) {}
+                        },
+                        onDecline: () async {
+                          try {
+                            await ApiService.instance.respondToConnection(
+                              reqId,
+                              'reject',
+                            );
+                            setState(() => _actedIds.add(reqId));
+                            widget.onRefresh();
+                          } catch (_) {}
+                        },
+                        onCancel: () async {
+                          try {
+                            await ApiService.instance.cancelConnectionRequest(
+                              reqId,
+                            );
+                            setState(() => _actedIds.add(reqId));
+                            widget.onRefresh();
+                          } catch (_) {}
+                        },
                       );
                     },
                   ),
@@ -841,8 +748,7 @@ class _DiscoverTabState extends State<_DiscoverTab> {
     try {
       final me = context.read<AuthProvider>().user?.id;
       final role = _selectedRole == 'All' ? null : _selectedRole;
-      final data =
-          await ApiService.instance.getDiscoverUsers(null, role: role);
+      final data = await ApiService.instance.getDiscoverUsers(null, role: role);
       if (!mounted) return;
       setState(() {
         _users = List<Map<String, dynamic>>.from(data)
@@ -893,8 +799,10 @@ class _DiscoverTabState extends State<_DiscoverTab> {
             decoration: InputDecoration(
               hintText: 'Search people...',
               hintStyle: TextStyle(color: context.colors.textSecondary),
-              prefixIcon:
-                  Icon(Icons.search, color: context.colors.textSecondary),
+              prefixIcon: Icon(
+                Icons.search,
+                color: context.colors.textSecondary,
+              ),
               filled: true,
               fillColor: context.colors.card,
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -929,14 +837,14 @@ class _DiscoverTabState extends State<_DiscoverTab> {
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 6),
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: sel ? AppColors.primary : context.colors.card,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: sel
-                            ? AppColors.primary
-                            : context.colors.divider,
+                        color: sel ? AppColors.primary : context.colors.divider,
                       ),
                     ),
                     child: Text(
@@ -958,250 +866,379 @@ class _DiscoverTabState extends State<_DiscoverTab> {
         Expanded(
           child: _loading
               ? Center(
-                  child: CircularProgressIndicator(color: AppColors.primary))
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                )
               : _error.isNotEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.error_outline,
-                              color: context.colors.textSecondary, size: 40),
-                          const SizedBox(height: 12),
-                          Text('Could not load users',
-                              style: TextStyle(
-                                  color: context.colors.textSecondary)),
-                          const SizedBox(height: 8),
-                          ElevatedButton(
-                            onPressed: _load,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
-                            ),
-                            child: const Text('Retry'),
-                          ),
-                        ],
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        color: context.colors.textSecondary,
+                        size: 40,
                       ),
-                    )
-                  : list.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.explore_outlined,
-                                  color: context.colors.textSecondary,
-                                  size: 48),
-                              const SizedBox(height: 12),
-                              Text(
-                                _search.isNotEmpty
-                                    ? 'No results for "$_search"'
-                                    : 'No new people to discover',
-                                style: TextStyle(
-                                    color: context.colors.textSecondary),
-                              ),
-                            ],
-                          ),
-                        )
-                      : RefreshIndicator(
-                          color: AppColors.primary,
-                          onRefresh: _load,
-                          child: ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
-                            itemCount: list.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 8),
-                            itemBuilder: (_, i) {
-                              final u = list[i];
-                              final uid = u['id'] as int? ?? 0;
-                              final name = u['full_name'] as String? ?? 'User';
-                              final role = u['role'] as String? ?? '';
-                              final bio = u['bio'] as String? ?? '';
-                              final title = u['title'] as String? ?? '';
-                              final company = u['company'] as String? ?? '';
-                              final avatarUrl = u['avatar_url'] as String?;
-                              final subtitle = [title, company]
-                                  .where((s) => s.isNotEmpty)
-                                  .join(' @ ');
-                              final sent = _sentIds.contains(uid);
-
-                              return Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: context.colors.card,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border:
-                                      Border.all(color: context.colors.divider),
-                                ),
-                                child: Row(
-                                  children: [
-                                    GestureDetector(
-                                      onTap: () =>
-                                          context.go('/profile/view/$uid'),
-                                      child: _avatar(
-                                          context, avatarUrl, name, 26),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: GestureDetector(
-                                        onTap: () =>
-                                            context.go('/profile/view/$uid'),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    name,
-                                                    style: TextStyle(
-                                                      color: context
-                                                          .colors.textPrimary,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      fontSize: 14,
-                                                    ),
-                                                  ),
-                                                ),
-                                                if (role.isNotEmpty)
-                                                  Container(
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        horizontal: 8,
-                                                        vertical: 2),
-                                                    decoration: BoxDecoration(
-                                                      color: AppColors.primary
-                                                          .withValues(
-                                                              alpha: 0.12),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              8),
-                                                    ),
-                                                    child: Text(
-                                                      _capitalize(role),
-                                                      style: TextStyle(
-                                                        color: AppColors.primary,
-                                                        fontSize: 10,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                            if (subtitle.isNotEmpty) ...[
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                subtitle,
-                                                style: TextStyle(
-                                                  color: context
-                                                      .colors.textSecondary,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ],
-                                            if (bio.isNotEmpty) ...[
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                bio,
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  color: context
-                                                      .colors.textSecondary,
-                                                  fontSize: 12,
-                                                  height: 1.3,
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Column(
-                                      children: [
-                                        GestureDetector(
-                                          onTap: sent
-                                              ? null
-                                              : () async {
-                                                  try {
-                                                    await ApiService.instance
-                                                        .sendConnectionRequest(
-                                                            uid);
-                                                    if (!mounted) return;
-                                                    setState(() =>
-                                                        _sentIds.add(uid));
-                                                    ScaffoldMessenger.of(
-                                                      context,
-                                                    ).showSnackBar(
-                                                      SnackBar(
-                                                        content: Text(
-                                                            'Request sent to $name!'),
-                                                        backgroundColor:
-                                                            AppColors.primary,
-                                                      ),
-                                                    );
-                                                  } catch (_) {
-                                                    if (!mounted) return;
-                                                    ScaffoldMessenger.of(
-                                                      context,
-                                                    ).showSnackBar(
-                                                      const SnackBar(
-                                                          content: Text(
-                                                              'Could not send request.')),
-                                                    );
-                                                  }
-                                                },
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 14, vertical: 8),
-                                            decoration: BoxDecoration(
-                                              color: sent
-                                                  ? context.colors.divider
-                                                  : AppColors.primary,
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            child: Text(
-                                              sent ? 'Sent' : 'Connect',
-                                              style: TextStyle(
-                                                color: sent
-                                                    ? context
-                                                        .colors.textSecondary
-                                                    : Colors.white,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        GestureDetector(
-                                          onTap: () =>
-                                              context.go('/profile/view/$uid'),
-                                          child: Text(
-                                            'View Profile',
-                                            style: TextStyle(
-                                              color: AppColors.primary,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w500,
-                                              decoration:
-                                                  TextDecoration.underline,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
+                      const SizedBox(height: 12),
+                      Text(
+                        'Could not load users',
+                        style: TextStyle(color: context.colors.textSecondary),
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton(
+                        onPressed: _load,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
                           ),
                         ),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              : list.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.explore_outlined,
+                        color: context.colors.textSecondary,
+                        size: 48,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _search.isNotEmpty
+                            ? 'No results for "$_search"'
+                            : 'No new people to discover',
+                        style: TextStyle(color: context.colors.textSecondary),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  color: AppColors.primary,
+                  onRefresh: _load,
+                  child: GridView.builder(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          mainAxisExtent: 270,
+                        ),
+                    itemCount: list.length,
+                    itemBuilder: (_, i) {
+                      final u = list[i];
+                      final uid = u['id'] as int? ?? 0;
+                      final name = u['full_name'] as String? ?? 'User';
+                      final role = u['role'] as String? ?? '';
+                      final bio = u['bio'] as String? ?? '';
+                      final title = u['title'] as String? ?? '';
+                      final company = u['company'] as String? ?? '';
+                      final avatarUrl = u['avatar_url'] as String?;
+                      final subtitle = [
+                        title,
+                        company,
+                      ].where((s) => s.isNotEmpty).join(' @ ');
+                      final sent = _sentIds.contains(uid);
+
+                      return _DiscoverCard(
+                        uid: uid,
+                        name: name,
+                        role: role,
+                        bio: bio,
+                        subtitle: subtitle,
+                        avatarUrl: avatarUrl,
+                        sent: sent,
+                        onConnect: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          try {
+                            await ApiService.instance.sendConnectionRequest(
+                              uid,
+                            );
+                            if (!context.mounted) return;
+                            setState(() => _sentIds.add(uid));
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Request sent to $name!'),
+                                backgroundColor: AppColors.primary,
+                              ),
+                            );
+                          } catch (_) {
+                            if (!context.mounted) return;
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Could not send request.'),
+                              ),
+                            );
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ),
         ),
       ],
+    );
+  }
+}
+
+class _PendingCard extends StatelessWidget {
+  final int uid;
+  final String name;
+  final String role;
+  final String subtitle;
+  final String? avatarUrl;
+  final String direction;
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+  final VoidCallback onCancel;
+
+  const _PendingCard({
+    required this.uid,
+    required this.name,
+    required this.role,
+    required this.subtitle,
+    required this.avatarUrl,
+    required this.direction,
+    required this.onAccept,
+    required this.onDecline,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final incoming = direction == 'received';
+    return Container(
+      decoration: BoxDecoration(
+        color: context.colors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.colors.divider),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            GestureDetector(
+              onTap: () => context.go('/profile/view/$uid'),
+              child: _avatar(context, avatarUrl, name, 28),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: context.colors.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+            if (subtitle.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: context.colors.textSecondary,
+                  fontSize: 10,
+                ),
+              ),
+            ] else if (role.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                _capitalize(role),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: context.colors.textSecondary,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: incoming
+                    ? AppColors.primary.withValues(alpha: 0.12)
+                    : Colors.orange.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                incoming ? 'Incoming' : 'Outgoing',
+                style: TextStyle(
+                  color: incoming ? AppColors.primary : Colors.orange,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const Spacer(),
+            if (incoming)
+              Row(
+                children: [
+                  Expanded(
+                    child: _SmallBtn(
+                      icon: Icons.check_rounded,
+                      label: 'Accept',
+                      color: AppColors.primary,
+                      onTap: onAccept,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _SmallBtn(
+                      icon: Icons.close_rounded,
+                      label: 'Decline',
+                      color: Colors.red,
+                      onTap: onDecline,
+                    ),
+                  ),
+                ],
+              )
+            else
+              SizedBox(
+                width: double.infinity,
+                child: _SmallBtn(
+                  icon: Icons.cancel_outlined,
+                  label: 'Cancel',
+                  color: Colors.orange,
+                  onTap: onCancel,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscoverCard extends StatelessWidget {
+  final int uid;
+  final String name;
+  final String role;
+  final String bio;
+  final String subtitle;
+  final String? avatarUrl;
+  final bool sent;
+  final VoidCallback onConnect;
+
+  const _DiscoverCard({
+    required this.uid,
+    required this.name,
+    required this.role,
+    required this.bio,
+    required this.subtitle,
+    required this.avatarUrl,
+    required this.sent,
+    required this.onConnect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: context.colors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.colors.divider),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            GestureDetector(
+              onTap: () => context.go('/profile/view/$uid'),
+              child: _avatar(context, avatarUrl, name, 28),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: context.colors.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+            if (role.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                _capitalize(role),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: context.colors.textSecondary,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+            if (subtitle.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: context.colors.textSecondary,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+            if (bio.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                bio,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: context.colors.textSecondary,
+                  fontSize: 10,
+                  height: 1.25,
+                ),
+              ),
+            ],
+            const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              child: _SmallBtn(
+                icon: sent
+                    ? Icons.check_circle_outline
+                    : Icons.person_add_alt_1,
+                label: sent ? 'Sent' : 'Connect',
+                color: sent ? context.colors.textSecondary : AppColors.primary,
+                onTap: sent ? () {} : onConnect,
+              ),
+            ),
+            const SizedBox(height: 6),
+            GestureDetector(
+              onTap: () => context.go('/profile/view/$uid'),
+              child: Text(
+                'View Profile',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1237,8 +1274,9 @@ class _BookSessionSheetState extends State<_BookSessionSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: Container(
         decoration: BoxDecoration(
           color: context.colors.card,
@@ -1255,8 +1293,7 @@ class _BookSessionSheetState extends State<_BookSessionSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color:
-                        context.colors.textSecondary.withValues(alpha: 0.3),
+                    color: context.colors.textSecondary.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -1287,8 +1324,9 @@ class _BookSessionSheetState extends State<_BookSessionSheet> {
                 style: TextStyle(color: context.colors.textPrimary),
                 decoration: _inputDecoration(null, context),
                 items: _types
-                    .map((t) => DropdownMenuItem(
-                        value: t.$1, child: Text(t.$2)))
+                    .map(
+                      (t) => DropdownMenuItem(value: t.$1, child: Text(t.$2)),
+                    )
                     .toList(),
                 onChanged: (v) => setState(() => _type = v!),
               ),
@@ -1327,12 +1365,16 @@ class _BookSessionSheetState extends State<_BookSessionSheet> {
                 style: TextStyle(color: context.colors.textPrimary),
                 decoration: _inputDecoration(null, context),
                 items: [30, 60, 90, 120]
-                    .map((d) => DropdownMenuItem(
-                          value: d,
-                          child: Text(d < 60
+                    .map(
+                      (d) => DropdownMenuItem(
+                        value: d,
+                        child: Text(
+                          d < 60
                               ? '$d min'
-                              : '${d ~/ 60}h${d % 60 > 0 ? " ${d % 60}min" : ""}'),
-                        ))
+                              : '${d ~/ 60}h${d % 60 > 0 ? " ${d % 60}min" : ""}',
+                        ),
+                      ),
+                    )
                     .toList(),
                 onChanged: (v) => setState(() => _duration = v!),
               ),
@@ -1363,18 +1405,25 @@ class _BookSessionSheetState extends State<_BookSessionSheet> {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                   child: _submitting
                       ? const SizedBox(
                           height: 20,
                           width: 20,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
-                      : const Text('Book Session',
+                      : const Text(
+                          'Book Session',
                           style: TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: 16)),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -1387,14 +1436,20 @@ class _BookSessionSheetState extends State<_BookSessionSheet> {
   Future<void> _submit() async {
     final title = _titleCtrl.text.trim();
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter a title')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter a title')));
       return;
     }
     setState(() => _submitting = true);
     try {
       final startDt = DateTime(
-          _date.year, _date.month, _date.day, _time.hour, _time.minute);
+        _date.year,
+        _date.month,
+        _date.day,
+        _time.hour,
+        _time.minute,
+      );
       final endDt = startDt.add(Duration(minutes: _duration));
       await ApiService.instance.createMeeting({
         'participant_id': widget.userId,
@@ -1440,13 +1495,17 @@ class _BookSessionSheetState extends State<_BookSessionSheet> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
         decoration: BoxDecoration(
           border: Border.all(
-              color: ctx.colors.textSecondary.withValues(alpha: 0.3)),
+            color: ctx.colors.textSecondary.withValues(alpha: 0.3),
+          ),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            Icon(Icons.calendar_today,
-                size: 14, color: ctx.colors.textSecondary),
+            Icon(
+              Icons.calendar_today,
+              size: 14,
+              color: ctx.colors.textSecondary,
+            ),
             const SizedBox(width: 6),
             Text(
               '${_date.day}/${_date.month}/${_date.year}',
@@ -1468,13 +1527,13 @@ class _BookSessionSheetState extends State<_BookSessionSheet> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
         decoration: BoxDecoration(
           border: Border.all(
-              color: ctx.colors.textSecondary.withValues(alpha: 0.3)),
+            color: ctx.colors.textSecondary.withValues(alpha: 0.3),
+          ),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            Icon(Icons.access_time,
-                size: 14, color: ctx.colors.textSecondary),
+            Icon(Icons.access_time, size: 14, color: ctx.colors.textSecondary),
             const SizedBox(width: 6),
             Text(
               _time.format(ctx),
@@ -1487,25 +1546,25 @@ class _BookSessionSheetState extends State<_BookSessionSheet> {
   }
 
   Widget _label(String text, BuildContext ctx) => Text(
-        text,
-        style: TextStyle(
-            color: ctx.colors.textSecondary,
-            fontSize: 12,
-            fontWeight: FontWeight.w600),
-      );
+    text,
+    style: TextStyle(
+      color: ctx.colors.textSecondary,
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+    ),
+  );
 
   Widget _field({
     required TextEditingController controller,
     required String hint,
     required BuildContext context,
     int maxLines = 1,
-  }) =>
-      TextField(
-        controller: controller,
-        maxLines: maxLines,
-        style: TextStyle(color: context.colors.textPrimary),
-        decoration: _inputDecoration(hint, context),
-      );
+  }) => TextField(
+    controller: controller,
+    maxLines: maxLines,
+    style: TextStyle(color: context.colors.textPrimary),
+    decoration: _inputDecoration(hint, context),
+  );
 
   InputDecoration _inputDecoration(String? hint, BuildContext ctx) =>
       InputDecoration(
@@ -1513,17 +1572,21 @@ class _BookSessionSheetState extends State<_BookSessionSheet> {
         hintStyle: TextStyle(color: ctx.colors.textSecondary),
         filled: true,
         fillColor: ctx.colors.background,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 13,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-              color: ctx.colors.textSecondary.withValues(alpha: 0.3)),
+            color: ctx.colors.textSecondary.withValues(alpha: 0.3),
+          ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-              color: ctx.colors.textSecondary.withValues(alpha: 0.3)),
+            color: ctx.colors.textSecondary.withValues(alpha: 0.3),
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -1548,51 +1611,29 @@ class _SmallBtn extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color.withValues(alpha: 0.35)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 13, color: color),
-              const SizedBox(width: 4),
-              Text(label,
-                  style: TextStyle(
-                      color: color,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
-      );
-}
-
-class _ActionChip extends StatelessWidget {
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  const _ActionChip(
-      {required this.label, required this.color, required this.onTap});
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color.withValues(alpha: 0.35)),
-          ),
-          child: Text(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 4),
+          Text(
             label,
             style: TextStyle(
-                color: color, fontSize: 12, fontWeight: FontWeight.w600),
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 }

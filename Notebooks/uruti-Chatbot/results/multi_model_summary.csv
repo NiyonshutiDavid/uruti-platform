@@ -1,0 +1,4 @@
+model,avg_latency_ms,avg_response_len,avg_quality_score,error_count
+llama3.2-11b,0.0,426.0,3.0,0
+llama3.2-90b,0.0,426.0,3.0,0
+gemini-3-flash-preview,0.0,0.0,0.0,5

@@ -67,7 +67,7 @@ class _NoInternetScreenState extends State<NoInternetScreen>
       icon: Icons.language_outlined,
       title: 'Also Available on Web',
       description:
-          'Access the full Uruti platform from any browser at uruti.io. '
+          'Access the full Uruti platform from any browser at uruti.rw. '
           'Seamlessly switch between your phone and desktop without losing progress.',
       accent: Color(0xFF76B947),
       isWebSlide: true,
@@ -559,7 +559,7 @@ class _BenefitCard extends StatelessWidget {
                     Icon(Icons.language, color: AppColors.primary, size: 16),
                     const SizedBox(width: 8),
                     Text(
-                      'uruti.io',
+                      'uruti.rw',
                       style: TextStyle(
                         fontFamily: 'InterTight',
                         fontSize: 14,

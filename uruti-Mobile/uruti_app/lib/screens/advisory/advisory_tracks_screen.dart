@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_colors.dart';
 import '../../services/api_service.dart';
@@ -50,6 +51,13 @@ class _AdvisoryTracksScreenState extends State<AdvisoryTracksScreen> {
           final p = await ApiService.instance.getUserTrackProgress(id);
           t['progress'] = p['progress_percentage'] ?? 0;
           t['status'] = p['status'] ?? 'not-started';
+          final completed = p['completed_materials'];
+          if (completed is List) {
+            t['completed_materials'] = completed
+                .map((e) => (e as num?)?.toInt())
+                .whereType<int>()
+                .toList();
+          }
         } catch (_) {
           t['progress'] ??= 0;
           t['status'] ??= 'not-started';
@@ -436,6 +444,121 @@ class _TrackDetailSheetState extends State<_TrackDetailSheet> {
     return done.contains(idx);
   }
 
+  Future<void> _readMaterial(dynamic material) async {
+    if (material is! Map) return;
+
+    final title = (material['name'] ?? 'Material').toString();
+    final type = (material['type'] ?? 'Resource').toString();
+    final description = (material['description'] ?? '').toString();
+    final content = (material['content'] ?? '').toString();
+    final rawUrl = (material['url'] ?? '').toString().trim();
+
+    if (content.isNotEmpty || description.isNotEmpty) {
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: context.colors.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (_) => SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: context.colors.divider,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: context.colors.textPrimary,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  type,
+                  style: TextStyle(
+                    color: context.colors.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      content.isNotEmpty ? content : description,
+                      style: TextStyle(
+                        color: context.colors.textSecondary,
+                        height: 1.45,
+                      ),
+                    ),
+                  ),
+                ),
+                if (rawUrl.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.open_in_new_rounded),
+                      label: const Text('Open source link'),
+                      onPressed: () async {
+                        final uri = Uri.tryParse(rawUrl);
+                        if (uri == null ||
+                            !await launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication,
+                            )) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Unable to open link.'),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (rawUrl.isNotEmpty) {
+      final uri = Uri.tryParse(rawUrl);
+      if (uri != null &&
+          await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        return;
+      }
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No readable content found for this material.'),
+      ),
+    );
+  }
+
   Future<void> _toggleDone(int trackId, int materialIndex, bool toDone) async {
     if (_saving) return;
     setState(() => _saving = true);
@@ -580,6 +703,7 @@ class _TrackDetailSheetState extends State<_TrackDetailSheet> {
 
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
+                    onTap: () => _readMaterial(m),
                     leading: Icon(
                       done
                           ? Icons.check_circle_rounded
@@ -606,10 +730,21 @@ class _TrackDetailSheetState extends State<_TrackDetailSheet> {
                     ),
                     trailing: trackId == null
                         ? null
-                        : Switch.adaptive(
-                            value: done,
-                            activeColor: AppColors.primary,
-                            onChanged: (v) => _toggleDone(trackId, i, v),
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.open_in_new_rounded,
+                                size: 16,
+                                color: context.colors.textMuted,
+                              ),
+                              const SizedBox(width: 6),
+                              Switch.adaptive(
+                                value: done,
+                                activeColor: AppColors.primary,
+                                onChanged: (v) => _toggleDone(trackId, i, v),
+                              ),
+                            ],
                           ),
                   );
                 },

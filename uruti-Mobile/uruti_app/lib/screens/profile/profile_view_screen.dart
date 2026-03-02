@@ -111,7 +111,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                   Icons.message_outlined,
                   color: context.colors.textPrimary,
                 ),
-                onPressed: () => context.go('/messages/${u.id}'),
+                onPressed: () => context.push('/messages/${u.id}'),
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(

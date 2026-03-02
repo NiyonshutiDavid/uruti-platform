@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "186275539225",
+    "project_id": "uruti-rw",
+    "storage_bucket": "uruti-rw.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:186275539225:android:3ba1357863d5df52e3fd88",
+        "android_client_info": {
+          "package_name": "com.uruti.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCDucFBUXoEPvhbhbZqXY_BTKE238BmvaM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

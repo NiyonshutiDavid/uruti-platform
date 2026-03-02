@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../core/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/realtime_service.dart';
 import '../main_scaffold.dart';
 
 // ─── HomeScreen ───────────────────────────────────────────────────────────────
@@ -32,11 +33,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Founder extras
   List<dynamic> _upcomingMeetings = [];
+  StreamSubscription<Map<String, dynamic>>? _realtimeSub;
 
   @override
   void initState() {
     super.initState();
     _load();
+
+    _realtimeSub = RealtimeService.instance.events.listen((event) {
+      if (!mounted) return;
+      if (event['event'] == 'notification_created' ||
+          event['event'] == 'message_created') {
+        _load();
+      }
+    });
+
+    final token = (context.read<AuthProvider>().token ?? '').trim();
+    if (token.isNotEmpty) {
+      RealtimeService.instance.connect(token);
+    }
+  }
+
+  @override
+  void dispose() {
+    _realtimeSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -689,26 +710,48 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actions = [
-      {
-        'icon': Icons.lightbulb_outline,
-        'label': 'Capture New Idea',
-        'sublabel': 'Log a startup concept',
-        'route': '/profile',
-      },
-      {
-        'icon': Icons.mic_none,
-        'label': 'Start Pitch Coach',
-        'sublabel': 'Practice your pitch with AI',
-        'route': '/coach',
-      },
-      {
-        'icon': Icons.people_outline,
-        'label': 'Build a Connection',
-        'sublabel': 'Grow your network',
-        'route': '/connections',
-      },
-    ];
+    final isInvestor = user?.isInvestor == true;
+    final actions = isInvestor
+        ? [
+            {
+              'icon': Icons.explore_outlined,
+              'label': 'Discover Startups',
+              'sublabel': 'Find investment opportunities',
+              'route': '/discovery',
+            },
+            {
+              'icon': Icons.trending_up,
+              'label': 'Review Deal Flow',
+              'sublabel': 'Track your saved ventures',
+              'route': '/deal-flow',
+            },
+            {
+              'icon': Icons.people_outline,
+              'label': 'Build a Connection',
+              'sublabel': 'Grow your network',
+              'route': '/connections',
+            },
+          ]
+        : [
+            {
+              'icon': Icons.person_outline,
+              'label': 'View Profile',
+              'sublabel': 'Update your details',
+              'route': '/profile',
+            },
+            {
+              'icon': Icons.auto_awesome_outlined,
+              'label': 'Open AI Chat',
+              'sublabel': 'Get guidance instantly',
+              'route': '/chat',
+            },
+            {
+              'icon': Icons.chat_bubble_outline,
+              'label': 'Open Messages',
+              'sublabel': 'Continue conversations',
+              'route': '/inbox',
+            },
+          ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1342,20 +1385,22 @@ class _FsInvestmentPie extends StatelessWidget {
     for (final v in ventures) {
       final score =
           (v['investment_readiness_score'] as num?)?.toDouble() ?? 0.0;
-      if (score >= 70)
+      if (score >= 70) {
         ready++;
-      else if (score >= 40)
+      } else if (score >= 40) {
         developing++;
-      else
+      } else {
         early++;
+      }
     }
     final total = ready + developing + early;
-    if (total == 0)
+    if (total == 0) {
       return const _FsEmptyChart(
         icon: Icons.pie_chart_outline,
         message: 'No data',
         height: 130,
       );
+    }
 
     return SizedBox(
       height: 130,
@@ -1488,8 +1533,9 @@ class _FsReadinessBar extends StatelessWidget {
                 reservedSize: 22,
                 getTitlesWidget: (v, _) {
                   final idx = v.toInt();
-                  if (idx < 0 || idx >= top.length)
+                  if (idx < 0 || idx >= top.length) {
                     return const SizedBox.shrink();
+                  }
                   final name = (top[idx]['name'] as String? ?? 'V${idx + 1}');
                   final short = name.length > 6 ? name.substring(0, 6) : name;
                   return Text(

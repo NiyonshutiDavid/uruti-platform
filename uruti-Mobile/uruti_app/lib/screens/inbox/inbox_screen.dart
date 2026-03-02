@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/realtime_service.dart';
 import '../main_scaffold.dart';
 
 // ─── Root Screen ──────────────────────────────────────────────────────────────
@@ -30,18 +33,46 @@ class _MessagesHomeState extends State<_MessagesHome> {
   String _filter = 'All'; // All | Unread | Starred
   String _search = '';
   final _searchCtrl = TextEditingController();
+  StreamSubscription<Map<String, dynamic>>? _realtimeSub;
 
   static const _filters = ['All', 'Unread', 'Starred'];
+
+  String _asText(dynamic value) {
+    if (value == null) return '';
+    return value.toString().trim();
+  }
+
+  String? _safeAvatarUrl(dynamic raw) {
+    final value = _asText(raw);
+    if (value.isEmpty) return null;
+    final uri = Uri.tryParse(value);
+    if (uri == null) return null;
+    if (uri.hasScheme && (uri.path.isEmpty || uri.path == '/')) {
+      return null;
+    }
+    return value;
+  }
 
   @override
   void initState() {
     super.initState();
     _load();
     _searchCtrl.addListener(() => setState(() => _search = _searchCtrl.text));
+
+    _realtimeSub = RealtimeService.instance.events.listen((event) {
+      if (!mounted || event['event'] != 'message_created') return;
+      _load();
+    });
+
+    final token = (context.read<AuthProvider>().token ?? '').trim();
+    if (token.isNotEmpty) {
+      RealtimeService.instance.connect(token);
+    }
   }
 
   @override
   void dispose() {
+    _realtimeSub?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -72,119 +103,12 @@ class _MessagesHomeState extends State<_MessagesHome> {
       final q = _search.trim().toLowerCase();
       list = list.where((c) {
         final other = (c['other_user'] as Map?)?.cast<String, dynamic>() ?? {};
-        final name = (other['full_name'] as String? ?? '').toLowerCase();
-        final msg = (c['last_message'] as String? ?? '').toLowerCase();
+        final name = _asText(other['full_name']).toLowerCase();
+        final msg = _asText(c['last_message']).toLowerCase();
         return name.contains(q) || msg.contains(q);
       }).toList();
     }
     return list;
-  }
-
-  void _makeCall(BuildContext ctx, String userId, String name, bool isVideo) {
-    showModalBottomSheet(
-      context: ctx,
-      backgroundColor: ctx.colors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: ctx.colors.divider,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                isVideo ? Icons.videocam_rounded : Icons.phone_rounded,
-                color: AppColors.primary,
-                size: 36,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              isVideo ? 'Video Call' : 'Voice Call',
-              style: TextStyle(
-                color: ctx.colors.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              name,
-              style: TextStyle(color: ctx.colors.textSecondary, fontSize: 14),
-            ),
-            const SizedBox(height: 28),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Starting ${isVideo ? 'video' : 'voice'} call with $name…',
-                      ),
-                      backgroundColor: AppColors.primary,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  );
-                },
-                icon: Icon(
-                  isVideo ? Icons.videocam_rounded : Icons.phone_rounded,
-                  color: Colors.white,
-                  size: 18,
-                ),
-                label: Text(
-                  'Call ${name.split(' ').first}',
-                  style: const TextStyle(color: Colors.white),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: ctx.colors.textSecondary,
-                  side: BorderSide(color: ctx.colors.divider),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Cancel'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   @override
@@ -325,14 +249,18 @@ class _MessagesHomeState extends State<_MessagesHome> {
                             (c['other_user'] as Map?)
                                 ?.cast<String, dynamic>() ??
                             {};
-                        final name = other['full_name'] as String? ?? 'User';
-                        final role = other['role'] as String? ?? '';
-                        final avatarUrl = other['avatar_url'] as String?;
-                        final lastMsg = c['last_message'] as String? ?? '';
+                        final name = _asText(other['display_name']).isNotEmpty
+                            ? _asText(other['display_name'])
+                            : _asText(other['full_name']).isNotEmpty
+                            ? _asText(other['full_name'])
+                            : 'Connection';
+                        final role = _asText(other['role']);
+                        final avatarUrl = _safeAvatarUrl(other['avatar_url']);
+                        final lastMsg = _asText(c['last_message']);
                         final unread = c['unread_count'] as int? ?? 0;
                         final isOnline = other['is_online'] == true;
                         final uid = '${other['id'] ?? ''}';
-                        final ts = c['last_message_time'] as String?;
+                        final ts = _asText(c['last_message_time']);
                         final timeStr = _formatTime(ts);
                         final initials = name
                             .split(' ')
@@ -351,23 +279,13 @@ class _MessagesHomeState extends State<_MessagesHome> {
                           isOnline: isOnline,
                           avatarUrl: avatarUrl,
                           initials: initials,
-                          onTap: () => ctx.go('/messages/$uid'),
-                          onVoiceCall: () => _makeCall(ctx, uid, name, false),
-                          onVideoCall: () => _makeCall(ctx, uid, name, true),
+                          onTap: () => ctx.push('/messages/$uid'),
                         );
                       },
                     ),
                   ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        tooltip: 'New Message',
-        onPressed: () => context.go('/messages'),
-        child: const Icon(Icons.edit_rounded),
       ),
     );
   }
@@ -385,8 +303,6 @@ class _ConversationTile extends StatelessWidget {
   final String? avatarUrl;
   final String initials;
   final VoidCallback onTap;
-  final VoidCallback onVoiceCall;
-  final VoidCallback onVideoCall;
 
   const _ConversationTile({
     required this.name,
@@ -398,8 +314,6 @@ class _ConversationTile extends StatelessWidget {
     required this.avatarUrl,
     required this.initials,
     required this.onTap,
-    required this.onVoiceCall,
-    required this.onVideoCall,
   });
 
   @override
@@ -560,21 +474,6 @@ class _ConversationTile extends StatelessWidget {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            )
-                          else
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _CallIconBtn(
-                                  icon: Icons.phone_outlined,
-                                  onTap: onVoiceCall,
-                                ),
-                                const SizedBox(width: 2),
-                                _CallIconBtn(
-                                  icon: Icons.videocam_outlined,
-                                  onTap: onVideoCall,
-                                ),
-                              ],
                             ),
                         ],
                       ),
@@ -592,24 +491,6 @@ class _ConversationTile extends StatelessWidget {
       ),
     );
   }
-}
-
-// ─── Call Icon Button ─────────────────────────────────────────────────────────
-
-class _CallIconBtn extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  const _CallIconBtn({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(20),
-    child: Padding(
-      padding: const EdgeInsets.all(4),
-      child: Icon(icon, size: 18, color: AppColors.primary),
-    ),
-  );
 }
 
 // ─── Empty State ──────────────────────────────────────────────────────────────

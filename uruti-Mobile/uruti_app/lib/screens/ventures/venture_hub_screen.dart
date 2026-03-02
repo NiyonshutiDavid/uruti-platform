@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../bloc/founder/founder_cubit.dart';
+import '../../bloc/founder/founder_state.dart';
 import '../../core/app_colors.dart';
-import '../../services/api_service.dart';
 import '../../screens/main_scaffold.dart';
 
 // ─── Stage / Industry labels (mirrors add_venture_screen constants) ───────────
@@ -57,65 +59,23 @@ class VentureHubScreen extends StatefulWidget {
 }
 
 class _VentureHubScreenState extends State<VentureHubScreen> {
-  List<Map<String, dynamic>> _ventures = [];
-  List<Map<String, dynamic>> _filtered = [];
-  bool _loading = true;
-  String? _error;
-
   final _searchCtrl = TextEditingController();
-  String _stageFilter = 'all';
 
   @override
   void initState() {
     super.initState();
-    _load();
-    _searchCtrl.addListener(_applyFilter);
+    final founderCubit = context.read<FounderCubit>();
+    _searchCtrl.text = founderCubit.state.ventureSearchTerm;
+    founderCubit.initializeVentureHub();
+    _searchCtrl.addListener(() {
+      context.read<FounderCubit>().setVentureSearchTerm(_searchCtrl.text);
+    });
   }
 
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final data = await ApiService.instance.getMyVentures();
-      if (!mounted) return;
-      final list = List<Map<String, dynamic>>.from(
-        data.map((e) => Map<String, dynamic>.from(e as Map)),
-      );
-      setState(() {
-        _ventures = list;
-        _loading = false;
-      });
-      _applyFilter();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
-  }
-
-  void _applyFilter() {
-    final q = _searchCtrl.text.trim().toLowerCase();
-    setState(() {
-      _filtered = _ventures.where((v) {
-        final matchQuery =
-            q.isEmpty ||
-            (v['name'] as String? ?? '').toLowerCase().contains(q) ||
-            (v['industry'] as String? ?? '').toLowerCase().contains(q) ||
-            (v['tagline'] as String? ?? '').toLowerCase().contains(q);
-        final matchStage = _stageFilter == 'all' || v['stage'] == _stageFilter;
-        return matchQuery && matchStage;
-      }).toList();
-    });
   }
 
   // ── Delete ───────────────────────────────────────────────────────────────────
@@ -154,20 +114,16 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    try {
-      await ApiService.instance.deleteVenture(id);
-      _load();
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Venture deleted')));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
+    final deleted = await context.read<FounderCubit>().deleteVenture(id);
+    if (!mounted) return;
+    if (deleted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Venture deleted')));
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Error deleting venture')));
     }
   }
 
@@ -311,24 +267,24 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
                     ),
                   ),
                   onPressed: () async {
-                    try {
-                      await ApiService.instance.updateVenture(id, {
-                        'name': nameCtrl.text.trim(),
-                        'tagline': taglineCtrl.text.trim(),
-                        'problem_statement': problemCtrl.text.trim(),
-                        'solution': solutionCtrl.text.trim(),
-                        'target_market': marketCtrl.text.trim(),
-                        'stage': stage,
-                        'industry': industry,
-                      });
-                      if (ctx.mounted) Navigator.pop(ctx);
-                      _load();
-                    } catch (e) {
-                      if (ctx.mounted) {
-                        ScaffoldMessenger.of(
-                          ctx,
-                        ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                      }
+                    final updated = await context
+                        .read<FounderCubit>()
+                        .updateVenture(id, {
+                          'name': nameCtrl.text.trim(),
+                          'tagline': taglineCtrl.text.trim(),
+                          'problem_statement': problemCtrl.text.trim(),
+                          'solution': solutionCtrl.text.trim(),
+                          'target_market': marketCtrl.text.trim(),
+                          'stage': stage,
+                          'industry': industry,
+                        });
+                    if (!ctx.mounted) return;
+                    if (updated) {
+                      Navigator.pop(ctx);
+                    } else {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(content: Text('Error updating venture')),
+                      );
                     }
                   },
                   child: const Text(
@@ -382,19 +338,19 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
 
   // ── Stats row ─────────────────────────────────────────────────────────────────
 
-  Widget _buildStatsRow() {
-    final total = _ventures.length;
-    final ready = _ventures
+  Widget _buildStatsRow(List<Map<String, dynamic>> ventures) {
+    final total = ventures.length;
+    final ready = ventures
         .where((v) => (v['stage'] as String?) == 'scale')
         .length;
-    final scores = _ventures
+    final scores = ventures
         .map((v) => (v['uruti_score'] as num?)?.toDouble() ?? 0.0)
         .toList();
     final avgScore = scores.isEmpty
         ? 0.0
         : scores.reduce((a, b) => a + b) / scores.length;
     final tracks = <String>{};
-    for (final v in _ventures) {
+    for (final v in ventures) {
       final s = v['stage'] as String?;
       if (s != null) tracks.add(s);
     }
@@ -464,7 +420,7 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: stageColor.withOpacity(0.15),
+                      color: stageColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(industryIcon, color: stageColor),
@@ -526,7 +482,7 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
                   _Badge(label: status.label, color: status.color),
                   _Badge(
                     label: _industryLabels[industry] ?? industry,
-                    color: AppColors.primary.withOpacity(0.7),
+                    color: AppColors.primary.withValues(alpha: 0.7),
                   ),
                 ],
               ),
@@ -560,7 +516,7 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         side: BorderSide(
-                          color: AppColors.primary.withOpacity(0.4),
+                          color: AppColors.primary.withValues(alpha: 0.4),
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -602,110 +558,122 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: context.colors.background,
-      appBar: AppBar(
-        backgroundColor: context.colors.background,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
-          onPressed: () => MainScaffold.scaffoldKey.currentState?.openDrawer(),
-        ),
-        title: Text(
-          'My Ventures',
-          style: TextStyle(
-            color: context.colors.textPrimary,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh, color: context.colors.textSecondary),
-            onPressed: _load,
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'Add Venture',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-        ),
-        onPressed: () async {
-          final added = await context.push('/ventures/new');
-          if (added == true) _load();
-        },
-      ),
-      body: Column(
-        children: [
-          // Stats row (visible when ventures are loaded)
-          if (!_loading && _ventures.isNotEmpty) _buildStatsRow(),
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: TextField(
-              controller: _searchCtrl,
-              style: TextStyle(color: context.colors.textPrimary),
-              decoration: InputDecoration(
-                hintText: 'Search ventures…',
-                hintStyle: TextStyle(color: context.colors.textSecondary),
-                prefixIcon: Icon(
-                  Icons.search,
-                  color: context.colors.textSecondary,
-                  size: 20,
-                ),
-                filled: true,
-                fillColor: context.colors.surface,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
+    return BlocBuilder<FounderCubit, FounderState>(
+      builder: (context, state) {
+        return Scaffold(
+          backgroundColor: context.colors.background,
+          appBar: AppBar(
+            backgroundColor: context.colors.background,
+            elevation: 0,
+            leading: IconButton(
+              icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
+              onPressed: () =>
+                  MainScaffold.scaffoldKey.currentState?.openDrawer(),
+            ),
+            title: Text(
+              'My Ventures',
+              style: TextStyle(
+                color: context.colors.textPrimary,
+                fontWeight: FontWeight.w700,
               ),
             ),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.refresh, color: context.colors.textSecondary),
+                onPressed: () =>
+                    context.read<FounderCubit>().refreshVentureHub(),
+              ),
+            ],
           ),
-          // Stage filter chips
-          SizedBox(
-            height: 44,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              children: [
-                _FilterChip(
-                  label: 'All',
-                  selected: _stageFilter == 'all',
-                  onTap: () {
-                    setState(() => _stageFilter = 'all');
-                    _applyFilter();
-                  },
-                ),
-                ..._stageLabels.entries.map(
-                  (e) => _FilterChip(
-                    label: e.value,
-                    selected: _stageFilter == e.key,
-                    color: _stageColors[e.key],
-                    onTap: () {
-                      setState(() => _stageFilter = e.key);
-                      _applyFilter();
-                    },
+          floatingActionButton: FloatingActionButton.extended(
+            backgroundColor: AppColors.primary,
+            icon: const Icon(Icons.add, color: Colors.white),
+            label: const Text(
+              'Add Venture',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            onPressed: () async {
+              final added = await context.push('/ventures/new');
+              if (!context.mounted) return;
+              if (added == true) {
+                await context.read<FounderCubit>().refreshVentureHub();
+              }
+            },
+          ),
+          body: Column(
+            children: [
+              if (state.status != FounderStatus.loading &&
+                  state.ventures.isNotEmpty)
+                _buildStatsRow(state.ventures),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: TextField(
+                  controller: _searchCtrl,
+                  style: TextStyle(color: context.colors.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'Search ventures…',
+                    hintStyle: TextStyle(color: context.colors.textSecondary),
+                    prefixIcon: Icon(
+                      Icons.search,
+                      color: context.colors.textSecondary,
+                      size: 20,
+                    ),
+                    filled: true,
+                    fillColor: context.colors.surface,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
                 ),
-              ],
-            ),
+              ),
+              SizedBox(
+                height: 44,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  children: [
+                    _FilterChip(
+                      label: 'All',
+                      selected: state.ventureStageFilter == 'all',
+                      onTap: () => context
+                          .read<FounderCubit>()
+                          .setVentureStageFilter('all'),
+                    ),
+                    ..._stageLabels.entries.map(
+                      (e) => _FilterChip(
+                        label: e.value,
+                        selected: state.ventureStageFilter == e.key,
+                        color: _stageColors[e.key],
+                        onTap: () => context
+                            .read<FounderCubit>()
+                            .setVentureStageFilter(e.key),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(child: _buildBody(state)),
+            ],
           ),
-          const Divider(height: 1),
-          Expanded(child: _buildBody()),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildBody() {
-    if (_loading) {
+  Widget _buildBody(FounderState state) {
+    if (state.status == FounderStatus.loading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_error != null) {
+    if (state.status == FounderStatus.error) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -718,7 +686,7 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
             ),
             const SizedBox(height: 12),
             ElevatedButton(
-              onPressed: _load,
+              onPressed: () => context.read<FounderCubit>().refreshVentureHub(),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
               ),
@@ -728,7 +696,7 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
         ),
       );
     }
-    if (_ventures.isEmpty) {
+    if (state.ventures.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -759,7 +727,7 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
         ),
       );
     }
-    if (_filtered.isEmpty) {
+    if (state.filteredVentures.isEmpty) {
       return Center(
         child: Text(
           'No ventures match your search.',
@@ -768,17 +736,17 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
       );
     }
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: () => context.read<FounderCubit>().refreshVentureHub(),
       color: AppColors.primary,
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-        itemCount: _filtered.length,
+        itemCount: state.filteredVentures.length,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (_, i) => _VentureCard(
-          venture: _filtered[i],
-          onView: () => _showDetails(_filtered[i]),
-          onEdit: () => _showEdit(_filtered[i]),
-          onDelete: () => _confirmDelete(_filtered[i]),
+          venture: state.filteredVentures[i],
+          onView: () => _showDetails(state.filteredVentures[i]),
+          onEdit: () => _showEdit(state.filteredVentures[i]),
+          onDelete: () => _confirmDelete(state.filteredVentures[i]),
         ),
       ),
     );
@@ -827,7 +795,7 @@ class _VentureCard extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: stageColor.withOpacity(0.15),
+                    color: stageColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(industryIcon, color: stageColor, size: 22),
@@ -937,7 +905,7 @@ class _VentureCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 _Badge(
                   label: _industryLabels[industry] ?? industry,
-                  color: AppColors.primary.withOpacity(0.8),
+                  color: AppColors.primary.withValues(alpha: 0.8),
                 ),
                 const SizedBox(width: 8),
                 _Badge(label: status.label, color: status.color),
@@ -978,7 +946,7 @@ class _Badge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(

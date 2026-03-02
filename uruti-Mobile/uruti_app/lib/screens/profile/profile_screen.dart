@@ -73,9 +73,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
             pinned: true,
             backgroundColor: context.colors.surface,
             leading: IconButton(
-              icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
-              onPressed: () =>
-                  MainScaffold.scaffoldKey.currentState?.openDrawer(),
+              icon: Icon(
+                context.canPop()
+                    ? Icons.arrow_back_ios_new_rounded
+                    : Icons.menu_rounded,
+                color: context.colors.textPrimary,
+              ),
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                  return;
+                }
+                MainScaffold.scaffoldKey.currentState?.openDrawer();
+              },
             ),
             actions: [
               TextButton(

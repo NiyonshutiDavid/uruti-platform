@@ -68,13 +68,6 @@ class InvestorDashboardScreen extends StatelessWidget {
                   Icons.trending_up,
                   const Color(0xFFFFB800),
                 ),
-                const SizedBox(width: 12),
-                _CardStat(
-                  'Avg Score',
-                  '81',
-                  Icons.star_outline,
-                  const Color(0xFF8B5CF6),
-                ),
               ],
             ),
             const SizedBox(height: 24),

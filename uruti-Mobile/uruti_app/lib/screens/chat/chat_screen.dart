@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/realtime_service.dart';
 import '../main_scaffold.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -15,11 +18,28 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   List<Map<String, dynamic>> _conversations = [];
   bool _loading = true;
+  StreamSubscription<Map<String, dynamic>>? _realtimeSub;
 
   @override
   void initState() {
     super.initState();
     _load();
+
+    _realtimeSub = RealtimeService.instance.events.listen((event) {
+      if (!mounted || event['event'] != 'message_created') return;
+      _load();
+    });
+
+    final token = (context.read<AuthProvider>().token ?? '').trim();
+    if (token.isNotEmpty) {
+      RealtimeService.instance.connect(token);
+    }
+  }
+
+  @override
+  void dispose() {
+    _realtimeSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -121,20 +141,41 @@ class _ConversationTile extends StatelessWidget {
   final Map<String, dynamic> data;
   const _ConversationTile({required this.data});
 
+  String _asText(dynamic value) {
+    if (value == null) return '';
+    return value.toString().trim();
+  }
+
+  String? _safeAvatarUrl(dynamic raw) {
+    final value = _asText(raw);
+    if (value.isEmpty) return null;
+    final uri = Uri.tryParse(value);
+    if (uri == null) return null;
+    if (uri.hasScheme && (uri.path.isEmpty || uri.path == '/')) {
+      return null;
+    }
+    return value;
+  }
+
   @override
   Widget build(BuildContext context) {
     final other = data['other_user'] as Map<String, dynamic>? ?? {};
-    final name = (other['full_name'] as String?) ?? 'User';
-    final role = (other['role'] as String?) ?? '';
-    final avatar = other['avatar_url'] as String?;
-    final lastMsg = (data['last_message'] as String?) ?? '';
-    final time = (data['last_message_time'] as String?) ?? '';
+    final displayName = _asText(other['display_name']);
+    final fullName = _asText(other['full_name']);
+    final name = displayName.isNotEmpty
+        ? displayName
+        : (fullName.isNotEmpty ? fullName : 'Connection');
+    final role = _asText(other['role']);
+    final avatar = _safeAvatarUrl(other['avatar_url']);
+    final lastMsg = _asText(data['last_message']);
+    final time = _asText(data['last_message_time']);
     final unread = (data['unread_count'] as int?) ?? 0;
-    final userId = other['id'] as String? ?? '';
+    final isOnline = other['is_online'] == true;
+    final userId = _asText(other['id']);
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      onTap: () => context.go('/messages/$userId'),
+      onTap: () => context.push('/messages/$userId'),
       leading: Stack(
         children: [
           CircleAvatar(
@@ -150,19 +191,23 @@ class _ConversationTile extends StatelessWidget {
                   )
                 : null,
           ),
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-                border: Border.all(color: context.colors.background, width: 2),
+          if (isOnline)
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: context.colors.background,
+                    width: 2,
+                  ),
+                ),
               ),
             ),
-          ),
         ],
       ),
       title: Row(

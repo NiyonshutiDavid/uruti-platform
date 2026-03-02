@@ -1,4 +1,4 @@
-package com.uruti.uruti_app
+package com.uruti.app
 
 import io.flutter.embedding.android.FlutterActivity
 

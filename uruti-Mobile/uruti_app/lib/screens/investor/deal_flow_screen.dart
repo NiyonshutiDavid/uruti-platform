@@ -68,21 +68,39 @@ class _DealFlowScreenState extends State<DealFlowScreen> {
   List<Map<String, dynamic>> get _ventures {
     return _bookmarks
         .map((b) {
-          final venture = (b['venture'] is Map<String, dynamic>)
-              ? Map<String, dynamic>.from(b['venture'] as Map<String, dynamic>)
-              : (b['venture'] is Map)
-              ? Map<String, dynamic>.from(
-                  (b['venture'] as Map).cast<String, dynamic>(),
-                )
+          final dynamic ventureRaw =
+              b['venture'] ?? b['startup'] ?? b['startup_data'];
+
+          final venture = (ventureRaw is Map<String, dynamic>)
+              ? Map<String, dynamic>.from(ventureRaw)
+              : (ventureRaw is Map)
+              ? Map<String, dynamic>.from(ventureRaw.cast<String, dynamic>())
               : <String, dynamic>{};
 
+          if (venture.isEmpty) {
+            final topLevelVenture = <String, dynamic>{
+              'id': b['venture_id'] ?? b['startup_id'] ?? b['id'],
+              'name': b['venture_name'] ?? b['startup_name'] ?? b['name'],
+              'industry': b['industry'],
+              'stage': b['stage'],
+              'tagline': b['tagline'],
+              'uruti_score': b['uruti_score'],
+              'funding_goal': b['funding_goal'],
+            };
+            topLevelVenture.removeWhere((_, value) => value == null);
+            if (topLevelVenture.isNotEmpty) {
+              venture.addAll(topLevelVenture);
+            }
+          }
+
           venture['bookmark_id'] = b['id'];
-          venture['venture_id'] = b['venture_id'] ?? venture['id'];
+          venture['venture_id'] =
+              b['venture_id'] ?? b['startup_id'] ?? venture['id'];
           venture['bookmark_notes'] = b['notes'];
           venture['bookmark_tags'] = b['tags'];
           return venture;
         })
-        .where((v) => v.isNotEmpty)
+        .where((v) => v.isNotEmpty && _s(v['name']).isNotEmpty)
         .toList();
   }
 
@@ -243,10 +261,6 @@ class _DealFlowScreenState extends State<DealFlowScreen> {
 
   Widget _overviewCard(BuildContext context) {
     final ventures = _ventures;
-    final avgScore = ventures.isEmpty
-        ? 0
-        : ventures.map((v) => _n(v['uruti_score'])).reduce((a, b) => a + b) /
-              ventures.length;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -259,13 +273,6 @@ class _DealFlowScreenState extends State<DealFlowScreen> {
         children: [
           Expanded(
             child: _stat(context, 'Bookmarked Startups', '${ventures.length}'),
-          ),
-          Expanded(
-            child: _stat(
-              context,
-              'Avg Uruti Score',
-              avgScore.toStringAsFixed(0),
-            ),
           ),
         ],
       ),

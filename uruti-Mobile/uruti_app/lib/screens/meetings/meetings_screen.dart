@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../core/app_colors.dart';
+import '../../providers/call_provider.dart';
 import '../../services/api_service.dart';
 import '../../screens/main_scaffold.dart';
 
@@ -358,6 +360,52 @@ class _MeetingCard extends StatelessWidget {
     return DateFormat('EEE, MMM d • h:mm a').format(dt.toLocal());
   }
 
+  Future<void> _startMeetingCall(BuildContext context, String type) async {
+    final normalizedType = type.toLowerCase();
+    final isVideo = normalizedType == 'video' || normalizedType == 'online';
+    final isVoice = normalizedType == 'phone';
+    if (!isVideo && !isVoice) return;
+
+    final calls = context.read<CallProvider>();
+    if (calls.hasCall) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Finish current call before starting another.'),
+        ),
+      );
+      return;
+    }
+
+    final calleeName =
+        (meeting['participant_name'] as String?)?.trim().isNotEmpty == true
+        ? (meeting['participant_name'] as String).trim()
+        : (meeting['host_name'] as String?)?.trim().isNotEmpty == true
+        ? (meeting['host_name'] as String).trim()
+        : (meeting['title'] as String?)?.trim().isNotEmpty == true
+        ? (meeting['title'] as String).trim()
+        : 'Meeting Contact';
+
+    await calls.startOutgoingCall(
+      calleeId:
+          '${meeting['participant_id'] ?? meeting['host_id'] ?? meeting['id'] ?? 'meeting'}',
+      calleeName: calleeName,
+      handle:
+          (meeting['meeting_url'] as String?) ??
+          (meeting['meeting_link'] as String?),
+      isVideo: isVideo,
+    );
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${isVideo ? 'Video' : 'Voice'} call started with $calleeName',
+        ),
+        backgroundColor: AppColors.primary,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final id = meeting['id'] as int? ?? 0;
@@ -365,6 +413,7 @@ class _MeetingCard extends StatelessWidget {
     final type = meeting['meeting_type'] as String? ?? 'online';
     final startTime = _formatTime(meeting['start_time'] as String?);
     final hasUrl = (meeting['meeting_url'] as String? ?? '').isNotEmpty;
+    final canStartCall = type == 'video' || type == 'online' || type == 'phone';
 
     final typeIcon = switch (type) {
       'video' || 'online' => Icons.videocam_outlined,
@@ -395,7 +444,7 @@ class _MeetingCard extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.12),
+                    color: AppColors.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(typeIcon, color: AppColors.primary, size: 20),
@@ -426,13 +475,19 @@ class _MeetingCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (hasUrl)
+                if (hasUrl || canStartCall)
                   Tooltip(
-                    message: 'Join Meeting',
-                    child: Icon(
-                      Icons.open_in_new,
-                      color: AppColors.primary,
-                      size: 18,
+                    message: canStartCall ? 'Start Call' : 'Join Meeting',
+                    child: IconButton(
+                      onPressed: () => _startMeetingCall(context, type),
+                      icon: Icon(
+                        canStartCall ? Icons.call_rounded : Icons.open_in_new,
+                        color: AppColors.primary,
+                        size: 18,
+                      ),
+                      splashRadius: 18,
+                      visualDensity: VisualDensity.compact,
+                      constraints: const BoxConstraints(),
                     ),
                   ),
               ],

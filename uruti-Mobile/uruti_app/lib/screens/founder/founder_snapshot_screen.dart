@@ -1,10 +1,11 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
+import '../../bloc/founder/founder_cubit.dart';
+import '../../bloc/founder/founder_state.dart';
 import '../../core/app_colors.dart';
 import '../../providers/auth_provider.dart';
-import '../../services/api_service.dart';
 import '../../screens/main_scaffold.dart';
 
 class FounderSnapshotScreen extends StatefulWidget {
@@ -14,43 +15,10 @@ class FounderSnapshotScreen extends StatefulWidget {
 }
 
 class _FounderSnapshotScreenState extends State<FounderSnapshotScreen> {
-  int _venturesCount = 0;
-  int _sessionsCount = 0;
-  int _connectionsCount = 0;
-  List<dynamic> _ventures = [];
-  List<dynamic> _notifications = [];
-  List<dynamic> _upcomingMeetings = [];
-  bool _loading = true;
-
   @override
   void initState() {
     super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final results = await Future.wait([
-        ApiService.instance.getMyVentures(),
-        ApiService.instance.getPitchSessions(),
-        ApiService.instance.getConnections(),
-        ApiService.instance.getNotifications(),
-        ApiService.instance.getMeetings(upcoming: true),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        _ventures = results[0];
-        _venturesCount = _ventures.length;
-        _sessionsCount = results[1].length;
-        _connectionsCount = results[2].length;
-        _notifications = results[3].take(5).toList();
-        _upcomingMeetings = results[4].take(5).toList();
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-    }
+    context.read<FounderCubit>().initializeSnapshot();
   }
 
   @override
@@ -59,199 +27,211 @@ class _FounderSnapshotScreenState extends State<FounderSnapshotScreen> {
     final score = user?.uritiScore.round() ?? 0;
     final displayName = user?.firstName ?? user?.displayNameOrFull ?? 'Founder';
 
-    return Scaffold(
-      backgroundColor: context.colors.background,
-      appBar: AppBar(
-        backgroundColor: context.colors.background,
-        leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
-          onPressed: () => MainScaffold.scaffoldKey.currentState?.openDrawer(),
-        ),
-        title: Text(
-          'Founder Snapshot',
-          style: TextStyle(
-            color: context.colors.textPrimary,
-            fontWeight: FontWeight.w700,
+    return BlocBuilder<FounderCubit, FounderState>(
+      builder: (context, state) {
+        final loading = state.status == FounderStatus.loading;
+        final venturesCount = state.ventures.length;
+        final sessionsCount = state.pitchSessions.length;
+        final connectionsCount = state.connections.length;
+
+        return Scaffold(
+          backgroundColor: context.colors.background,
+          appBar: AppBar(
+            backgroundColor: context.colors.background,
+            leading: IconButton(
+              icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
+              onPressed: () =>
+                  MainScaffold.scaffoldKey.currentState?.openDrawer(),
+            ),
+            title: Text(
+              'Founder Snapshot',
+              style: TextStyle(
+                color: context.colors.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
-        ),
-      ),
-      body: RefreshIndicator(
-        color: AppColors.primary,
-        onRefresh: _load,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── Welcome ────────────────────────────────────────────────
-              _WelcomeCard(name: displayName),
-              const SizedBox(height: 16),
-
-              // ── Key Stats ──────────────────────────────────────────────
-              Row(
+          body: RefreshIndicator(
+            color: AppColors.primary,
+            onRefresh: () => context.read<FounderCubit>().refreshSnapshot(),
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _StatCard(
-                    icon: Icons.lightbulb_outline,
-                    label: 'Startup Ideas',
-                    value: _loading ? '...' : '$_venturesCount',
-                    sub: _venturesCount == 0
-                        ? 'Start capturing ideas'
-                        : '$_venturesCount idea${_venturesCount > 1 ? 's' : ''} captured',
-                  ),
-                  const SizedBox(width: 12),
-                  _StatCard(
-                    icon: Icons.trending_up,
-                    label: 'Pitch Sessions',
-                    value: _loading ? '...' : '$_sessionsCount',
-                    sub: _sessionsCount == 0
-                        ? 'No active sessions yet'
-                        : '$_sessionsCount session${_sessionsCount > 1 ? 's' : ''}',
-                  ),
-                  const SizedBox(width: 12),
-                  _StatCard(
-                    icon: Icons.people_outline,
-                    label: 'Connections',
-                    value: _loading ? '...' : '$_connectionsCount',
-                    sub: _connectionsCount == 0
-                        ? 'No connections yet'
-                        : '$_connectionsCount built',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
+                  // ── Welcome ────────────────────────────────────────────────
+                  _WelcomeCard(name: displayName),
+                  const SizedBox(height: 16),
 
-              // ── AI Readiness Score ─────────────────────────────────────
-              _ScoreCard(score: score, loading: _loading),
-              const SizedBox(height: 16),
-
-              // ── Quick Actions ──────────────────────────────────────────
-              _sectionTitle(
-                context,
-                'Quick Actions',
-                subtitle: 'Fast track your startup development',
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _QuickAction(
-                    icon: Icons.lightbulb_outline,
-                    label: 'Capture\nNew Idea',
-                    onTap: () => context.go('/venture-hub'),
-                  ),
-                  const SizedBox(width: 10),
-                  _QuickAction(
-                    icon: Icons.mic_outlined,
-                    label: 'Start Pitch\nCoach',
-                    onTap: () => context.go('/pitch-sessions'),
-                  ),
-                  const SizedBox(width: 10),
-                  _QuickAction(
-                    icon: Icons.person_add_alt_1_outlined,
-                    label: 'Build a\nConnection',
-                    onTap: () => context.go('/connections'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // ── Charts row ────────────────────────────────────────────
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _ChartCard(
-                      title: 'Pitch Performance Trend',
-                      subtitle: 'Your improvement over the last month',
-                      child: const _EmptyChart(
+                  // ── Key Stats ──────────────────────────────────────────────
+                  Row(
+                    children: [
+                      _StatCard(
+                        icon: Icons.lightbulb_outline,
+                        label: 'Startup Ideas',
+                        value: loading ? '...' : '$venturesCount',
+                        sub: venturesCount == 0
+                            ? 'Start capturing ideas'
+                            : '$venturesCount idea${venturesCount > 1 ? 's' : ''} captured',
+                      ),
+                      const SizedBox(width: 12),
+                      _StatCard(
                         icon: Icons.trending_up,
-                        message:
-                            'No pitch performance data yet. Start your first pitch session!',
+                        label: 'Pitch Sessions',
+                        value: loading ? '...' : '$sessionsCount',
+                        sub: sessionsCount == 0
+                            ? 'No active sessions yet'
+                            : '$sessionsCount session${sessionsCount > 1 ? 's' : ''}',
+                      ),
+                      const SizedBox(width: 12),
+                      _StatCard(
+                        icon: Icons.people_outline,
+                        label: 'Connections',
+                        value: loading ? '...' : '$connectionsCount',
+                        sub: connectionsCount == 0
+                            ? 'No connections yet'
+                            : '$connectionsCount built',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── AI Readiness Score ─────────────────────────────────────
+                  _ScoreCard(score: score, loading: loading),
+                  const SizedBox(height: 16),
+
+                  // ── Quick Actions ──────────────────────────────────────────
+                  _sectionTitle(
+                    context,
+                    'Quick Actions',
+                    subtitle: 'Fast track your startup development',
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _QuickAction(
+                        icon: Icons.lightbulb_outline,
+                        label: 'Capture\nNew Idea',
+                        onTap: () => context.go('/ventures'),
+                      ),
+                      const SizedBox(width: 10),
+                      _QuickAction(
+                        icon: Icons.mic_outlined,
+                        label: 'Start Pitch\nCoach',
+                        onTap: () => context.go('/coach'),
+                      ),
+                      const SizedBox(width: 10),
+                      _QuickAction(
+                        icon: Icons.person_add_alt_1_outlined,
+                        label: 'Build a\nConnection',
+                        onTap: () => context.go('/connections'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Charts row ────────────────────────────────────────────
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _ChartCard(
+                          title: 'Pitch Performance Trend',
+                          subtitle: 'Your improvement over the last month',
+                          child: const _EmptyChart(
+                            icon: Icons.trending_up,
+                            message:
+                                'No pitch performance data yet. Start your first pitch session!',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ChartCard(
+                          title: 'Investment Readiness',
+                          subtitle: 'Current status of your startup portfolio',
+                          child: state.ventures.isEmpty
+                              ? const _EmptyChart(
+                                  icon: Icons.track_changes_outlined,
+                                  message:
+                                      'No startup data yet. Capture your first idea!',
+                                )
+                              : _InvestmentReadinessPie(
+                                  ventures: state.ventures,
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Startup Readiness Bar Chart ───────────────────────────
+                  _ChartCard(
+                    title: 'Startup Readiness Score',
+                    subtitle: 'Readiness scores for your top startups',
+                    child: state.ventures.isEmpty
+                        ? const _EmptyChart(
+                            icon: Icons.lightbulb_outline,
+                            message:
+                                'No startup readiness scores yet. Start by capturing your ideas!',
+                            height: 160,
+                          )
+                        : _ReadinessBarChart(ventures: state.ventures),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Notifications + Milestones ────────────────────────────
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _ListCard(
+                          title: 'Recent Notifications',
+                          subtitle: 'Stay updated with your latest activities',
+                          emptyIcon: Icons.notifications_none,
+                          emptyMsg:
+                              'No recent notifications. Start using the platform!',
+                          items: state.previewNotifications,
+                          itemBuilder: (n) => _NotificationTile(n: n),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ListCard(
+                          title: 'Upcoming Milestones',
+                          subtitle: 'Track your important dates',
+                          emptyIcon: Icons.calendar_today_outlined,
+                          emptyMsg: 'No upcoming milestones yet.',
+                          items: state.previewMeetings,
+                          itemBuilder: (m) => _MilestoneTile(m: m),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── CTA ───────────────────────────────────────────────────
+                  ElevatedButton.icon(
+                    onPressed: () => context.go('/advisory-tracks'),
+                    icon: const Icon(Icons.smart_toy_outlined),
+                    label: const Text('Get AI Recommendations'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _ChartCard(
-                      title: 'Investment Readiness',
-                      subtitle: 'Current status of your startup portfolio',
-                      child: _ventures.isEmpty
-                          ? const _EmptyChart(
-                              icon: Icons.track_changes_outlined,
-                              message:
-                                  'No startup data yet. Capture your first idea!',
-                            )
-                          : _InvestmentReadinessPie(ventures: _ventures),
-                    ),
-                  ),
+                  const SizedBox(height: 40),
                 ],
               ),
-              const SizedBox(height: 12),
-
-              // ── Startup Readiness Bar Chart ───────────────────────────
-              _ChartCard(
-                title: 'Startup Readiness Score',
-                subtitle: 'Readiness scores for your top startups',
-                child: _ventures.isEmpty
-                    ? const _EmptyChart(
-                        icon: Icons.lightbulb_outline,
-                        message:
-                            'No startup readiness scores yet. Start by capturing your ideas!',
-                        height: 160,
-                      )
-                    : _ReadinessBarChart(ventures: _ventures),
-              ),
-              const SizedBox(height: 20),
-
-              // ── Notifications + Milestones ────────────────────────────
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _ListCard(
-                      title: 'Recent Notifications',
-                      subtitle: 'Stay updated with your latest activities',
-                      emptyIcon: Icons.notifications_none,
-                      emptyMsg:
-                          'No recent notifications. Start using the platform!',
-                      items: _notifications,
-                      itemBuilder: (n) => _NotificationTile(n: n),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _ListCard(
-                      title: 'Upcoming Milestones',
-                      subtitle: 'Track your important dates',
-                      emptyIcon: Icons.calendar_today_outlined,
-                      emptyMsg: 'No upcoming milestones yet.',
-                      items: _upcomingMeetings,
-                      itemBuilder: (m) => _MilestoneTile(m: m),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // ── CTA ───────────────────────────────────────────────────
-              ElevatedButton.icon(
-                onPressed: () => context.go('/advisory-tracks'),
-                icon: const Icon(Icons.smart_toy_outlined),
-                label: const Text('Get AI Recommendations'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(52),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 40),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
