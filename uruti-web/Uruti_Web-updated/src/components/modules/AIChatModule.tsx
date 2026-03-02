@@ -80,7 +80,24 @@ interface Venture {
   id: number;
   name: string;
   sector: string;
+  stage?: string;
+  industry?: string;
+  description?: string;
+  problem_statement?: string;
+  solution?: string;
+  target_market?: string;
+  business_model?: string;
   uruti_score?: number;
+}
+
+interface BackendAiModel {
+  id: string;
+  name: string;
+  description: string;
+  type: 'chatbot' | 'analysis';
+  requires_venture_context: boolean;
+  fixed_prompt?: string | null;
+  is_default?: boolean;
 }
 
 interface AIChatModuleProps {
@@ -105,27 +122,6 @@ const investorQuickActions = [
   { icon: DollarSign, label: 'Valuation Analysis', prompt: 'Is the valuation reasonable for this stage?', color: 'text-emerald-500' },
 ];
 
-const aiModels = [
-  { 
-    id: 'ranker', 
-    name: 'Uruti Ranker', 
-    description: 'Best for giving Uruti score',
-    color: 'from-amber-500 to-orange-600'
-  },
-  { 
-    id: 'advisory', 
-    name: 'Uruti Advisory', 
-    description: 'Best for advisory and refining ideas',
-    color: 'from-blue-500 to-indigo-600'
-  },
-  { 
-    id: 'investor', 
-    name: 'Uruti Investor', 
-    description: 'Best for investor analyzing',
-    color: 'from-purple-500 to-pink-600'
-  },
-];
-
 export function AIChatModule({ userType = 'founder', startupContext, analysisContext }: AIChatModuleProps) {
   const { user } = useAuth();
   const [chatHistories, setChatHistories] = useState<ChatHistory[]>([]);
@@ -143,7 +139,9 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
   const [selectedStartup, setSelectedStartup] = useState<Venture | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(aiModels[1]);
+  const [availableModels, setAvailableModels] = useState<BackendAiModel[]>([]);
+  const [selectedModel, setSelectedModel] = useState<BackendAiModel | null>(null);
+  const [isLoadingModels, setIsLoadingModels] = useState(true);
   const [modelSelectOpen, setModelSelectOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [chatToDelete, setChatToDelete] = useState<string | null>(null);
@@ -151,6 +149,56 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const quickActions = userType === 'founder' ? founderQuickActions : investorQuickActions;
+
+  const renderFormattedText = (content: string) => {
+    const lines = content.split('\n');
+    return lines.map((line, lineIndex) => {
+      const parts = line.split(/(\*\*[^*]+\*\*)/g);
+      return (
+        <span key={`${lineIndex}-${line}`}>
+          {parts.map((part, partIndex) => {
+            const isBold = part.startsWith('**') && part.endsWith('**') && part.length > 4;
+            if (isBold) {
+              return <strong key={`${lineIndex}-${partIndex}`}>{part.slice(2, -2)}</strong>;
+            }
+            return <span key={`${lineIndex}-${partIndex}`}>{part}</span>;
+          })}
+          {lineIndex < lines.length - 1 && <br />}
+        </span>
+      );
+    });
+  };
+
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        setIsLoadingModels(true);
+        const data = await apiClient.getAiModels();
+        const models: BackendAiModel[] = (data || []).map((model: any) => ({
+          id: String(model.id),
+          name: String(model.name || model.id),
+          description: String(model.description || ''),
+          type: model.type === 'analysis' ? 'analysis' : 'chatbot',
+          requires_venture_context: Boolean(model.requires_venture_context),
+          fixed_prompt: model.fixed_prompt ?? null,
+          is_default: Boolean(model.is_default),
+        }));
+
+        setAvailableModels(models);
+        const defaultModel = models.find((m) => m.is_default) || models.find((m) => m.type === 'chatbot') || models[0] || null;
+        setSelectedModel(defaultModel);
+      } catch (error) {
+        setAvailableModels([]);
+        setSelectedModel(null);
+      } finally {
+        setIsLoadingModels(false);
+      }
+    };
+
+    if (user) {
+      loadModels();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -168,13 +216,26 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
         setIsLoadingVentures(true);
         
         if (userType === 'founder') {
-          // Load all user's ventures
-          const data = await apiClient.getVentures();
-          setVentures(data);
+          // Load only founder's own ventures
+          const data = await apiClient.getMyVentures();
+          setVentures(
+            (data || []).map((venture: any) => ({
+              ...venture,
+              sector: venture.sector || venture.industry || 'General',
+            }))
+          );
         } else {
           // Load bookmarked ventures for investors
           const bookmarks = await apiClient.getBookmarks();
-          setBookmarkedVentures(bookmarks.map((b: any) => b.venture));
+          setBookmarkedVentures(
+            (bookmarks || [])
+              .map((bookmark: any) => bookmark?.venture)
+              .filter(Boolean)
+              .map((venture: any) => ({
+                ...venture,
+                sector: venture.sector || venture.industry || 'General',
+              }))
+          );
         }
       } catch (error) {
         // Silently handle error - backend might not be running or endpoints not ready
@@ -198,18 +259,15 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
     const loadChatHistory = async () => {
       try {
         setIsLoadingChats(true);
-        const conversations = await apiClient.getChatConversations();
+        const sessions = await apiClient.getAiHistorySessions();
         
-        const formattedHistory: ChatHistory[] = conversations.map((conv: any) => ({
-          id: conv.id,
-          title: conv.title,
-          lastMessage: conv.last_message || 'No messages yet',
-          timestamp: new Date(conv.updated_at || conv.created_at),
+        const formattedHistory: ChatHistory[] = (sessions || []).map((session: any) => ({
+          id: session.session_id,
+          title: (session.first_message || 'New Chat').slice(0, 50),
+          lastMessage: session.first_message || 'No messages yet',
+          timestamp: new Date(session.created_at),
           unread: false,
-          startup: conv.startup ? {
-            name: conv.startup.name,
-            sector: conv.startup.sector,
-          } : undefined,
+          startup: undefined,
         }));
 
         setChatHistories(formattedHistory);
@@ -228,117 +286,77 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
 
   // Handle startup context from external navigation
   useEffect(() => {
-    if (startupContext && messages.length === 0) {
-      const contextStartup: Venture = {
-        id: 0,
-        name: startupContext.name,
-        sector: 'Context',
-        uruti_score: 0
-      };
-      setSelectedStartup(contextStartup);
-      
-      setCurrentChatId(null);
-      
-      const greeting = `Hi! I'm your AI Advisory Assistant. I see you want to refine **${startupContext.name}**. Let me help you with that!`;
-      
+    if (!startupContext || messages.length > 0) return;
+
+    const scopedVentures = userType === 'investor' ? bookmarkedVentures : ventures;
+    const matched = scopedVentures.find((v) => v.name === startupContext.name);
+
+    setCurrentChatId(null);
+
+    if (!matched) {
+      const notAllowedText = userType === 'founder'
+        ? 'Requested context was not attached because it is not one of your created ventures.'
+        : 'Requested context was not attached because it is not in your bookmarked ideas.';
+
       setMessages([
         {
           id: '1',
           role: 'assistant',
-          content: greeting,
-          timestamp: new Date()
-        }
-      ]);
-      
-      setTimeout(() => {
-        const userMessage: Message = {
-          id: '2',
-          role: 'user',
-          content: `Help me refine this startup idea:\n\n**${startupContext.name}**\n${startupContext.description}`,
+          content: notAllowedText,
           timestamp: new Date(),
-          startup: { name: startupContext.name, sector: 'Context' }
-        };
-        
-        setMessages(prev => [...prev, userMessage]);
-        setIsTyping(true);
-        
-        setTimeout(() => {
-          const aiResponse = `Great! Let's refine **${startupContext.name}**. Based on your description, here are key areas to focus on:\n\n**1. Value Proposition Clarity**\n• Clearly articulate the unique problem you solve\n• Emphasize your differentiation from competitors in the Rwandan market\n\n**2. Target Market Definition**\n• Define your ideal customer profile more specifically\n• Quantify your addressable market size in Rwanda and East Africa\n\n**3. Business Model Development**\n• Clarify how you'll generate revenue\n• Outline your pricing strategy for the local market\n\n**4. Traction & Milestones**\n• Set measurable KPIs for the next 6 months\n• Identify quick wins to prove concept\n\n**5. Local Context Integration**\n• Address Rwanda-specific challenges and opportunities\n• Leverage local partnerships and infrastructure\n\n**💡 Pro Tip:** After refining, submit for Uruti Score analysis to get publicly ranked and attract investor attention!\n\n**🎯 Next Steps:**\n• Which specific area would you like to dive deeper into?\n• Do you have any specific questions about your value proposition?\n• Would you like help with market sizing or competitor analysis?\n\nLet me know what you'd like to focus on first!`;
-          
-          const assistantMessage: Message = {
-            id: '3',
-            role: 'assistant',
-            content: aiResponse,
-            timestamp: new Date()
-          };
-          setMessages(prev => [...prev, assistantMessage]);
-          setIsTyping(false);
-        }, 1500);
-      }, 500);
+        },
+      ]);
+      return;
     }
-  }, [startupContext]);
+
+    setSelectedStartup(matched);
+    setMessages([
+      {
+        id: '1',
+        role: 'assistant',
+        content: `Context attached: ${matched.name}. Ask your question and I'll use this context in the backend model response.`,
+        timestamp: new Date(),
+      },
+    ]);
+  }, [startupContext, userType, ventures, bookmarkedVentures, messages.length]);
 
   // Handle AI analysis context for investors
   useEffect(() => {
     if (analysisContext && userType === 'investor') {
+      const matchedBookmarked = bookmarkedVentures.find((venture) => venture.id === analysisContext.id);
+      if (!matchedBookmarked) {
+        setCurrentChatId(null);
+        setSelectedStartup(null);
+        setMessages([
+          {
+            id: '1',
+            role: 'assistant',
+            content: 'This startup is not in your bookmarked ideas. Bookmark it first, then attach it as context.',
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+
       const contextStartup: Venture = {
-        id: analysisContext.id || 0,
-        name: analysisContext.name,
-        sector: analysisContext.sector,
-        uruti_score: analysisContext.urutiScore
+        id: matchedBookmarked.id,
+        name: matchedBookmarked.name,
+        sector: matchedBookmarked.sector || matchedBookmarked.industry || 'General',
+        uruti_score: matchedBookmarked.uruti_score ?? analysisContext.urutiScore
       };
       setSelectedStartup(contextStartup);
       
       setCurrentChatId(null);
-      setMessages([]);
-      
-      const greeting = `Hi! I'm analyzing **${analysisContext.name}** for you. Let me provide a comprehensive investment analysis.`;
-      
       setMessages([
         {
           id: '1',
           role: 'assistant',
-          content: greeting,
+          content: `Context attached: ${contextStartup.name}. Choose a chatbot model and ask your investment question.`,
           timestamp: new Date()
         }
       ]);
-      
-      setTimeout(() => {
-        const userMessage: Message = {
-          id: '2',
-          role: 'user',
-          content: `Analyze the investment potential of ${analysisContext.name}`,
-          timestamp: new Date(),
-          startup: { name: analysisContext.name, sector: analysisContext.sector }
-        };
-        
-        setMessages(prev => [...prev, userMessage]);
-        setIsTyping(true);
-        
-        setTimeout(() => {
-          const getScoreRating = (score: number) => {
-            if (score >= 85) return { label: 'Excellent', color: '🟢', desc: 'Strong investment opportunity' };
-            if (score >= 75) return { label: 'Very Good', color: '🔵', desc: 'High-potential investment' };
-            if (score >= 65) return { label: 'Good', color: '🟡', desc: 'Solid investment prospect' };
-            return { label: 'Developing', color: '🟠', desc: 'Emerging opportunity' };
-          };
-          
-          const scoreRating = getScoreRating(analysisContext.urutiScore);
-          
-          const aiResponse = `**🎯 Investment Analysis: ${analysisContext.name}**\n\n**━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━**\n\n**📊 URUTI SCORE: ${analysisContext.urutiScore}/100** ${scoreRating.color}\n*Rating: ${scoreRating.label}* - ${scoreRating.desc}\n\n**━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━**\n\n**💼 Executive Summary**\n\n${analysisContext.name} is a ${analysisContext.stage} stage ${analysisContext.sector} startup operating in ${analysisContext.location}. ${analysisContext.tagline}\n\n**━━━━━━━━━━━━━━━━━━━━━━━━━━━━━**\n\n**✨ Key Strengths**\n\n• **Strong Product-Market Fit**: ${analysisContext.highlights[0]}\n• **Impressive Traction**: ${analysisContext.highlights[1]}\n• **Funding Success**: ${analysisContext.highlights[2]}\n• **Recognition**: ${analysisContext.highlights[3] || 'Growing market presence'}\n\n**━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━**\n\nWould you like me to dive deeper into any specific area of this analysis?`;
-          
-          const assistantMessage: Message = {
-            id: '3',
-            role: 'assistant',
-            content: aiResponse,
-            timestamp: new Date()
-          };
-          setMessages(prev => [...prev, assistantMessage]);
-          setIsTyping(false);
-        }, 2000);
-      }, 500);
     }
-  }, [analysisContext, userType]);
+  }, [analysisContext, userType, bookmarkedVentures]);
 
   useEffect(() => {
     if (messages.length === 0 && !currentChatId) {
@@ -356,7 +374,37 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
   }, [currentChatId, userType]);
 
   const handleSend = async (text?: string) => {
-    const messageText = text || inputText.trim();
+    if (!selectedModel) return;
+
+    const typedText = (text || inputText.trim()).trim();
+    const isAnalysisModel = selectedModel.type === 'analysis';
+
+    if (isAnalysisModel && userType !== 'founder') {
+      const blockedMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: 'The analysis model is only available for founders analyzing their own ventures.',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, blockedMessage]);
+      return;
+    }
+
+    if (isAnalysisModel && !selectedStartup) {
+      const blockedMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: 'Please attach one of your ventures as context before using the analysis model.',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, blockedMessage]);
+      return;
+    }
+
+    const messageText = isAnalysisModel
+      ? (selectedModel.fixed_prompt || 'analyse my venture')
+      : typedText;
+
     if (!messageText && attachments.length === 0) return;
 
     const userMessage: Message = {
@@ -373,98 +421,59 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
     setAttachments([]);
     setIsTyping(true);
 
-    // Save to backend
     try {
-      let conversationId = currentChatId;
-      
-      // Create new conversation if needed
-      if (!conversationId) {
-        const title = messageText.slice(0, 50) + (messageText.length > 50 ? '...' : '');
-        const newConv = await apiClient.createChatConversation({
-          title,
-          startup_id: selectedStartup?.id,
-        });
-        conversationId = newConv.id;
-        setCurrentChatId(conversationId);
-      }
-
-      // Save user message
-      await apiClient.sendChatMessage(conversationId, {
-        role: 'user',
-        content: messageText,
-        startup_id: selectedStartup?.id,
+      const response = await apiClient.sendAiChat({
+        message: messageText,
+        model: selectedModel.id,
+        session_id: currentChatId || undefined,
+        startup_context: selectedStartup
+          ? {
+              venture_id: selectedStartup.id,
+              name: selectedStartup.name,
+              description: selectedStartup.description,
+              stage: selectedStartup.stage,
+              industry: selectedStartup.industry || selectedStartup.sector,
+              problem_statement: selectedStartup.problem_statement,
+              solution: selectedStartup.solution,
+              target_market: selectedStartup.target_market,
+              business_model: selectedStartup.business_model,
+            }
+          : undefined,
       });
 
-      // Generate AI response
-      const aiResponse = generateAIResponse(messageText, selectedStartup, userType);
+      setCurrentChatId(response.session_id);
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: aiResponse,
+        content: response.message,
         timestamp: new Date()
       };
-
-      // Save AI response
-      await apiClient.sendChatMessage(conversationId, {
-        role: 'assistant',
-        content: aiResponse,
-      });
 
       setMessages(prev => [...prev, assistantMessage]);
       setIsTyping(false);
 
-      // Reload chat history
-      const conversations = await apiClient.getChatConversations();
-      const formattedHistory: ChatHistory[] = conversations.map((conv: any) => ({
-        id: conv.id,
-        title: conv.title,
-        lastMessage: conv.last_message || 'No messages yet',
-        timestamp: new Date(conv.updated_at || conv.created_at),
+      const sessions = await apiClient.getAiHistorySessions();
+      const formattedHistory: ChatHistory[] = (sessions || []).map((session: any) => ({
+        id: session.session_id,
+        title: (session.first_message || 'New Chat').slice(0, 50),
+        lastMessage: session.first_message || 'No messages yet',
+        timestamp: new Date(session.created_at),
         unread: false,
-        startup: conv.startup ? {
-          name: conv.startup.name,
-          sector: conv.startup.sector,
-        } : undefined,
+        startup: undefined,
       }));
       setChatHistories(formattedHistory);
     } catch (error) {
       console.error('Error saving message:', error);
-      // Still show AI response even if save fails
-      setTimeout(() => {
-        const aiResponse = generateAIResponse(messageText, selectedStartup, userType);
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: aiResponse,
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, assistantMessage]);
-        setIsTyping(false);
-      }, 1500);
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: error instanceof Error ? error.message : 'Failed to send message. Please try again.',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+      setIsTyping(false);
     }
-  };
-
-  const generateAIResponse = (userMessage: string, startup?: Venture | null, type?: string) => {
-    const lower = userMessage.toLowerCase();
-    
-    if (type === 'investor') {
-      if (lower.includes('investment') || lower.includes('potential')) {
-        return startup 
-          ? `**Investment Analysis: ${startup.name}**\n\n**🎯 Uruti Score: ${startup.uruti_score || 'N/A'}/100**\n\n**Key Strengths:**\n• Strong product-market fit in Rwanda's growing ${startup.sector} sector\n• Experienced founding team with domain expertise\n• Clear path to profitability within 18-24 months\n• Strategic partnerships with key market players\n\n**Investment Highlights:**\n• Addressable market: $50M+ in East Africa\n• Current traction: 15% MoM growth\n• Unit economics: Strong LTV/CAC ratio of 4.2x\n\n**Recommended Action:** High-potential investment opportunity. Suggest deeper due diligence on technical infrastructure and competitive moat.\n\nWould you like me to dive deeper into any specific area?`
-          : `I'd be happy to analyze a startup's investment potential. Please select a startup from the context menu or share the startup details, and I'll provide:\n\n1. Market opportunity assessment\n2. Team evaluation\n3. Traction analysis\n4. Risk factors\n5. Valuation perspective\n\nWhich startup interests you?`;
-      }
-      
-      return `As your investment advisor, I can help you with:\n\n💼 **Due Diligence**\n• Market analysis and sizing\n• Competitive landscape review\n• Financial model assessment\n\n📊 **Portfolio Strategy**\n• Sector diversification analysis\n• Stage allocation optimization\n• Risk-return balance\n\n🎯 **Deal Evaluation**\n• Valuation benchmarking\n• Term sheet review\n• Exit potential analysis\n\nWhat would you like to explore?`;
-    }
-    
-    // Founder responses
-    if (lower.includes('refine') || lower.includes('improve')) {
-      return startup 
-        ? `Great! Let's refine **${startup.name}** in the ${startup.sector} sector. Here are key areas to focus on:\n\n**1. Value Proposition**\n• Clearly articulate the unique problem you solve\n• Emphasize your differentiation from competitors\n\n**2. Target Market**\n• Define your ideal customer profile more specifically\n• Quantify your addressable market size\n\n**3. Business Model**\n• Clarify how you'll generate revenue\n• Outline your pricing strategy\n\n**4. Traction & Milestones**\n• Set measurable KPIs for the next 6 months\n• Identify quick wins to prove concept\n\n**💡 Pro Tip:** Submit for Uruti Score to get ranked publicly and attract investor attention!\n\nWhich area would you like to dive deeper into?`
-        : `I'd be happy to help refine your startup idea! To give you the best advice, could you tell me:\n\n1. What problem are you solving?\n2. Who are your target customers?\n3. What's your unique solution?\n\nShare these details and I'll provide specific refinement strategies.`;
-    }
-    
-    return `I'm here to help you succeed! I can assist with:\n\n✨ **Strategy & Planning**\n• Refining your startup idea\n• Market analysis and sizing\n• Go-to-market strategies\n\n💡 **Business Development**\n• Revenue model design\n• Customer acquisition\n• Pricing strategies\n\n📊 **Investment Readiness**\n• Pitch deck feedback\n• Financial projections\n• Investor relations\n\n🎯 **Execution**\n• Milestone planning\n• KPI tracking\n• Team building\n\nWhat specific challenge are you facing right now?`;
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -518,17 +527,13 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
         setSelectedStartup(foundVenture || null);
       }
 
-      // Load messages from backend
-      const messagesData = await apiClient.getChatMessages(chatId);
+      const messagesData = await apiClient.getAiSessionMessages(chatId);
       const formattedMessages: Message[] = messagesData.map((msg: any) => ({
-        id: msg.id,
+        id: String(msg.id),
         role: msg.role,
         content: msg.content,
         timestamp: new Date(msg.created_at),
-        startup: msg.startup ? {
-          name: msg.startup.name,
-          sector: msg.startup.sector,
-        } : undefined,
+        startup: undefined,
       }));
 
       setMessages(formattedMessages);
@@ -541,7 +546,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
     if (!chatToDelete) return;
 
     try {
-      await apiClient.deleteChatConversation(chatToDelete);
+      await apiClient.deleteAiSessionHistory(chatToDelete);
       setChatHistories(prev => prev.filter(chat => chat.id !== chatToDelete));
       
       if (currentChatId === chatToDelete) {
@@ -579,6 +584,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
   };
 
   const availableVentures = userType === 'investor' ? bookmarkedVentures : ventures;
+  const isAnalysisSelected = selectedModel?.type === 'analysis';
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-gradient-to-br from-purple-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900/20 relative">
@@ -685,7 +691,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={(e) => {
+                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                           e.stopPropagation();
                           setChatToDelete(chat.id);
                           setDeleteDialogOpen(true);
@@ -841,7 +847,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                             }`}
                           >
                             <p className={`text-sm whitespace-pre-wrap ${message.role === 'user' ? 'text-black dark:text-white' : ''}`} style={{ fontFamily: 'var(--font-body)' }}>
-                              {message.content}
+                              {renderFormattedText(message.content)}
                             </p>
                             {message.attachments && message.attachments.length > 0 && (
                               <div className="mt-3 space-y-2">
@@ -911,7 +917,11 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                   <DialogContent className="glass-card border-purple-200 dark:border-purple-500/30">
                     <DialogHeader>
                       <DialogTitle style={{ fontFamily: 'var(--font-heading)' }}>Add to Conversation</DialogTitle>
-                      <DialogDescription>Attach files or select a startup context</DialogDescription>
+                      <DialogDescription>
+                        {isAnalysisSelected
+                          ? 'Analysis model requires a venture context from your own ventures'
+                          : 'Attach files or select a startup context'}
+                      </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-3">
                       <Button
@@ -978,7 +988,13 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
 
                 <div className="flex-1 min-h-[48px]">
                   <Input
-                    placeholder={userType === 'founder' ? "Ask Uruti AI anything about your startup..." : "Ask Uruti AI about investment opportunities..."}
+                    placeholder={
+                      isAnalysisSelected
+                        ? 'Analysis mode uses fixed prompt: "analyse my venture"'
+                        : userType === 'founder'
+                          ? 'Ask Uruti AI anything about your startup...'
+                          : 'Ask Uruti AI about investment opportunities...'
+                    }
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
@@ -996,7 +1012,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                         className="rounded-full px-4 h-10 glass-card border-purple-300 dark:border-purple-600 hover:bg-[#76B947]/10 hover:border-[#76B947] transition-all"
                       >
                         <span className="font-medium text-sm" style={{ fontFamily: 'var(--font-heading)' }}>
-                          {selectedModel.name}
+                            {selectedModel?.name || (isLoadingModels ? 'Loading models...' : 'No model')}
                         </span>
                         <ChevronRight className="h-4 w-4 ml-1 text-muted-foreground rotate-90" />
                       </Button>
@@ -1007,13 +1023,13 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                         <DialogDescription>Choose the best model for your task</DialogDescription>
                       </DialogHeader>
                       <div className="space-y-3">
-                        {aiModels.map((model) => (
+                          {availableModels.map((model) => (
                           <Button
                             key={model.id}
-                            variant={selectedModel.id === model.id ? 'default' : 'outline'}
+                              variant={selectedModel?.id === model.id ? 'default' : 'outline'}
                             className={
-                              selectedModel.id === model.id
-                                ? `w-full justify-start transition-all bg-gradient-to-r ${model.color} text-white h-auto py-4`
+                                selectedModel?.id === model.id
+                                  ? 'w-full justify-start transition-all bg-gradient-to-r from-purple-600 to-purple-800 text-white h-auto py-4'
                                 : 'w-full justify-start transition-all hover:bg-[#76B947]/10 hover:border-[#76B947] hover:text-[#76B947] dark:hover:bg-[#76B947]/20 h-auto py-4'
                             }
                             onClick={() => {
@@ -1029,11 +1045,14 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                                 {model.description}
                               </div>
                             </div>
-                            {selectedModel.id === model.id && (
+                            {selectedModel?.id === model.id && (
                               <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
                             )}
                           </Button>
                         ))}
+                        {!isLoadingModels && availableModels.length === 0 && (
+                          <p className="text-sm text-muted-foreground">No models available from backend.</p>
+                        )}
                       </div>
                     </DialogContent>
                   </Dialog>
@@ -1053,7 +1072,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
 
                   <Button
                     onClick={() => handleSend()}
-                    disabled={(!inputText.trim() && attachments.length === 0) || isTyping}
+                    disabled={isTyping || (!isAnalysisSelected && !inputText.trim() && attachments.length === 0) || (isAnalysisSelected && !selectedStartup)}
                     size="icon"
                     className="h-10 w-10 rounded-full bg-[#76B947] hover:bg-[#5a8f35] text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all flex-shrink-0"
                   >

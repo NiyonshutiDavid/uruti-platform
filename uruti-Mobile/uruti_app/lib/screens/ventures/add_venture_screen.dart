@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/app_colors.dart';
 import '../../services/api_service.dart';
+import '../../widgets/top_notification.dart';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -29,7 +32,8 @@ const _industries = [
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 class AddVentureScreen extends StatefulWidget {
-  const AddVentureScreen({super.key});
+  final Map<String, dynamic>? initialVenture;
+  const AddVentureScreen({super.key, this.initialVenture});
   @override
   State<AddVentureScreen> createState() => _AddVentureScreenState();
 }
@@ -45,8 +49,16 @@ class _AddVentureScreenState extends State<AddVentureScreen>
   final _descCtrl = TextEditingController();
   final _problemCtrl = TextEditingController();
   final _solutionCtrl = TextEditingController();
+  final _competitiveEdgeCtrl = TextEditingController();
   final _marketCtrl = TextEditingController();
+  final _teamSizeCtrl = TextEditingController();
+  final _teamBackgroundCtrl = TextEditingController();
+  final _highlightsCtrl = TextEditingController();
+  final _milestonesCtrl = TextEditingController();
+  final _fundingPlansCtrl = TextEditingController();
   final _modelCtrl = TextEditingController();
+  final _iconLogoUrlCtrl = TextEditingController();
+  final _landscapeLogoUrlCtrl = TextEditingController();
 
   // Selections
   String _stage = 'ideation';
@@ -60,6 +72,11 @@ class _AddVentureScreenState extends State<AddVentureScreen>
   late Animation<double> _progressAnim;
 
   final _pageCtrl = PageController();
+  File? _iconLogoFile;
+  File? _landscapeLogoFile;
+
+  bool get _isEdit => widget.initialVenture != null;
+  int? get _ventureId => (widget.initialVenture?['id'] as num?)?.toInt();
 
   @override
   void initState() {
@@ -73,6 +90,35 @@ class _AddVentureScreenState extends State<AddVentureScreen>
       parent: _progressCtrl,
       curve: Curves.easeInOut,
     );
+
+    final initial = widget.initialVenture;
+    if (initial != null) {
+      _nameCtrl.text = (initial['name'] as String? ?? '').trim();
+      _taglineCtrl.text = (initial['tagline'] as String? ?? '').trim();
+      _descCtrl.text = (initial['description'] as String? ?? '').trim();
+      _problemCtrl.text = (initial['problem_statement'] as String? ?? '')
+          .trim();
+      _solutionCtrl.text = (initial['solution'] as String? ?? '').trim();
+      _competitiveEdgeCtrl.text = (initial['business_model'] as String? ?? '')
+          .trim();
+      _marketCtrl.text = (initial['target_market'] as String? ?? '').trim();
+      _teamSizeCtrl.text = (initial['team_size'] as String? ?? '').trim();
+      _teamBackgroundCtrl.text = (initial['team_background'] as String? ?? '')
+          .trim();
+      _highlightsCtrl.text = (initial['key_highlights'] as String? ?? '')
+          .trim();
+      _milestonesCtrl.text = (initial['milestones'] as String? ?? '').trim();
+      _fundingPlansCtrl.text = (initial['funding_plans'] as String? ?? '')
+          .trim();
+      _modelCtrl.text = (initial['business_model'] as String? ?? '').trim();
+      _iconLogoUrlCtrl.text = (initial['logo_url'] as String? ?? '').trim();
+      _landscapeLogoUrlCtrl.text = (initial['banner_url'] as String? ?? '')
+          .trim();
+      _stage = (initial['stage'] as String? ?? 'ideation');
+      _industry = (initial['industry'] as String?)?.trim().isEmpty == true
+          ? null
+          : (initial['industry'] as String?);
+    }
   }
 
   @override
@@ -85,17 +131,43 @@ class _AddVentureScreenState extends State<AddVentureScreen>
       _descCtrl,
       _problemCtrl,
       _solutionCtrl,
+      _competitiveEdgeCtrl,
       _marketCtrl,
+      _teamSizeCtrl,
+      _teamBackgroundCtrl,
+      _highlightsCtrl,
+      _milestonesCtrl,
+      _fundingPlansCtrl,
       _modelCtrl,
+      _iconLogoUrlCtrl,
+      _landscapeLogoUrlCtrl,
     ]) {
       c.dispose();
     }
     super.dispose();
   }
 
+  Future<void> _pickLogo({required bool landscape}) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 90,
+      maxWidth: landscape ? 1800 : 1024,
+    );
+    if (picked == null) return;
+
+    setState(() {
+      if (landscape) {
+        _landscapeLogoFile = File(picked.path);
+      } else {
+        _iconLogoFile = File(picked.path);
+      }
+    });
+  }
+
   void _goTo(int step) {
     setState(() => _step = step);
-    _progressCtrl.animateTo(step / 2);
+    _progressCtrl.animateTo(step / 3);
     _pageCtrl.animateToPage(
       step,
       duration: const Duration(milliseconds: 350),
@@ -115,6 +187,22 @@ class _AddVentureScreenState extends State<AddVentureScreen>
     return ok;
   }
 
+  bool _validateStep1() {
+    final hasProblem = _problemCtrl.text.trim().isNotEmpty;
+    final hasSolution = _solutionCtrl.text.trim().isNotEmpty;
+    if (hasProblem && hasSolution) return true;
+    TopNotification.show(
+      context,
+      message: 'Please describe both problem and solution to continue.',
+      isError: true,
+    );
+    return false;
+  }
+
+  String _mergeNonEmpty(List<String> parts) {
+    return parts.where((part) => part.trim().isNotEmpty).join('\n\n');
+  }
+
   Future<void> _submit() async {
     if (_nameCtrl.text.trim().isEmpty) {
       _goTo(0);
@@ -127,14 +215,28 @@ class _AddVentureScreenState extends State<AddVentureScreen>
 
     setState(() => _submitting = true);
     try {
-      await ApiService.instance.createVenture({
+      final mergedDescription = _mergeNonEmpty([
+        _descCtrl.text.trim(),
+        if (_teamBackgroundCtrl.text.trim().isNotEmpty)
+          'Team Background:\n${_teamBackgroundCtrl.text.trim()}',
+        if (_highlightsCtrl.text.trim().isNotEmpty)
+          'Key Highlights:\n${_highlightsCtrl.text.trim()}',
+        if (_milestonesCtrl.text.trim().isNotEmpty)
+          'Milestones:\n${_milestonesCtrl.text.trim()}',
+        if (_fundingPlansCtrl.text.trim().isNotEmpty)
+          'Funding Plans:\n${_fundingPlansCtrl.text.trim()}',
+      ]);
+      final mergedBusinessModel = _mergeNonEmpty([
+        _modelCtrl.text.trim(),
+        _competitiveEdgeCtrl.text.trim(),
+      ]);
+
+      final payload = {
         'name': _nameCtrl.text.trim(),
         'tagline': _taglineCtrl.text.trim().isEmpty
             ? null
             : _taglineCtrl.text.trim(),
-        'description': _descCtrl.text.trim().isEmpty
-            ? null
-            : _descCtrl.text.trim(),
+        'description': mergedDescription.isEmpty ? null : mergedDescription,
         'problem_statement': _problemCtrl.text.trim().isEmpty
             ? null
             : _problemCtrl.text.trim(),
@@ -144,22 +246,54 @@ class _AddVentureScreenState extends State<AddVentureScreen>
         'target_market': _marketCtrl.text.trim().isEmpty
             ? null
             : _marketCtrl.text.trim(),
-        'business_model': _modelCtrl.text.trim().isEmpty
+        'business_model': mergedBusinessModel.isEmpty
             ? null
-            : _modelCtrl.text.trim(),
+            : mergedBusinessModel,
+        'logo_url': _iconLogoUrlCtrl.text.trim().isEmpty
+            ? null
+            : _iconLogoUrlCtrl.text.trim(),
+        'banner_url': _landscapeLogoUrlCtrl.text.trim().isEmpty
+            ? null
+            : _landscapeLogoUrlCtrl.text.trim(),
         'stage': _stage,
         'industry': _industry,
-      });
+      };
+
+      int? ventureId;
+      if (_isEdit) {
+        final id = _ventureId;
+        if (id == null) throw Exception('Missing venture id');
+        await ApiService.instance.updateVenture(id, payload);
+        ventureId = id;
+      } else {
+        final created = await ApiService.instance.createVenture(payload);
+        ventureId = (created['id'] as num?)?.toInt();
+      }
+
+      if (ventureId != null) {
+        if (_iconLogoFile != null) {
+          await ApiService.instance.uploadVentureLogo(
+            ventureId,
+            _iconLogoFile!.path,
+          );
+        }
+        if (_landscapeLogoFile != null) {
+          await ApiService.instance.uploadVentureBanner(
+            ventureId,
+            _landscapeLogoFile!.path,
+          );
+        }
+      }
+
       if (!mounted) return;
       _showSuccess();
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceFirst('ApiException', '').trim()),
-          backgroundColor: Colors.red.shade700,
-        ),
+      TopNotification.show(
+        context,
+        message: e.toString().replaceFirst('ApiException', '').trim(),
+        isError: true,
       );
     }
   }
@@ -189,7 +323,7 @@ class _AddVentureScreenState extends State<AddVentureScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              'Venture Added!',
+              _isEdit ? 'Venture Updated!' : 'Venture Added!',
               style: TextStyle(
                 color: context.colors.textPrimary,
                 fontWeight: FontWeight.w800,
@@ -198,7 +332,9 @@ class _AddVentureScreenState extends State<AddVentureScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              '"${_nameCtrl.text.trim()}" has been created successfully.',
+              _isEdit
+                  ? '"${_nameCtrl.text.trim()}" has been updated successfully.'
+                  : '"${_nameCtrl.text.trim()}" has been created successfully.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: context.colors.textSecondary,
@@ -220,7 +356,7 @@ class _AddVentureScreenState extends State<AddVentureScreen>
             ),
             onPressed: () {
               Navigator.pop(context); // close dialog
-              context.pop(); // back to profile
+              context.pop(true);
             },
             child: const Text('Done'),
           ),
@@ -241,7 +377,7 @@ class _AddVentureScreenState extends State<AddVentureScreen>
           onPressed: () => context.pop(),
         ),
         title: Text(
-          'Add Venture',
+          _isEdit ? 'Edit Venture' : 'Add Venture',
           style: TextStyle(
             color: context.colors.textPrimary,
             fontWeight: FontWeight.w700,
@@ -259,11 +395,13 @@ class _AddVentureScreenState extends State<AddVentureScreen>
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             child: Row(
               children: [
-                _StepLabel(index: 0, current: _step, label: 'Essentials'),
+                _StepLabel(index: 0, current: _step, label: 'Basic Info'),
                 const Spacer(),
-                _StepLabel(index: 1, current: _step, label: 'Your Story'),
+                _StepLabel(index: 1, current: _step, label: 'Problem'),
                 const Spacer(),
-                _StepLabel(index: 2, current: _step, label: 'Market'),
+                _StepLabel(index: 2, current: _step, label: 'Team'),
+                const Spacer(),
+                _StepLabel(index: 3, current: _step, label: 'Funding'),
               ],
             ),
           ),
@@ -277,6 +415,11 @@ class _AddVentureScreenState extends State<AddVentureScreen>
                 _Step0(
                   nameCtrl: _nameCtrl,
                   taglineCtrl: _taglineCtrl,
+                  teamSizeCtrl: _teamSizeCtrl,
+                  iconLogoUrlCtrl: _iconLogoUrlCtrl,
+                  landscapeLogoUrlCtrl: _landscapeLogoUrlCtrl,
+                  iconLogoFile: _iconLogoFile,
+                  landscapeLogoFile: _landscapeLogoFile,
                   stage: _stage,
                   industry: _industry,
                   nameError: _nameError,
@@ -287,13 +430,28 @@ class _AddVentureScreenState extends State<AddVentureScreen>
                     _industryError = null;
                   }),
                   onNameChanged: (_) => setState(() => _nameError = null),
+                  onPickIconLogo: () => _pickLogo(landscape: false),
+                  onPickLandscapeLogo: () => _pickLogo(landscape: true),
+                  onRemoveIconLogo: () => setState(() => _iconLogoFile = null),
+                  onRemoveLandscapeLogo: () =>
+                      setState(() => _landscapeLogoFile = null),
                 ),
                 _Step1(
                   problemCtrl: _problemCtrl,
                   solutionCtrl: _solutionCtrl,
+                  competitiveEdgeCtrl: _competitiveEdgeCtrl,
+                  marketCtrl: _marketCtrl,
+                ),
+                _Step2(
+                  teamBackgroundCtrl: _teamBackgroundCtrl,
+                  highlightsCtrl: _highlightsCtrl,
+                ),
+                _Step3(
+                  milestonesCtrl: _milestonesCtrl,
+                  fundingPlansCtrl: _fundingPlansCtrl,
+                  modelCtrl: _modelCtrl,
                   descCtrl: _descCtrl,
                 ),
-                _Step2(marketCtrl: _marketCtrl, modelCtrl: _modelCtrl),
               ],
             ),
           ),
@@ -302,9 +460,11 @@ class _AddVentureScreenState extends State<AddVentureScreen>
           _NavBar(
             step: _step,
             submitting: _submitting,
+            isEdit: _isEdit,
             onBack: () => _goTo(_step - 1),
             onNext: () {
               if (_step == 0 && !_validateStep0()) return;
+              if (_step == 1 && !_validateStep1()) return;
               _goTo(_step + 1);
             },
             onSubmit: _submit,
@@ -327,7 +487,7 @@ class _ProgressBar extends StatelessWidget {
     return AnimatedBuilder(
       animation: anim,
       builder: (_, __) => LinearProgressIndicator(
-        value: (step + 1) / 3,
+        value: (step + 1) / 4,
         backgroundColor: context.colors.divider,
         valueColor: const AlwaysStoppedAnimation(AppColors.primary),
         minHeight: 3,
@@ -394,15 +554,26 @@ class _StepLabel extends StatelessWidget {
 // ─── Step 0: Essentials ───────────────────────────────────────────────────────
 
 class _Step0 extends StatelessWidget {
-  final TextEditingController nameCtrl, taglineCtrl;
+  final TextEditingController nameCtrl, taglineCtrl, teamSizeCtrl;
+  final TextEditingController iconLogoUrlCtrl, landscapeLogoUrlCtrl;
+  final File? iconLogoFile, landscapeLogoFile;
   final String stage;
   final String? industry;
   final String? nameError, industryError;
   final ValueChanged<String> onStageChanged, onIndustryChanged, onNameChanged;
+  final VoidCallback onPickIconLogo;
+  final VoidCallback onPickLandscapeLogo;
+  final VoidCallback onRemoveIconLogo;
+  final VoidCallback onRemoveLandscapeLogo;
 
   const _Step0({
     required this.nameCtrl,
     required this.taglineCtrl,
+    required this.teamSizeCtrl,
+    required this.iconLogoUrlCtrl,
+    required this.landscapeLogoUrlCtrl,
+    required this.iconLogoFile,
+    required this.landscapeLogoFile,
     required this.stage,
     required this.industry,
     required this.nameError,
@@ -410,6 +581,10 @@ class _Step0 extends StatelessWidget {
     required this.onStageChanged,
     required this.onIndustryChanged,
     required this.onNameChanged,
+    required this.onPickIconLogo,
+    required this.onPickLandscapeLogo,
+    required this.onRemoveIconLogo,
+    required this.onRemoveLandscapeLogo,
   });
 
   @override
@@ -432,9 +607,44 @@ class _Step0 extends StatelessWidget {
           const SizedBox(height: 16),
           _Field(
             controller: taglineCtrl,
-            label: 'Tagline (optional)',
+            label: 'One-Line Tagline (optional)',
             hint: 'A one-liner that captures your mission',
             maxLength: 120,
+          ),
+          const SizedBox(height: 16),
+          _Field(
+            controller: teamSizeCtrl,
+            label: 'Team Size (optional)',
+            hint: 'e.g. 5 members',
+            maxLength: 40,
+          ),
+          const SizedBox(height: 16),
+          _Field(
+            controller: iconLogoUrlCtrl,
+            label: 'Icon Logo URL (optional)',
+            hint: 'https://example.com/logo-icon.png',
+          ),
+          const SizedBox(height: 10),
+          _ImagePickerCard(
+            title: 'Icon Logo Upload',
+            subtitle: 'Square logo used in venture lists.',
+            file: iconLogoFile,
+            onPick: onPickIconLogo,
+            onRemove: onRemoveIconLogo,
+          ),
+          const SizedBox(height: 14),
+          _Field(
+            controller: landscapeLogoUrlCtrl,
+            label: 'Landscape Logo URL (optional)',
+            hint: 'https://example.com/logo-landscape.png',
+          ),
+          const SizedBox(height: 10),
+          _ImagePickerCard(
+            title: 'Landscape Logo Upload',
+            subtitle: 'Wide logo used in venture details.',
+            file: landscapeLogoFile,
+            onPick: onPickLandscapeLogo,
+            onRemove: onRemoveLandscapeLogo,
           ),
           const SizedBox(height: 24),
           _SectionTitle('Industry'),
@@ -485,11 +695,15 @@ class _Step0 extends StatelessWidget {
 // ─── Step 1: Your Story ───────────────────────────────────────────────────────
 
 class _Step1 extends StatelessWidget {
-  final TextEditingController problemCtrl, solutionCtrl, descCtrl;
+  final TextEditingController problemCtrl;
+  final TextEditingController solutionCtrl;
+  final TextEditingController competitiveEdgeCtrl;
+  final TextEditingController marketCtrl;
   const _Step1({
     required this.problemCtrl,
     required this.solutionCtrl,
-    required this.descCtrl,
+    required this.competitiveEdgeCtrl,
+    required this.marketCtrl,
   });
 
   @override
@@ -527,34 +741,15 @@ class _Step1 extends StatelessWidget {
             maxLines: 4,
           ),
           const SizedBox(height: 20),
-          _SectionTitle('Overview (optional)'),
+          _SectionTitle('Competitive Edge (optional)'),
           const SizedBox(height: 12),
           _Field(
-            controller: descCtrl,
-            label: 'Full Description',
-            hint: 'A broader description of your venture...',
-            maxLines: 5,
+            controller: competitiveEdgeCtrl,
+            label: 'Competitive Edge',
+            hint: 'What gives your venture an advantage?',
+            maxLines: 3,
           ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Step 2: Market & Model ───────────────────────────────────────────────────
-
-class _Step2 extends StatelessWidget {
-  final TextEditingController marketCtrl, modelCtrl;
-  const _Step2({required this.marketCtrl, required this.modelCtrl});
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+          const SizedBox(height: 20),
           _SectionTitle('Target Market'),
           const SizedBox(height: 4),
           Text(
@@ -568,19 +763,121 @@ class _Step2 extends StatelessWidget {
             hint: 'e.g. SMEs in East Africa, Rural farmers in Rwanda...',
             maxLines: 3,
           ),
-          const SizedBox(height: 20),
-          _SectionTitle('Business Model'),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Step 2: Team & Highlights ────────────────────────────────────────────────
+
+class _Step2 extends StatelessWidget {
+  final TextEditingController teamBackgroundCtrl;
+  final TextEditingController highlightsCtrl;
+  const _Step2({
+    required this.teamBackgroundCtrl,
+    required this.highlightsCtrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionTitle('Team Background'),
           const SizedBox(height: 4),
           Text(
-            'How do you make money?',
+            'Share experience and strengths of your team.',
             style: TextStyle(color: context.colors.textSecondary, fontSize: 13),
           ),
+          const SizedBox(height: 12),
+          _Field(
+            controller: teamBackgroundCtrl,
+            label: 'Team Background',
+            hint:
+                'Who is on the team and what relevant expertise do they bring?',
+            maxLines: 3,
+          ),
+          const SizedBox(height: 20),
+          _SectionTitle('Key Highlights'),
+          const SizedBox(height: 4),
+          Text(
+            'List key traction, partnerships, or achievements.',
+            style: TextStyle(color: context.colors.textSecondary, fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          _Field(
+            controller: highlightsCtrl,
+            label: 'Highlights',
+            hint: 'One highlight per line (optional)',
+            maxLines: 3,
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Step 3: Milestones & Funding ─────────────────────────────────────────────
+
+class _Step3 extends StatelessWidget {
+  final TextEditingController milestonesCtrl;
+  final TextEditingController fundingPlansCtrl;
+  final TextEditingController modelCtrl;
+  final TextEditingController descCtrl;
+
+  const _Step3({
+    required this.milestonesCtrl,
+    required this.fundingPlansCtrl,
+    required this.modelCtrl,
+    required this.descCtrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionTitle('Milestones (optional)'),
+          const SizedBox(height: 12),
+          _Field(
+            controller: milestonesCtrl,
+            label: 'Milestones',
+            hint: 'Major milestones reached or upcoming, one per line',
+            maxLines: 3,
+          ),
+          const SizedBox(height: 20),
+          _SectionTitle('Funding Plans (optional)'),
+          const SizedBox(height: 12),
+          _Field(
+            controller: fundingPlansCtrl,
+            label: 'Funding Plans',
+            hint: 'How funding will be used and what you are targeting',
+            maxLines: 3,
+          ),
+          const SizedBox(height: 20),
+          _SectionTitle('Business Model (optional)'),
           const SizedBox(height: 12),
           _Field(
             controller: modelCtrl,
             label: 'Business Model',
             hint: 'e.g. SaaS subscription, freemium, marketplace commission...',
             maxLines: 3,
+          ),
+          const SizedBox(height: 20),
+          _SectionTitle('Overview (optional)'),
+          const SizedBox(height: 12),
+          _Field(
+            controller: descCtrl,
+            label: 'Full Description',
+            hint: 'A broader description of your venture...',
+            maxLines: 5,
           ),
           const SizedBox(height: 32),
           Container(
@@ -602,7 +899,7 @@ class _Step2 extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'All fields on this step are optional. You can always update your venture details later.',
+                    'All fields on this step are optional. You can always refine details later.',
                     style: TextStyle(
                       color: context.colors.textSecondary,
                       fontSize: 13,
@@ -624,11 +921,13 @@ class _Step2 extends StatelessWidget {
 class _NavBar extends StatelessWidget {
   final int step;
   final bool submitting;
+  final bool isEdit;
   final VoidCallback onBack, onNext, onSubmit;
 
   const _NavBar({
     required this.step,
     required this.submitting,
+    required this.isEdit,
     required this.onBack,
     required this.onNext,
     required this.onSubmit,
@@ -667,7 +966,7 @@ class _NavBar extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: submitting
                     ? null
-                    : step < 2
+                    : step < 3
                     ? onNext
                     : onSubmit,
                 style: ElevatedButton.styleFrom(
@@ -688,7 +987,9 @@ class _NavBar extends StatelessWidget {
                         ),
                       )
                     : Text(
-                        step < 2 ? 'Continue' : 'Create Venture',
+                        step < 3
+                            ? 'Continue'
+                            : (isEdit ? 'Save Changes' : 'Create Venture'),
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
               ),
@@ -776,6 +1077,83 @@ class _Field extends StatelessWidget {
           horizontal: 16,
           vertical: 12,
         ),
+      ),
+    );
+  }
+}
+
+class _ImagePickerCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final File? file;
+  final VoidCallback onPick;
+  final VoidCallback onRemove;
+
+  const _ImagePickerCard({
+    required this.title,
+    required this.subtitle,
+    required this.file,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.colors.card,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: context.colors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: context.colors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: TextStyle(color: context.colors.textSecondary, fontSize: 11),
+          ),
+          const SizedBox(height: 10),
+          if (file != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.file(file!, height: 70, fit: BoxFit.cover),
+            ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onPick,
+                  icon: const Icon(Icons.upload_rounded, size: 16),
+                  label: Text(file == null ? 'Upload Image' : 'Replace Image'),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: context.colors.divider),
+                    foregroundColor: context.colors.textPrimary,
+                  ),
+                ),
+              ),
+              if (file != null) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: onRemove,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  color: Colors.redAccent,
+                  tooltip: 'Remove image',
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }

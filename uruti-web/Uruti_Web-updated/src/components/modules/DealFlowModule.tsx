@@ -124,7 +124,7 @@ export function DealFlowModule() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl mb-2 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-              My Deal Flow 📊
+              My Deal Flow
             </h1>
             <p className="text-lg text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
               Startups you're interested in tracking

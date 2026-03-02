@@ -29,6 +29,7 @@ import { AdminDashboardModule } from '../modules/AdminDashboardModule';
 import { AdminUserManagementModule } from '../modules/AdminUserManagementModule';
 import { AdminCredentialsModule } from '../modules/AdminCredentialsModule';
 import { useCall } from '../../lib/call-context';
+import { Button } from '../ui/button';
 
 export function DashboardLayout() {
   const navigate = useNavigate();
@@ -38,7 +39,7 @@ export function DashboardLayout() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [aiChatContext, setAiChatContext] = useState<{ name: string; description: string } | undefined>();
   const [aiAnalysisContext, setAiAnalysisContext] = useState<any>(undefined);
-  const { callState, endCall } = useCall();
+  const { callState, endCall, acceptIncomingCall, declineIncomingCall } = useCall();
 
   // Keep module state synced with URL and enforce role-based access
   useEffect(() => {
@@ -221,14 +222,45 @@ export function DashboardLayout() {
         </main>
       </div>
       {user.role !== 'admin' && <OnboardingTour />}
-      {callState && <FloatingCallWidget
-        open={callState.isOpen}
-        onClose={endCall}
-        type={callState.type}
-        contactName={callState.contactName}
-        contactAvatar={callState.contactAvatar}
-        contactOnline={callState.contactOnline}
-      />}
+
+      {callState?.isOpen && callState.isRinging && callState.isIncoming && (
+        <div className="fixed left-1/2 top-4 z-[220] w-[min(92vw,420px)] -translate-x-1/2 rounded-2xl border border-border/70 bg-card/95 p-4 text-foreground shadow-2xl backdrop-blur sm:top-6 md:top-20">
+          <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+            Incoming {callState.type} call
+          </p>
+          <p className="mt-1 text-base font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>
+            {callState.contactName}
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <Button
+              onClick={() => void declineIncomingCall()}
+              variant="destructive"
+              className="flex-1"
+            >
+              Decline
+            </Button>
+            <Button
+              onClick={() => void acceptIncomingCall()}
+              className="flex-1 bg-[#76B947] text-white hover:bg-[#76B947]/90"
+            >
+              Accept
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {callState && (
+        <FloatingCallWidget
+          open={callState.isOpen && (!callState.isIncoming || !callState.isRinging)}
+          onClose={endCall}
+          type={callState.type}
+          isRinging={callState.isRinging}
+          isIncoming={callState.isIncoming}
+          contactName={callState.contactName}
+          contactAvatar={callState.contactAvatar}
+          contactOnline={callState.contactOnline}
+        />
+      )}
     </>
   );
 }

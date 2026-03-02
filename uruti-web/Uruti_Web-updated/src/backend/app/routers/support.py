@@ -6,9 +6,11 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_active_user
+from ..config import settings
 from ..database import get_db
 from ..models import SupportMessage, User, UserRole
 from ..schemas import SupportMessageCreate, SupportMessageRespond, SupportMessageResponse
+from ..services.email_service import send_plain_email
 from pydantic import EmailStr
 
 router = APIRouter(prefix="/support", tags=["Support"])
@@ -29,6 +31,18 @@ def create_support_message(
     db.add(support_message)
     db.commit()
     db.refresh(support_message)
+
+    send_plain_email(
+        to_email=settings.SUPPORT_EMAIL,
+        subject=f"[Uruti Contact] {payload.visitor_name}",
+        body=(
+            f"New message received from contact form/live support.\n\n"
+            f"Name: {payload.visitor_name}\n"
+            f"Email: {payload.visitor_email}\n\n"
+            f"Message:\n{payload.message}"
+        ),
+    )
+
     return support_message
 
 
@@ -91,6 +105,17 @@ def respond_to_support_message(
 
     db.commit()
     db.refresh(support_message)
+
+    send_plain_email(
+        to_email=str(support_message.visitor_email),
+        subject="Uruti Support Response",
+        body=(
+            "Your support request has been updated.\n\n"
+            f"Original message:\n{support_message.message}\n\n"
+            f"Response:\n{payload.response}"
+        ),
+    )
+
     return support_message
 
 

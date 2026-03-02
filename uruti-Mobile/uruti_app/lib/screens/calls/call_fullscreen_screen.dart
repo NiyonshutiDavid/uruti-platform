@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/app_colors.dart';
 import '../../models/call_session.dart';
 
-class CallFullscreenScreen extends StatelessWidget {
+class CallFullscreenScreen extends StatefulWidget {
   final CallSession session;
   final bool incoming;
+  final bool outgoing;
+  final bool isActive;
   final bool muted;
   final bool speakerOn;
+  final bool videoEnabled;
   final Duration activeDuration;
   final VoidCallback onMinimize;
   final VoidCallback onAccept;
@@ -15,13 +20,17 @@ class CallFullscreenScreen extends StatelessWidget {
   final VoidCallback onEnd;
   final VoidCallback onToggleMute;
   final VoidCallback onToggleSpeaker;
+  final VoidCallback onToggleVideo;
 
   const CallFullscreenScreen({
     super.key,
     required this.session,
     required this.incoming,
+    required this.outgoing,
+    required this.isActive,
     required this.muted,
     required this.speakerOn,
+    required this.videoEnabled,
     required this.activeDuration,
     required this.onMinimize,
     required this.onAccept,
@@ -29,29 +38,196 @@ class CallFullscreenScreen extends StatelessWidget {
     required this.onEnd,
     required this.onToggleMute,
     required this.onToggleSpeaker,
+    required this.onToggleVideo,
   });
 
   @override
+  State<CallFullscreenScreen> createState() => _CallFullscreenScreenState();
+}
+
+class _CallFullscreenScreenState extends State<CallFullscreenScreen> {
+  CameraController? _cameraController;
+  CameraDescription? _selectedCamera;
+  bool _cameraPermissionGranted = false;
+  bool _cameraInitializing = false;
+
+  bool get _needsLocalPreview {
+    if (!widget.session.isVideo) return false;
+    if (!widget.videoEnabled) return false;
+    return widget.outgoing || widget.isActive;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _syncCameraState();
+  }
+
+  @override
+  void didUpdateWidget(covariant CallFullscreenScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final previewStateChanged =
+        oldWidget.session.isVideo != widget.session.isVideo ||
+        oldWidget.videoEnabled != widget.videoEnabled ||
+        oldWidget.outgoing != widget.outgoing ||
+        oldWidget.isActive != widget.isActive;
+
+    if (previewStateChanged) {
+      _syncCameraState();
+    }
+  }
+
+  Future<void> _syncCameraState() async {
+    if (!_needsLocalPreview) {
+      await _disposeCamera(notifyUi: true);
+      return;
+    }
+    await _ensureCameraReady();
+  }
+
+  Future<void> _ensureCameraReady() async {
+    if (_cameraController?.value.isInitialized == true || _cameraInitializing) {
+      return;
+    }
+
+    _cameraInitializing = true;
+    try {
+      if (!_cameraPermissionGranted) {
+        final status = await Permission.camera.request();
+        _cameraPermissionGranted = status.isGranted;
+      }
+
+      if (!_cameraPermissionGranted) {
+        return;
+      }
+
+      final cams = await availableCameras();
+      if (cams.isEmpty) return;
+
+      _selectedCamera = cams.firstWhere(
+        (cam) => cam.lensDirection == CameraLensDirection.front,
+        orElse: () => cams.first,
+      );
+
+      final controller = CameraController(
+        _selectedCamera!,
+        ResolutionPreset.medium,
+        enableAudio: false,
+      );
+
+      await controller.initialize();
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+
+      setState(() => _cameraController = controller);
+    } catch (_) {
+      // Keep the call UI functional even if camera preview fails.
+    } finally {
+      _cameraInitializing = false;
+    }
+  }
+
+  Future<void> _disposeCamera({required bool notifyUi}) async {
+    final controller = _cameraController;
+    _cameraController = null;
+    if (notifyUi && mounted) {
+      setState(() {});
+    }
+    await controller?.dispose();
+  }
+
+  @override
+  void dispose() {
+    _disposeCamera(notifyUi: false);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final showFullOwnPreview =
+        widget.session.isVideo &&
+        widget.outgoing &&
+        !widget.incoming &&
+        widget.videoEnabled;
+    final showSmallOwnPreview =
+        widget.session.isVideo && widget.isActive && widget.videoEnabled;
+    final camReady = _cameraController?.value.isInitialized == true;
+
     return Material(
       type: MaterialType.transparency,
       child: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF081120), Color(0xFF040A12)],
+            colors: showFullOwnPreview
+                ? const [Color(0xFF0A1A2A), Color(0xFF081324)]
+                : const [Color(0xFF081120), Color(0xFF040A12)],
           ),
         ),
         child: SafeArea(
           child: Stack(
             children: [
+              if (showFullOwnPreview)
+                Positioned.fill(
+                  child: camReady
+                      ? ClipRect(
+                          child: OverflowBox(
+                            maxWidth: double.infinity,
+                            maxHeight: double.infinity,
+                            child: FittedBox(
+                              fit: BoxFit.cover,
+                              child: SizedBox(
+                                width: 100,
+                                height:
+                                    100 /
+                                    (_cameraController!.value.aspectRatio),
+                                child: CameraPreview(_cameraController!),
+                              ),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color(0xFF1B3550), Color(0xFF0E1C30)],
+                            ),
+                          ),
+                          child: Center(
+                            child: Icon(
+                              Icons.videocam_rounded,
+                              size: 110,
+                              color: Colors.white.withValues(alpha: 0.22),
+                            ),
+                          ),
+                        ),
+                ),
+              if (showFullOwnPreview)
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.25),
+                          Colors.black.withValues(alpha: 0.5),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               Positioned(
                 top: 12,
                 left: 12,
                 child: _TopCircleButton(
                   icon: Icons.call_received_rounded,
-                  onTap: onMinimize,
+                  onTap: widget.onMinimize,
                 ),
               ),
               Positioned(
@@ -70,7 +246,7 @@ class CallFullscreenScreen extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        session.callerName,
+                        widget.session.callerName,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 30,
@@ -79,9 +255,11 @@ class CallFullscreenScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        incoming
-                            ? (session.handle ?? 'Incoming call')
-                            : _format(activeDuration),
+                        widget.incoming
+                            ? (widget.session.handle ?? 'Incoming call')
+                            : widget.isActive
+                            ? _format(widget.activeDuration)
+                            : 'Ringing…',
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 17,
@@ -91,28 +269,82 @@ class CallFullscreenScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              Align(
-                alignment: incoming ? Alignment.center : Alignment(0, 0.05),
-                child: CircleAvatar(
-                  radius: incoming ? 108 : 118,
-                  backgroundColor: const Color(0xFF1E1E1E),
-                  backgroundImage:
-                      (session.callerAvatarUrl?.isNotEmpty ?? false)
-                      ? NetworkImage(session.callerAvatarUrl!)
-                      : null,
-                  child: (session.callerAvatarUrl?.isEmpty ?? true)
-                      ? Text(
-                          _initials(session.callerName),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 52,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        )
-                      : null,
+              if (!showFullOwnPreview)
+                Align(
+                  alignment: widget.incoming
+                      ? Alignment.center
+                      : Alignment(0, 0.05),
+                  child: CircleAvatar(
+                    radius: widget.incoming ? 108 : 118,
+                    backgroundColor: const Color(0xFF1E1E1E),
+                    backgroundImage:
+                        (widget.session.callerAvatarUrl?.isNotEmpty ?? false)
+                        ? NetworkImage(widget.session.callerAvatarUrl!)
+                        : null,
+                    child: (widget.session.callerAvatarUrl?.isEmpty ?? true)
+                        ? Text(
+                            _initials(widget.session.callerName),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 52,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          )
+                        : null,
+                  ),
                 ),
-              ),
-              if (!incoming)
+
+              if (showSmallOwnPreview && widget.videoEnabled)
+                Positioned(
+                  right: 16,
+                  bottom: 190,
+                  child: Container(
+                    width: 116,
+                    height: 162,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.9),
+                        width: 2,
+                      ),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF30485F), Color(0xFF1B2A39)],
+                      ),
+                    ),
+                    child: Stack(
+                      children: [
+                        if (camReady)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: CameraPreview(_cameraController!),
+                          )
+                        else
+                          Center(
+                            child: Icon(
+                              Icons.videocam_rounded,
+                              size: 34,
+                              color: Colors.white.withValues(alpha: 0.55),
+                            ),
+                          ),
+                        Positioned(
+                          left: 8,
+                          bottom: 8,
+                          child: Text(
+                            'You',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.92),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              if (!widget.incoming)
                 Positioned(
                   left: 12,
                   right: 12,
@@ -130,23 +362,25 @@ class CallFullscreenScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         _CallControl(
-                          icon: speakerOn
+                          icon: widget.speakerOn
                               ? Icons.volume_up_rounded
                               : Icons.volume_off_rounded,
-                          active: speakerOn,
-                          onTap: onToggleSpeaker,
+                          active: widget.speakerOn,
+                          onTap: widget.onToggleSpeaker,
                         ),
                         _CallControl(
-                          icon: muted
+                          icon: widget.muted
                               ? Icons.mic_off_rounded
                               : Icons.mic_rounded,
-                          active: muted,
-                          onTap: onToggleMute,
+                          active: widget.muted,
+                          onTap: widget.onToggleMute,
                         ),
                         _CallControl(
-                          icon: Icons.videocam_off_rounded,
-                          active: false,
-                          onTap: () {},
+                          icon: widget.videoEnabled
+                              ? Icons.videocam_rounded
+                              : Icons.videocam_off_rounded,
+                          active: widget.videoEnabled,
+                          onTap: widget.onToggleVideo,
                         ),
                         _CallControl(
                           icon: Icons.more_horiz_rounded,
@@ -161,7 +395,7 @@ class CallFullscreenScreen extends StatelessWidget {
                 left: 0,
                 right: 0,
                 bottom: 18,
-                child: incoming
+                child: widget.incoming
                     ? Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
@@ -169,13 +403,13 @@ class CallFullscreenScreen extends StatelessWidget {
                             color: AppColors.error,
                             icon: Icons.call_end_rounded,
                             label: 'Decline',
-                            onTap: onDecline,
+                            onTap: widget.onDecline,
                           ),
                           _CallRoundAction(
                             color: AppColors.success,
                             icon: Icons.call_rounded,
                             label: 'Accept',
-                            onTap: onAccept,
+                            onTap: widget.onAccept,
                           ),
                         ],
                       )
@@ -184,7 +418,7 @@ class CallFullscreenScreen extends StatelessWidget {
                           color: AppColors.error,
                           icon: Icons.call_end_rounded,
                           label: 'End',
-                          onTap: onEnd,
+                          onTap: widget.onEnd,
                         ),
                       ),
               ),

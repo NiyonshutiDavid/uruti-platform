@@ -1,3 +1,13 @@
+import os
+import warnings
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+warnings.filterwarnings(
+    "ignore",
+    message=r"`clean_up_tokenization_spaces` was not set.*",
+    category=FutureWarning,
+)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse

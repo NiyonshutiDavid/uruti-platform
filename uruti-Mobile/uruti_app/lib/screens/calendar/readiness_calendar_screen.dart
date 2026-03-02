@@ -239,11 +239,14 @@ class _ReadinessCalendarScreenState extends State<ReadinessCalendarScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
+            final media = MediaQuery.of(ctx);
             return Padding(
               padding: EdgeInsets.only(
+                top: media.padding.top + 12,
                 bottom: MediaQuery.of(ctx).viewInsets.bottom,
               ),
               child: Container(
+                constraints: BoxConstraints(maxHeight: media.size.height * 0.9),
                 decoration: BoxDecoration(
                   color: outerContext.colors.card,
                   borderRadius: const BorderRadius.vertical(
@@ -270,13 +273,27 @@ class _ReadinessCalendarScreenState extends State<ReadinessCalendarScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Text(
-                        'Add Event',
-                        style: TextStyle(
-                          color: outerContext.colors.textPrimary,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Add Event',
+                              style: TextStyle(
+                                color: outerContext.colors.textPrimary,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            icon: Icon(
+                              Icons.close,
+                              color: outerContext.colors.textSecondary,
+                            ),
+                            tooltip: 'Close',
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 20),
 
@@ -714,7 +731,9 @@ class _CalendarGrid extends StatelessWidget {
     final cells =
         List<int?>.filled(startWeekday, null) +
         List.generate(daysInMonth, (i) => i + 1);
-    while (cells.length % 7 != 0) cells.add(null);
+    while (cells.length % 7 != 0) {
+      cells.add(null);
+    }
 
     return GridView.count(
       crossAxisCount: 7,
@@ -801,15 +820,19 @@ class _EventTile extends StatelessWidget {
     decoration: BoxDecoration(
       color: context.colors.card,
       borderRadius: BorderRadius.circular(14),
-      border: Border(
-        left: BorderSide(color: _color, width: 4),
-        top: BorderSide(color: _color.withValues(alpha: 0.3)),
-        right: BorderSide(color: _color.withValues(alpha: 0.3)),
-        bottom: BorderSide(color: _color.withValues(alpha: 0.3)),
-      ),
+      border: Border.all(color: _color.withValues(alpha: 0.3)),
     ),
     child: Row(
       children: [
+        Container(
+          width: 4,
+          height: 50,
+          decoration: BoxDecoration(
+            color: _color,
+            borderRadius: BorderRadius.circular(99),
+          ),
+        ),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -105,6 +105,25 @@ class _HomeScreenState extends State<HomeScreen> {
     return avg.round().clamp(0, 100);
   }
 
+  int _computeBookmarkedUrutiTotal() {
+    double total = 0;
+    for (final item in _bookmarks) {
+      if (item is! Map) continue;
+      final map = item.cast<dynamic, dynamic>();
+      final venture = map['venture'];
+      final rawScore = venture is Map
+          ? venture['uruti_score'] ?? map['uruti_score']
+          : map['uruti_score'];
+
+      if (rawScore is num) {
+        total += rawScore.toDouble();
+      } else if (rawScore is String) {
+        total += double.tryParse(rawScore) ?? 0;
+      }
+    }
+    return total.round();
+  }
+
   List<Widget> _buildFounderContent({required int score}) => [
     // ── Stat cards ──
     Row(
@@ -260,7 +279,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const SizedBox(height: 20),
     _InvestorHome(
       loading: _loading,
-      bookmarkCount: _bookmarks.length,
+      bookmarkedScoreTotal: _computeBookmarkedUrutiTotal(),
       connectionCount: _connections.length,
       pendingRequests: _pending.length,
     ),
@@ -519,12 +538,12 @@ class _AiScoreCard extends StatelessWidget {
 // ─── Investor home ────────────────────────────────────────────────────────────
 class _InvestorHome extends StatelessWidget {
   final bool loading;
-  final int bookmarkCount;
+  final int bookmarkedScoreTotal;
   final int connectionCount;
   final int pendingRequests;
   const _InvestorHome({
     required this.loading,
-    required this.bookmarkCount,
+    required this.bookmarkedScoreTotal,
     required this.connectionCount,
     required this.pendingRequests,
   });
@@ -539,8 +558,8 @@ class _InvestorHome extends StatelessWidget {
         Row(
           children: [
             _StatCard(
-              'Bookmarked\nStartups',
-              loading ? '—' : '$bookmarkCount',
+              'Bookmarked\nUruti Score',
+              loading ? '—' : '$bookmarkedScoreTotal',
               Icons.bookmark_outline,
               AppColors.primary,
             ),
@@ -720,10 +739,10 @@ class _QuickActions extends StatelessWidget {
               'route': '/discovery',
             },
             {
-              'icon': Icons.trending_up,
-              'label': 'Review Deal Flow',
-              'sublabel': 'Track your saved ventures',
-              'route': '/deal-flow',
+              'icon': Icons.emoji_events_outlined,
+              'label': 'View Leaderboard',
+              'sublabel': 'Top startups by Uruti score',
+              'route': '/leaderboard',
             },
             {
               'icon': Icons.people_outline,

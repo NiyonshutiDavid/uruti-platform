@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../screens/main_scaffold.dart';
+import '../../widgets/top_notification.dart';
 
 // ─── Day helpers ──────────────────────────────────────────────────────────────
 
@@ -98,9 +99,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        TopNotification.show(context, message: 'Error: $e', isError: true);
       }
     }
   }
@@ -119,148 +118,157 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModal) => Padding(
-          padding: EdgeInsets.only(
-            top: 20,
-            left: 20,
-            right: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 28,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'Add Availability Slot',
-                    style: TextStyle(
-                      color: ctx.colors.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
+      builder: (ctx) {
+        return FractionallySizedBox(
+          heightFactor: 0.9,
+          alignment: Alignment.bottomCenter,
+          child: StatefulBuilder(
+            builder: (ctx, setModal) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  top: 12,
+                  left: 20,
+                  right: 20,
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 28,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Add Availability Slot',
+                          style: TextStyle(
+                            color: ctx.colors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: Icon(
+                            Icons.close,
+                            color: ctx.colors.textSecondary,
+                          ),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
                     ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: Icon(Icons.close, color: ctx.colors.textSecondary),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Day picker
-              Text(
-                'Day',
-                style: TextStyle(color: ctx.colors.textSecondary, fontSize: 12),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: List.generate(7, (i) {
-                  final selected = dayOfWeek == i;
-                  return GestureDetector(
-                    onTap: () => setModal(() => dayOfWeek = i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 7,
+                    const SizedBox(height: 16),
+                    Text(
+                      'Day',
+                      style: TextStyle(
+                        color: ctx.colors.textSecondary,
+                        fontSize: 12,
                       ),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? AppColors.primary
-                            : ctx.colors.background,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        _dayShort[i],
-                        style: TextStyle(
-                          color: selected
-                              ? Colors.white
-                              : ctx.colors.textSecondary,
-                          fontSize: 13,
-                          fontWeight: selected
-                              ? FontWeight.w600
-                              : FontWeight.w400,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: List.generate(7, (i) {
+                        final selected = dayOfWeek == i;
+                        return GestureDetector(
+                          onTap: () => setModal(() => dayOfWeek = i),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? AppColors.primary
+                                  : ctx.colors.background,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              _dayShort[i],
+                              style: TextStyle(
+                                color: selected
+                                    ? Colors.white
+                                    : ctx.colors.textSecondary,
+                                fontSize: 13,
+                                fontWeight: selected
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 16),
+                    _TimePicker(
+                      label: 'Start Time',
+                      time: startTime,
+                      onTap: () async {
+                        final picked = await showTimePicker(
+                          context: ctx,
+                          initialTime: startTime,
+                        );
+                        if (picked != null) setModal(() => startTime = picked);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _TimePicker(
+                      label: 'End Time',
+                      time: endTime,
+                      onTap: () async {
+                        final picked = await showTimePicker(
+                          context: ctx,
+                          initialTime: endTime,
+                        );
+                        if (picked != null) setModal(() => endTime = picked);
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () async {
+                          String fmt(TimeOfDay t) =>
+                              '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+                          try {
+                            await ApiService.instance.createAvailabilitySlot({
+                              'day_of_week': dayOfWeek,
+                              'start_time': fmt(startTime),
+                              'end_time': fmt(endTime),
+                              'is_active': true,
+                            });
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            _load();
+                          } catch (e) {
+                            if (ctx.mounted) {
+                              TopNotification.show(
+                                ctx,
+                                message: 'Error: $e',
+                                isError: true,
+                              );
+                            }
+                          }
+                        },
+                        child: const Text(
+                          'Add Slot',
+                          style: TextStyle(color: Colors.white),
                         ),
                       ),
                     ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 16),
-
-              // Start time
-              _TimePicker(
-                label: 'Start Time',
-                time: startTime,
-                onTap: () async {
-                  final picked = await showTimePicker(
-                    context: ctx,
-                    initialTime: startTime,
-                  );
-                  if (picked != null) setModal(() => startTime = picked);
-                },
-              ),
-              const SizedBox(height: 12),
-
-              // End time
-              _TimePicker(
-                label: 'End Time',
-                time: endTime,
-                onTap: () async {
-                  final picked = await showTimePicker(
-                    context: ctx,
-                    initialTime: endTime,
-                  );
-                  if (picked != null) setModal(() => endTime = picked);
-                },
-              ),
-              const SizedBox(height: 20),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: () async {
-                    String fmt(TimeOfDay t) =>
-                        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-                    try {
-                      await ApiService.instance.createAvailabilitySlot({
-                        'day_of_week': dayOfWeek,
-                        'start_time': fmt(startTime),
-                        'end_time': fmt(endTime),
-                        'is_active': true,
-                      });
-                      if (ctx.mounted) Navigator.pop(ctx);
-                      _load();
-                    } catch (e) {
-                      if (ctx.mounted) {
-                        ScaffoldMessenger.of(
-                          ctx,
-                        ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                      }
-                    }
-                  },
-                  child: const Text(
-                    'Add Slot',
-                    style: TextStyle(color: Colors.white),
-                  ),
+                  ],
                 ),
-              ),
-            ],
+              );
+            },
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

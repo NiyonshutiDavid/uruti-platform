@@ -30,6 +30,8 @@ interface EditVentureDialogProps {
 
 export function EditVentureDialog({ open, onOpenChange, venture, onSave }: EditVentureDialogProps) {
   const [currentStep, setCurrentStep] = useState(1);
+  const [iconLogoFile, setIconLogoFile] = useState<File | null>(null);
+  const [landscapeLogoFile, setLandscapeLogoFile] = useState<File | null>(null);
   const [formData, setFormData] = useState({
     name: venture?.name || '',
     tagline: venture?.tagline || '',
@@ -37,6 +39,8 @@ export function EditVentureDialog({ open, onOpenChange, venture, onSave }: EditV
     stage: venture?.stage || '',
     teamSize: venture?.teamSize || '',
     location: venture?.location || '',
+    iconLogoUrl: venture?.logoUrl || venture?.logo_url || '',
+    landscapeLogoUrl: venture?.bannerUrl || venture?.banner_url || '',
     
     problem: venture?.problem || '',
     solution: venture?.solution || '',
@@ -78,6 +82,26 @@ export function EditVentureDialog({ open, onOpenChange, venture, onSave }: EditV
     setCurrentStep(prev => Math.min(4, prev + 1));
   };
 
+  const handleLogoFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'landscape') => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Logo file must be less than 5MB');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select a valid image file');
+      return;
+    }
+
+    if (type === 'icon') {
+      setIconLogoFile(file);
+    } else {
+      setLandscapeLogoFile(file);
+    }
+  };
+
   const handleBack = () => {
     setCurrentStep(prev => Math.max(1, prev - 1));
   };
@@ -86,6 +110,8 @@ export function EditVentureDialog({ open, onOpenChange, venture, onSave }: EditV
     const updatedVenture = {
       ...venture,
       ...formData,
+      iconLogoFile,
+      landscapeLogoFile,
       highlights: formData.highlights.filter(h => h.trim() !== ''),
       milestones: formData.milestones.filter(m => m.title.trim() !== '')
     };
@@ -162,6 +188,41 @@ export function EditVentureDialog({ open, onOpenChange, venture, onSave }: EditV
                 placeholder="Describe your venture in one sentence"
                 className="glass-card"
               />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="iconLogoUrl">Icon Logo URL</Label>
+                <Input
+                  id="iconLogoUrl"
+                  value={formData.iconLogoUrl}
+                  onChange={(e) => handleChange('iconLogoUrl', e.target.value)}
+                  placeholder="https://example.com/logo-icon.png"
+                  className="glass-card"
+                />
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleLogoFileChange(e, 'icon')}
+                  className="glass-card"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="landscapeLogoUrl">Landscape Logo URL</Label>
+                <Input
+                  id="landscapeLogoUrl"
+                  value={formData.landscapeLogoUrl}
+                  onChange={(e) => handleChange('landscapeLogoUrl', e.target.value)}
+                  placeholder="https://example.com/logo-landscape.png"
+                  className="glass-card"
+                />
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleLogoFileChange(e, 'landscape')}
+                  className="glass-card"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

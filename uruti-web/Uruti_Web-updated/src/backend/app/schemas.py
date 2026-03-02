@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, validator
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 from enum import Enum
@@ -553,6 +553,7 @@ class AdvisoryTrackResponse(AdvisoryTrackBase):
 # ─── AI Chat ──────────────────────────────────────────────────────────────────
 
 class AiStartupContext(BaseModel):
+    venture_id: Optional[int] = None
     name: str
     description: Optional[str] = None
     stage: Optional[str] = None
@@ -590,8 +591,10 @@ class AiChatMessageResponse(BaseModel):
     attachment_name: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(
+        from_attributes=True,
+        protected_namespaces=(),
+    )
 
 
 class AiChatSessionSummary(BaseModel):
@@ -600,6 +603,8 @@ class AiChatSessionSummary(BaseModel):
     message_count: int
     created_at: datetime
     model_used: Optional[str] = None
+
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class FounderProfilePayload(BaseModel):

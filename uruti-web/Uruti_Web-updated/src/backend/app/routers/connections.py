@@ -204,6 +204,22 @@ async def accept_connection_request(
         },
     )
     await publish_notification(notification, db)
+
+    requester = db.query(User).filter(User.id == request.requester_id).first()
+    if requester:
+        receiver_notification = create_notification(
+            db,
+            user_id=current_user.id,
+            title="New connection added",
+            message=f"You are now connected with {requester.display_name}.",
+            notification_type=NotificationType.SYSTEM,
+            data={
+                "kind": "connection_added",
+                "connection_id": connection.id,
+                "user_id": requester.id,
+            },
+        )
+        await publish_notification(receiver_notification, db)
     
     return connection
 
@@ -317,7 +333,7 @@ def get_connections(
 
 
 @router.delete("/{connection_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_connection(
+async def remove_connection(
     connection_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -332,8 +348,42 @@ def remove_connection(
     if connection.user1_id != current_user.id and connection.user2_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
     
+    other_user_id = connection.user2_id if connection.user1_id == current_user.id else connection.user1_id
+    other_user = db.query(User).filter(User.id == other_user_id).first()
+
     db.delete(connection)
     db.commit()
+
+    if other_user:
+        removed_for_other = create_notification(
+            db,
+            user_id=other_user.id,
+            title="Connection removed",
+            message=f"{current_user.display_name} removed your connection.",
+            notification_type=NotificationType.SYSTEM,
+            data={
+                "kind": "connection_removed",
+                "user_id": current_user.id,
+                "connection_id": connection_id,
+                "route": "/connections",
+            },
+        )
+        await publish_notification(removed_for_other, db)
+
+        removed_for_self = create_notification(
+            db,
+            user_id=current_user.id,
+            title="Connection removed",
+            message=f"You removed your connection with {other_user.display_name}.",
+            notification_type=NotificationType.SYSTEM,
+            data={
+                "kind": "connection_removed",
+                "user_id": other_user.id,
+                "connection_id": connection_id,
+                "route": "/connections",
+            },
+        )
+        await publish_notification(removed_for_self, db)
     
     return None
 

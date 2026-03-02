@@ -44,6 +44,25 @@ export function AIChatbot({ open, onClose, startupContext }: AIChatbotProps) {
   const [isRecording, setIsRecording] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const renderFormattedText = (content: string) => {
+    const lines = content.split('\n');
+    return lines.map((line, lineIndex) => {
+      const parts = line.split(/(\*\*[^*]+\*\*)/g);
+      return (
+        <span key={`${lineIndex}-${line}`}>
+          {parts.map((part, partIndex) => {
+            const isBold = part.startsWith('**') && part.endsWith('**') && part.length > 4;
+            if (isBold) {
+              return <strong key={`${lineIndex}-${partIndex}`}>{part.slice(2, -2)}</strong>;
+            }
+            return <span key={`${lineIndex}-${partIndex}`}>{part}</span>;
+          })}
+          {lineIndex < lines.length - 1 && <br />}
+        </span>
+      );
+    });
+  };
+
   useEffect(() => {
     if (!open) return;
     const cachedProfile = localStorage.getItem('uruti_founder_profile') || '';
@@ -323,7 +342,7 @@ export function AIChatbot({ open, onClose, startupContext }: AIChatbotProps) {
                             }`}
                           >
                             <p className="text-sm whitespace-pre-wrap" style={{ fontFamily: 'var(--font-body)' }}>
-                              {message.content}
+                              {renderFormattedText(message.content)}
                             </p>
                           </div>
                           <span className="text-xs text-muted-foreground mt-1" style={{ fontFamily: 'var(--font-body)' }}>

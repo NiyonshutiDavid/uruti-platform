@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/app_colors.dart';
+import '../../providers/auth_provider.dart';
 
 class MobileUnsupportedScreen extends StatelessWidget {
   const MobileUnsupportedScreen({super.key});
@@ -42,7 +44,12 @@ class MobileUnsupportedScreen extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () => context.go('/login'),
+                    onPressed: () async {
+                      await context.read<AuthProvider>().logout();
+                      if (context.mounted) {
+                        context.go('/login');
+                      }
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,

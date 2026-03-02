@@ -61,6 +61,7 @@ export function AdminUserManagementModule() {
     returnTabParam === 'overview' ||
     returnTabParam === 'users' ||
     returnTabParam === 'ventures' ||
+    returnTabParam === 'model-metrics' ||
     returnTabParam === 'support'
       ? returnTabParam
       : 'users';

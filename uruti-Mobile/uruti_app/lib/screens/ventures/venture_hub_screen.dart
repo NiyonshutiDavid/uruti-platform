@@ -3,8 +3,17 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../bloc/founder/founder_cubit.dart';
 import '../../bloc/founder/founder_state.dart';
+import '../../core/app_constants.dart';
 import '../../core/app_colors.dart';
+import '../../services/api_service.dart';
 import '../../screens/main_scaffold.dart';
+import '../../widgets/top_notification.dart';
+
+String? _ventureMediaUrl(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return null;
+  if (raw.startsWith('http')) return raw;
+  return '${AppConstants.apiBaseUrl}$raw';
+}
 
 // ─── Stage / Industry labels (mirrors add_venture_screen constants) ───────────
 
@@ -60,6 +69,9 @@ class VentureHubScreen extends StatefulWidget {
 
 class _VentureHubScreenState extends State<VentureHubScreen> {
   final _searchCtrl = TextEditingController();
+  int? _analyzingVentureId;
+  final Map<int, double> _scoreOverrides = {};
+  final Map<int, int> _leaderboardRanks = {};
 
   @override
   void initState() {
@@ -117,13 +129,13 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
     final deleted = await context.read<FounderCubit>().deleteVenture(id);
     if (!mounted) return;
     if (deleted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Venture deleted')));
+      TopNotification.show(context, message: 'Venture deleted');
     } else {
-      ScaffoldMessenger.of(
+      TopNotification.show(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Error deleting venture')));
+        message: 'Error deleting venture',
+        isError: true,
+      );
     }
   }
 
@@ -132,195 +144,88 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
   Future<void> _showEdit(Map<String, dynamic> venture) async {
     final id = venture['id'] as int?;
     if (id == null) return;
-
-    final nameCtrl = TextEditingController(
-      text: venture['name'] as String? ?? '',
-    );
-    final taglineCtrl = TextEditingController(
-      text: venture['tagline'] as String? ?? '',
-    );
-    final problemCtrl = TextEditingController(
-      text: venture['problem_statement'] as String? ?? '',
-    );
-    final solutionCtrl = TextEditingController(
-      text: venture['solution'] as String? ?? '',
-    );
-    final marketCtrl = TextEditingController(
-      text: venture['target_market'] as String? ?? '',
-    );
-    String stage = (venture['stage'] as String? ?? 'ideation');
-    String? industry = venture['industry'] as String?;
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: context.colors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModal) => Padding(
-          padding: EdgeInsets.only(
-            top: 20,
-            left: 20,
-            right: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'Edit Venture',
-                    style: TextStyle(
-                      color: ctx.colors.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: Icon(Icons.close, color: ctx.colors.textSecondary),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _modalField(ctx, 'Name', nameCtrl),
-              const SizedBox(height: 12),
-              _modalField(ctx, 'Tagline', taglineCtrl),
-              const SizedBox(height: 12),
-              _modalField(ctx, 'Problem Statement', problemCtrl, maxLines: 3),
-              const SizedBox(height: 12),
-              _modalField(ctx, 'Solution', solutionCtrl, maxLines: 3),
-              const SizedBox(height: 12),
-              _modalField(ctx, 'Target Market', marketCtrl, maxLines: 2),
-              const SizedBox(height: 12),
-              // Stage picker
-              Text(
-                'Stage',
-                style: TextStyle(color: ctx.colors.textSecondary, fontSize: 12),
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: _stageLabels.entries.map((e) {
-                  final selected = stage == e.key;
-                  return ChoiceChip(
-                    label: Text(
-                      e.value,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: selected
-                            ? Colors.white
-                            : ctx.colors.textSecondary,
-                      ),
-                    ),
-                    selected: selected,
-                    selectedColor: _stageColors[e.key] ?? AppColors.primary,
-                    backgroundColor: ctx.colors.background,
-                    onSelected: (_) => setModal(() => stage = e.key),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 12),
-              // Industry picker
-              Text(
-                'Industry',
-                style: TextStyle(color: ctx.colors.textSecondary, fontSize: 12),
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: _industryLabels.entries.map((e) {
-                  final selected = industry == e.key;
-                  return ChoiceChip(
-                    label: Text(
-                      e.value,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: selected
-                            ? Colors.white
-                            : ctx.colors.textSecondary,
-                      ),
-                    ),
-                    selected: selected,
-                    selectedColor: AppColors.primary,
-                    backgroundColor: ctx.colors.background,
-                    onSelected: (_) => setModal(() => industry = e.key),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: () async {
-                    final updated = await context
-                        .read<FounderCubit>()
-                        .updateVenture(id, {
-                          'name': nameCtrl.text.trim(),
-                          'tagline': taglineCtrl.text.trim(),
-                          'problem_statement': problemCtrl.text.trim(),
-                          'solution': solutionCtrl.text.trim(),
-                          'target_market': marketCtrl.text.trim(),
-                          'stage': stage,
-                          'industry': industry,
-                        });
-                    if (!ctx.mounted) return;
-                    if (updated) {
-                      Navigator.pop(ctx);
-                    } else {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        const SnackBar(content: Text('Error updating venture')),
-                      );
-                    }
-                  },
-                  child: const Text(
-                    'Save Changes',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    final saved = await context.push<bool>('/ventures/new', extra: venture);
+    if (saved == true && mounted) {
+      context.read<FounderCubit>().refreshVentureHub();
+    }
   }
 
-  Widget _modalField(
-    BuildContext ctx,
-    String label,
-    TextEditingController ctrl, {
-    int maxLines = 1,
-  }) {
-    return TextField(
-      controller: ctrl,
-      maxLines: maxLines,
-      style: TextStyle(color: ctx.colors.textPrimary),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: ctx.colors.textSecondary),
-        filled: true,
-        fillColor: ctx.colors.background,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
-        ),
-      ),
-    );
+  int _ventureId(Map<String, dynamic> venture) {
+    final raw = venture['id'];
+    if (raw is int) return raw;
+    return int.tryParse('$raw') ?? -1;
+  }
+
+  double _displayScore(Map<String, dynamic> venture) {
+    final id = _ventureId(venture);
+    if (_scoreOverrides.containsKey(id)) {
+      return _scoreOverrides[id] ?? 0;
+    }
+    return (venture['uruti_score'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  int _computeRank(double score, List<dynamic> publicVentures, int ventureId) {
+    final scoreBoard = <double>[];
+
+    for (final item in publicVentures) {
+      if (item is! Map) continue;
+      final venture = Map<String, dynamic>.from(item);
+      final id = _ventureId(venture);
+      if (id == ventureId) continue;
+      scoreBoard.add((venture['uruti_score'] as num?)?.toDouble() ?? 0.0);
+    }
+
+    if (scoreBoard.isEmpty) {
+      for (final venture in context.read<FounderCubit>().state.ventures) {
+        final id = _ventureId(venture);
+        if (id == ventureId) continue;
+        scoreBoard.add(_displayScore(venture));
+      }
+    }
+
+    final higher = scoreBoard.where((value) => value > score).length;
+    return higher + 1;
+  }
+
+  Future<void> _analyzeVenture(Map<String, dynamic> venture) async {
+    final id = _ventureId(venture);
+    if (id < 0 || _analyzingVentureId != null) return;
+
+    setState(() => _analyzingVentureId = id);
+
+    try {
+      final analyzed = await ApiService.instance.analyzeVenture(id);
+      final newScore =
+          (analyzed['uruti_score'] as num?)?.toDouble() ??
+          (venture['uruti_score'] as num?)?.toDouble() ??
+          0.0;
+      final publicVentures = await ApiService.instance.getVentures(limit: 200);
+      final rank = _computeRank(newScore, publicVentures, id);
+
+      if (!mounted) return;
+      setState(() {
+        _scoreOverrides[id] = newScore;
+        _leaderboardRanks[id] = rank;
+      });
+
+      final name = (venture['name'] as String? ?? 'Venture').trim();
+      TopNotification.show(
+        context,
+        title: name,
+        message: 'Uruti Score ${newScore.round()}/100 • Public rank #$rank',
+      );
+
+      await context.read<FounderCubit>().refreshVentureHub();
+    } catch (_) {
+      if (!mounted) return;
+      TopNotification.show(
+        context,
+        message: 'Unable to analyze now. Please retry.',
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _analyzingVentureId = null);
+    }
   }
 
   // ── Stage → status ────────────────────────────────────────────────────────────
@@ -390,6 +295,8 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
         final solution = venture['solution'] as String? ?? '';
         final market = venture['target_market'] as String? ?? '';
         final score = (venture['uruti_score'] as num?)?.toDouble() ?? 0.0;
+        final iconLogoUrl = _ventureMediaUrl(venture['logo_url'] as String?);
+        final bannerUrl = _ventureMediaUrl(venture['banner_url'] as String?);
         final status = _stageToStatus(stage);
         final stageColor = _stageColors[stage] ?? const Color(0xFF9E9E9E);
         final industryIcon = _industryIcons[industry] ?? Icons.category_rounded;
@@ -414,6 +321,19 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
                   ),
                 ),
               ),
+              if (bannerUrl != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    bannerUrl,
+                    height: 120,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               Row(
                 children: [
                   Container(
@@ -423,7 +343,17 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
                       color: stageColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(industryIcon, color: stageColor),
+                    child: iconLogoUrl != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.network(
+                              iconLogoUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  Icon(industryIcon, color: stageColor),
+                            ),
+                          )
+                        : Icon(industryIcon, color: stageColor),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -744,9 +674,16 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (_, i) => _VentureCard(
           venture: state.filteredVentures[i],
+          score: _displayScore(state.filteredVentures[i]),
+          leaderboardRank:
+              _leaderboardRanks[_ventureId(state.filteredVentures[i])],
+          analyzingScore:
+              _analyzingVentureId == _ventureId(state.filteredVentures[i]),
           onView: () => _showDetails(state.filteredVentures[i]),
           onEdit: () => _showEdit(state.filteredVentures[i]),
           onDelete: () => _confirmDelete(state.filteredVentures[i]),
+          onRefine: () => context.go('/chat'),
+          onAnalyze: () => _analyzeVenture(state.filteredVentures[i]),
         ),
       ),
     );
@@ -757,15 +694,25 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
 
 class _VentureCard extends StatelessWidget {
   final Map<String, dynamic> venture;
+  final double score;
+  final int? leaderboardRank;
+  final bool analyzingScore;
   final VoidCallback onView;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onRefine;
+  final VoidCallback onAnalyze;
 
   const _VentureCard({
     required this.venture,
+    required this.score,
+    required this.leaderboardRank,
+    required this.analyzingScore,
     required this.onView,
     required this.onEdit,
     required this.onDelete,
+    required this.onRefine,
+    required this.onAnalyze,
   });
 
   @override
@@ -776,158 +723,254 @@ class _VentureCard extends StatelessWidget {
     final industry = venture['industry'] as String? ?? 'other';
     final stageColor = _stageColors[stage] ?? const Color(0xFF9E9E9E);
     final industryIcon = _industryIcons[industry] ?? Icons.category_rounded;
-    final score = (venture['uruti_score'] as num?)?.toDouble() ?? 0.0;
+    final logoUrl = _ventureMediaUrl(venture['logo_url'] as String?);
     final status = _VentureHubScreenState._stageToStatus(stage);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: stageColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
+    return GestureDetector(
+      onTap: onView,
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: stageColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: logoUrl != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.network(
+                              logoUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Icon(
+                                industryIcon,
+                                color: stageColor,
+                                size: 22,
+                              ),
+                            ),
+                          )
+                        : Icon(industryIcon, color: stageColor, size: 22),
                   ),
-                  child: Icon(industryIcon, color: stageColor, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: TextStyle(
-                          color: context.colors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (tagline.isNotEmpty) ...[
-                        const SizedBox(height: 2),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          tagline,
+                          name,
                           style: TextStyle(
-                            color: context.colors.textSecondary,
-                            fontSize: 12,
+                            color: context.colors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        if (tagline.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            tagline,
+                            style: TextStyle(
+                              color: context.colors.textSecondary,
+                              fontSize: 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                PopupMenuButton<String>(
-                  color: context.colors.surface,
-                  icon: Icon(
-                    Icons.more_vert,
-                    color: context.colors.textSecondary,
-                    size: 20,
-                  ),
-                  itemBuilder: (_) => [
-                    PopupMenuItem(
-                      value: 'view',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.visibility_outlined,
-                            size: 18,
-                            color: context.colors.textSecondary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'View Details',
-                            style: TextStyle(color: context.colors.textPrimary),
-                          ),
-                        ],
-                      ),
+                  PopupMenuButton<String>(
+                    color: context.colors.surface,
+                    icon: Icon(
+                      Icons.more_vert,
+                      color: context.colors.textSecondary,
+                      size: 20,
                     ),
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.edit_outlined,
-                            size: 18,
-                            color: context.colors.textSecondary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Edit',
-                            style: TextStyle(color: context.colors.textPrimary),
-                          ),
-                        ],
+                    itemBuilder: (_) => [
+                      PopupMenuItem(
+                        value: 'view',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.visibility_outlined,
+                              size: 18,
+                              color: context.colors.textSecondary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'View Details',
+                              style: TextStyle(
+                                color: context.colors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.delete_outline,
-                            size: 18,
-                            color: Colors.redAccent,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Delete',
-                            style: TextStyle(color: Colors.redAccent),
-                          ),
-                        ],
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.edit_outlined,
+                              size: 18,
+                              color: context.colors.textSecondary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Edit',
+                              style: TextStyle(
+                                color: context.colors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                  onSelected: (v) {
-                    if (v == 'view') onView();
-                    if (v == 'edit') onEdit();
-                    if (v == 'delete') onDelete();
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _Badge(label: _stageLabels[stage] ?? stage, color: stageColor),
-                const SizedBox(width: 8),
-                _Badge(
-                  label: _industryLabels[industry] ?? industry,
-                  color: AppColors.primary.withValues(alpha: 0.8),
-                ),
-                const SizedBox(width: 8),
-                _Badge(label: status.label, color: status.color),
-                const Spacer(),
-                if (score > 0)
-                  Row(
-                    children: [
-                      Icon(Icons.star_rounded, color: Colors.amber, size: 14),
-                      const SizedBox(width: 3),
-                      Text(
-                        '${score.round()}',
-                        style: TextStyle(
-                          color: context.colors.textPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.delete_outline,
+                              size: 18,
+                              color: Colors.redAccent,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Delete',
+                              style: TextStyle(color: Colors.redAccent),
+                            ),
+                          ],
                         ),
                       ),
                     ],
+                    onSelected: (v) {
+                      if (v == 'view') onView();
+                      if (v == 'edit') onEdit();
+                      if (v == 'delete') onDelete();
+                    },
                   ),
-              ],
-            ),
-          ],
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _Badge(
+                    label: _stageLabels[stage] ?? stage,
+                    color: stageColor,
+                  ),
+                  _Badge(
+                    label: _industryLabels[industry] ?? industry,
+                    color: AppColors.primary.withValues(alpha: 0.8),
+                  ),
+                  _Badge(label: status.label, color: status.color),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: onRefine,
+                      icon: const Icon(Icons.auto_awesome, size: 15),
+                      label: const Text('Refine with AI'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF7C3AED),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: analyzingScore ? null : onAnalyze,
+                      icon: analyzingScore
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.auto_graph_rounded, size: 15),
+                      label: Text(analyzingScore ? 'Analyzing...' : 'Analyze'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Uruti Score: ${score.round()}/100',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  if (leaderboardRank != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'Leaderboard #$leaderboardRank',
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

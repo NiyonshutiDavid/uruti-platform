@@ -75,21 +75,49 @@ export function ReadinessCalendarModule() {
     try {
       // Load events/meetings from backend
       const meetingsData = await apiClient.getMeetings();
-      const formattedEvents: CalendarEvent[] = meetingsData.map((meeting: any) => ({
-        id: meeting.id,
-        title: meeting.title || 'Untitled Event',
-        type: meeting.type || 'meeting',
-        date: new Date(meeting.scheduled_time),
-        time: new Date(meeting.scheduled_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
-        duration: meeting.duration ? `${meeting.duration} min` : '30 min',
-        venture: meeting.venture?.name,
-        attendees: meeting.attendees?.map((a: any) => a.full_name) || [],
-        location: meeting.location || 'virtual',
-        meetingLink: meeting.meeting_link,
-        description: meeting.notes || '',
-        status: meeting.status === 'scheduled' ? 'upcoming' : meeting.status,
-        guest_ids: meeting.attendees?.map((a: any) => a.id) || []
-      }));
+      const formattedEvents: CalendarEvent[] = meetingsData
+        .map((meeting: any) => {
+          const startRaw = meeting.start_time || meeting.scheduled_time;
+          const endRaw = meeting.end_time;
+          if (!startRaw) return null;
+
+          const startDate = new Date(startRaw);
+          if (Number.isNaN(startDate.getTime())) return null;
+
+          let durationLabel = '30 min';
+          if (endRaw) {
+            const endDate = new Date(endRaw);
+            if (!Number.isNaN(endDate.getTime())) {
+              const mins = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 60000));
+              durationLabel = `${mins} min`;
+            }
+          }
+
+          const normalizedStatus = meeting.status === 'scheduled'
+            ? 'upcoming'
+            : meeting.status === 'cancelled'
+              ? 'cancelled'
+              : meeting.status === 'completed'
+                ? 'completed'
+                : 'upcoming';
+
+          return {
+            id: meeting.id,
+            title: meeting.title || 'Untitled Event',
+            type: meeting.meeting_type || meeting.type || 'meeting',
+            date: startDate,
+            time: startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+            duration: durationLabel,
+            venture: meeting.venture?.name,
+            attendees: meeting.attendees?.map((a: any) => a.full_name) || [],
+            location: meeting.location || 'virtual',
+            meetingLink: meeting.meeting_url || meeting.meeting_link,
+            description: meeting.description || meeting.notes || '',
+            status: normalizedStatus,
+            guest_ids: meeting.attendees?.map((a: any) => a.id) || []
+          } as CalendarEvent;
+        })
+        .filter((event): event is CalendarEvent => Boolean(event));
       setEvents(formattedEvents);
 
       // Load ventures (for founders)

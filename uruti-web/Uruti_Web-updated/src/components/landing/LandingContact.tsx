@@ -33,6 +33,8 @@ import {
   SelectValue,
 } from '../ui/select';
 import { toast } from 'sonner';
+import apiClient from '../../lib/api-client';
+import { SUPPORT_EMAIL, supportMailtoLink } from '../../lib/contact-info';
 
 interface LandingContactProps {
   onNavigate: (page: string) => void;
@@ -68,7 +70,6 @@ export function LandingContact({ onNavigate }: LandingContactProps) {
     message: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
   const [show360View, setShow360View] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
@@ -185,26 +186,30 @@ export function LandingContact({ onNavigate }: LandingContactProps) {
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    const formattedMessage =
+      `Name: ${formData.fullname}\n` +
+      `Email: ${formData.email}\n` +
+      `Role: ${formData.role}\n` +
+      `Subject: ${formData.subject}\n\n` +
+      `Message:\n${formData.message}`;
 
     try {
-      // Create mailto link with form data
-      const subject = encodeURIComponent(`Contact Form: ${formData.subject}`);
-      const body = encodeURIComponent(
-        `Name: ${formData.fullname}\n` +
-        `Email: ${formData.email}\n` +
-        `Role: ${formData.role}\n` +
-        `Subject: ${formData.subject}\n\n` +
-        `Message:\n${formData.message}`
-      );
-      
-      // Open default email client
-      window.location.href = `mailto:uruti.info@gmail.com?subject=${subject}&body=${body}`;
-      
-      // Show custom success modal
+      await apiClient.createSupportMessage({
+        visitor_name: formData.fullname,
+        visitor_email: formData.email,
+        message: `[${formData.role}] ${formData.subject}\n\n${formData.message}`,
+      });
+
       setShowSuccessModal(true);
-      
     } catch (error) {
-      console.error('Error submitting form:', error);
+      console.error('Error submitting form to backend, falling back to mailto:', error);
+
+      const subject = `Contact Form: ${formData.subject}`;
+      const mailtoLink = supportMailtoLink(subject, formattedMessage);
+      window.location.href = mailtoLink;
+      toast.info('Opened your email app as fallback.');
+
+      setShowSuccessModal(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -250,16 +255,18 @@ export function LandingContact({ onNavigate }: LandingContactProps) {
                 Email Us
               </h3>
               <a 
-                href="mailto:uruti.info@gmail.com"
+                href={`mailto:${SUPPORT_EMAIL}`}
                 className="text-sm text-[#76B947] mb-1 hover:underline block" 
                 style={{ fontFamily: 'var(--font-body)' }}
               >
-                uruti.info@gmail.com
+                {SUPPORT_EMAIL}
               </a>
               <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
                 Get in touch for general inquiries
               </p>
             </div>
+      );
+      
 
             {/* Call Us */}
             <div className="glass-card border-black/5 dark:border-white/10 rounded-xl p-8 text-center hover:bg-[#76B947]/5 transition-colors">
@@ -390,11 +397,12 @@ export function LandingContact({ onNavigate }: LandingContactProps) {
 
                   <Button
                     type="submit"
+                    disabled={isSubmitting}
                     className="w-full bg-[#76B947] text-white hover:bg-[#5a8f35] h-12 text-base"
                     style={{ fontFamily: 'var(--font-body)' }}
                   >
                     <Send className="mr-2 h-5 w-5" />
-                    Send Message
+                    {isSubmitting ? 'Sending...' : 'Send Message'}
                   </Button>
                   
                   <p className="text-xs text-center text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
@@ -760,7 +768,7 @@ export function LandingContact({ onNavigate }: LandingContactProps) {
                   Message Sent Successfully!
                 </h3>
                 <p className="text-sm text-muted-foreground mb-6" style={{ fontFamily: 'var(--font-body)' }}>
-                  Your email client has been opened with your message. We'll get back to you within 24 hours.
+                  Your message has been delivered to the Uruti support team. We'll get back to you within 24 hours.
                 </p>
                 <Button
                   onClick={handleCloseSuccessModal}

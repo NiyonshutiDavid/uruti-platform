@@ -6,12 +6,39 @@ from pathlib import Path
 import shutil
 import uuid
 from ..database import get_db
-from ..models import User, Venture, PitchSession, Connection, NotificationType
+from ..models import User, Venture, PitchSession, Connection, Bookmark, NotificationType, UserRole
 from ..schemas import VentureCreate, VentureResponse, VentureUpdate
 from ..auth import get_current_active_user
 from .notifications import create_notification, publish_notification
+from ..services.venture_scorer import venture_scorer
 
 router = APIRouter(prefix="/ventures", tags=["Ventures"])
+
+VENTURE_FIELD_LABELS = {
+    "name": "name",
+    "tagline": "tagline",
+    "description": "description",
+    "problem_statement": "problem statement",
+    "solution": "solution",
+    "stage": "stage",
+    "industry": "industry",
+    "target_market": "target market",
+    "business_model": "business model",
+    "funding_goal": "funding goal",
+    "funding_raised": "funding raised",
+    "revenue": "revenue",
+    "monthly_burn_rate": "monthly burn rate",
+    "team_size": "team size",
+    "team_info": "team info",
+    "customers": "customers",
+    "mrr": "MRR",
+    "logo_url": "logo",
+    "banner_url": "banner",
+    "pitch_deck_url": "pitch deck",
+    "demo_video_url": "demo video",
+    "is_published": "publish status",
+    "is_seeking_funding": "funding status",
+}
 
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -32,6 +59,17 @@ ALLOWED_IMAGE_TYPES = {
 }
 
 
+def _apply_venture_score(venture: Venture) -> None:
+    analysis = venture_scorer.score_venture(venture)
+    venture.uruti_score = float(analysis.get("uruti_score") or 0.0)
+    venture.score_breakdown = analysis
+
+
+def _ensure_admin(current_user: User) -> None:
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+
 @router.post("/", response_model=VentureResponse, status_code=status.HTTP_201_CREATED)
 async def create_venture(
     venture_data: VentureCreate,
@@ -48,6 +86,8 @@ async def create_venture(
         **venture_dict,
         founder_id=current_user.id
     )
+
+    _apply_venture_score(db_venture)
     
     db.add(db_venture)
     db.commit()
@@ -144,6 +184,65 @@ def get_my_ventures(
     return ventures
 
 
+@router.get("/admin/model-performance")
+def get_model_performance(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get model information and runtime performance metrics (admin only)."""
+
+    _ensure_admin(current_user)
+
+    ventures = db.query(Venture).all()
+    scored = [v for v in ventures if v.uruti_score is not None]
+    scores = [float(v.uruti_score or 0.0) for v in scored]
+
+    class_distribution = {
+        "not_ready": 0,
+        "mentorship_needed": 0,
+        "investment_ready": 0,
+    }
+    source_distribution = {
+        "root_models_bundle": 0,
+        "heuristic_fallback": 0,
+        "other": 0,
+    }
+
+    for venture in scored:
+        breakdown = venture.score_breakdown if isinstance(venture.score_breakdown, dict) else {}
+
+        predicted_class = str(breakdown.get("predicted_class") or "").strip().lower()
+        if predicted_class in class_distribution:
+            class_distribution[predicted_class] += 1
+
+        model_source = str(breakdown.get("model_source") or "").strip().lower()
+        if model_source == "root_models_bundle":
+            source_distribution["root_models_bundle"] += 1
+        elif model_source == "heuristic_fallback":
+            source_distribution["heuristic_fallback"] += 1
+        elif model_source:
+            source_distribution["other"] += 1
+
+    average_score = round(sum(scores) / len(scores), 2) if scores else 0.0
+    max_score = round(max(scores), 2) if scores else 0.0
+    min_score = round(min(scores), 2) if scores else 0.0
+
+    model_info = venture_scorer.get_model_info()
+
+    return {
+        "model_info": model_info,
+        "performance": {
+            "total_ventures": len(ventures),
+            "scored_ventures": len(scored),
+            "average_score": average_score,
+            "max_score": max_score,
+            "min_score": min_score,
+            "class_distribution": class_distribution,
+            "source_distribution": source_distribution,
+        },
+    }
+
+
 @router.get("/{venture_id}", response_model=VentureResponse)
 def get_venture(
     venture_id: int,
@@ -164,7 +263,7 @@ def get_venture(
 
 
 @router.put("/{venture_id}", response_model=VentureResponse)
-def update_venture(
+async def update_venture(
     venture_id: int,
     venture_update: VentureUpdate,
     db: Session = Depends(get_db),
@@ -182,11 +281,66 @@ def update_venture(
     
     # Update fields
     update_data = venture_update.model_dump(exclude_unset=True)
+    changed_fields = [
+        field for field in update_data.keys()
+        if field in VENTURE_FIELD_LABELS
+    ]
+
     for field, value in update_data.items():
         setattr(venture, field, value)
+
+    _apply_venture_score(venture)
     
     db.commit()
     db.refresh(venture)
+
+    if changed_fields:
+        connected = db.query(Connection).filter(
+            or_(
+                Connection.user1_id == current_user.id,
+                Connection.user2_id == current_user.id,
+            )
+        ).all()
+
+        connected_ids = {
+            conn.user2_id if conn.user1_id == current_user.id else conn.user1_id
+            for conn in connected
+        }
+
+        bookmark_user_ids = {
+            row.user_id
+            for row in db.query(Bookmark).filter(Bookmark.venture_id == venture.id).all()
+        }
+
+        candidate_ids = connected_ids.union(bookmark_user_ids)
+        investors = db.query(User).filter(
+            User.id.in_(candidate_ids),
+            User.role == UserRole.INVESTOR,
+            User.id != current_user.id,
+        ).all() if candidate_ids else []
+
+        primary_field = VENTURE_FIELD_LABELS.get(changed_fields[0], changed_fields[0])
+        extra_count = max(0, len(changed_fields) - 1)
+        extra_suffix = f" and {extra_count} more field{'s' if extra_count > 1 else ''}" if extra_count > 0 else ""
+
+        for investor in investors:
+            notification = create_notification(
+                db,
+                user_id=investor.id,
+                title="Startup update",
+                message=f"{venture.name} updated its {primary_field}{extra_suffix}.",
+                notification_type=NotificationType.SYSTEM,
+                data={
+                    "kind": "venture_updated",
+                    "venture_id": venture.id,
+                    "venture_name": venture.name,
+                    "founder_id": current_user.id,
+                    "updated_fields": changed_fields,
+                    "primary_field": changed_fields[0],
+                    "route": "/discovery",
+                },
+            )
+            await publish_notification(notification, db)
     
     return venture
 
@@ -211,6 +365,28 @@ def delete_venture(
     db.commit()
     
     return None
+
+
+@router.post("/{venture_id}/analyze", response_model=VentureResponse)
+def analyze_venture(
+    venture_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Analyze a venture with the deployed MLP bundle and update its Uruti score."""
+
+    venture = db.query(Venture).filter(Venture.id == venture_id).first()
+    if not venture:
+        raise HTTPException(status_code=404, detail="Venture not found")
+
+    if venture.founder_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to analyze this venture")
+
+    _apply_venture_score(venture)
+
+    db.commit()
+    db.refresh(venture)
+    return venture
 
 
 @router.get("/leaderboard/top", response_model=List[VentureResponse])
@@ -262,6 +438,42 @@ async def upload_venture_logo(
         if file_path.exists():
             file_path.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"Failed to upload venture logo: {exc}")
+
+
+@router.post("/{venture_id}/banner", response_model=VentureResponse)
+async def upload_venture_banner(
+    venture_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Upload or replace venture banner (landscape logo) image."""
+    venture = db.query(Venture).filter(Venture.id == venture_id).first()
+    if not venture:
+        raise HTTPException(status_code=404, detail="Venture not found")
+
+    if venture.founder_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this venture")
+
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid image format")
+
+    extension = Path(file.filename or "banner.png").suffix or ".png"
+    filename = f"venture_banner_{venture_id}_{uuid.uuid4().hex}{extension}"
+    file_path = UPLOAD_DIR / filename
+
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        venture.banner_url = f"/api/v1/profile/uploads/{filename}"
+        db.commit()
+        db.refresh(venture)
+        return venture
+    except Exception as exc:
+        if file_path.exists():
+            file_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail=f"Failed to upload venture banner: {exc}")
 
 
 @router.post("/{venture_id}/pitch-video")

@@ -11,7 +11,11 @@ from ..database import SessionLocal
 from ..models import User, Message, NotificationType
 from ..schemas import MessageCreate, MessageResponse
 from ..auth import get_current_active_user
-from .notifications import create_notification, publish_notification
+from .notifications import (
+    create_notification,
+    publish_notification,
+    notification_hub,
+)
 from datetime import datetime
 
 router = APIRouter(prefix="/messages", tags=["Messages"])
@@ -169,6 +173,53 @@ async def send_message(
     await publish_notification(message_notification, db)
     
     return db_message
+
+
+@router.post("/call/signal", status_code=status.HTTP_200_OK)
+async def signal_call_event(
+    payload: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Broadcast call signaling events (invite/accept/decline/end) to participants."""
+
+    receiver_id = int(payload.get("receiver_id") or 0)
+    action = str(payload.get("action") or "").strip().lower()
+    call_id = str(payload.get("call_id") or "").strip() or uuid.uuid4().hex
+
+    if receiver_id <= 0:
+        raise HTTPException(status_code=400, detail="receiver_id is required")
+    if action not in {"invite", "accept", "decline", "end"}:
+        raise HTTPException(status_code=400, detail="Invalid call action")
+
+    receiver = db.query(User).filter(User.id == receiver_id).first()
+    if not receiver:
+        raise HTTPException(status_code=404, detail="Receiver not found")
+
+    event_payload = {
+        "event": "call_event",
+        "data": {
+            "call_id": call_id,
+            "action": action,
+            "caller_id": current_user.id,
+            "caller_name": current_user.display_name,
+            "caller_avatar_url": current_user.avatar_url,
+            "receiver_id": receiver_id,
+            "is_video": bool(payload.get("is_video", False)),
+            "handle": payload.get("handle"),
+            "created_at": datetime.utcnow().isoformat(),
+        },
+    }
+
+    await realtime_hub.broadcast_to_user(current_user.id, event_payload)
+    if receiver_id != current_user.id:
+        await realtime_hub.broadcast_to_user(receiver_id, event_payload)
+
+    await notification_hub.broadcast_to_user(current_user.id, event_payload)
+    if receiver_id != current_user.id:
+        await notification_hub.broadcast_to_user(receiver_id, event_payload)
+
+    return {"status": "ok", "call_id": call_id, "action": action}
 
 
 @router.get("/inbox", response_model=List[MessageResponse])

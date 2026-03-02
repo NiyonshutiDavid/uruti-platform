@@ -20,6 +20,7 @@ interface Startup {
   id: string;
   name: string;
   logoUrl?: string;
+  bannerUrl?: string;
   sector: string;
   problemStatement: string;
   solutionHypothesis: string;
@@ -43,6 +44,7 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [viewingStartup, setViewingStartup] = useState<any | null>(null);
   const [isCreatingVenture, setIsCreatingVenture] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const mapIndustryToEnum = (sector: string | undefined) => {
     const normalized = (sector || '').trim().toLowerCase();
@@ -62,6 +64,7 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
     id: String(venture.id),
     name: venture.name,
     logoUrl: venture.logo_url || '',
+    bannerUrl: venture.banner_url || '',
     sector: venture.industry || 'other',
     problemStatement: venture.problem_statement || '',
     solutionHypothesis: venture.solution || '',
@@ -99,17 +102,25 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
     setShowScoreToast(true);
   };
 
-  const handleAnalyzeAgain = () => {
-    if (selectedStartup) {
-      // Simulate re-analysis with a slightly different score
-      const newScore = Math.min(100, (selectedStartup.urutiScore || 0) + Math.floor(Math.random() * 5) - 2);
-      setToastMessage(`${selectedStartup.name} - Updated Uruti Score: ${newScore}/100 (Re-analyzed on ${new Date().toLocaleDateString()})`);
-      
-      // Update the startup score
-      setStartups(startups.map(s => 
-        s.id === selectedStartup.id ? { ...s, urutiScore: newScore } : s
-      ));
-      setSelectedStartup({ ...selectedStartup, urutiScore: newScore });
+  const handleAnalyzeAgain = async () => {
+    if (!selectedStartup) return;
+
+    setIsAnalyzing(true);
+    try {
+      const analyzed = await apiClient.analyzeVenture(Number(selectedStartup.id));
+      const mapped = mapVentureToStartup(analyzed);
+
+      setStartups((prev) => prev.map((s) => (s.id === mapped.id ? mapped : s)));
+      setSelectedStartup(mapped);
+      setToastMessage(
+        `${mapped.name} - Updated Uruti Score: ${mapped.urutiScore}/100 (Re-analyzed on ${new Date().toLocaleDateString()})`,
+      );
+      toast.success('Venture analyzed with MLP model.');
+    } catch (error: any) {
+      console.error('Failed to analyze venture:', error);
+      toast.error(error?.message || 'Failed to analyze venture. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -266,7 +277,8 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
             const venturePayload = {
               name: ventureData.name,
               tagline: ventureData.tagline,
-              logo_url: ventureData.logoUrl || undefined,
+              logo_url: ventureData.iconLogoUrl || undefined,
+              banner_url: ventureData.landscapeLogoUrl || undefined,
               industry: mapIndustryToEnum(ventureData.sector),
               problem_statement: ventureData.problem,
               solution: ventureData.solution,
@@ -277,8 +289,12 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
 
             let newVenture = await apiClient.createVenture(venturePayload);
 
-            if (ventureData.logoFile instanceof File) {
-              newVenture = await apiClient.uploadVentureLogo(Number(newVenture.id), ventureData.logoFile);
+            if (ventureData.iconLogoFile instanceof File) {
+              newVenture = await apiClient.uploadVentureLogo(Number(newVenture.id), ventureData.iconLogoFile);
+            }
+
+            if (ventureData.landscapeLogoFile instanceof File) {
+              newVenture = await apiClient.uploadVentureBanner(Number(newVenture.id), ventureData.landscapeLogoFile);
             }
 
             setStartups((prev) => [mapVentureToStartup(newVenture), ...prev]);
@@ -319,11 +335,12 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
                   </div>
                   <Button 
                     size="sm" 
-                    onClick={handleAnalyzeAgain}
+                    onClick={() => void handleAnalyzeAgain()}
+                    disabled={isAnalyzing}
                     className="bg-[#76B947] hover:bg-[#5a8f35] text-white w-full"
                   >
                     <Sparkles className="h-4 w-4 mr-1" />
-                    Analyze Again
+                    {isAnalyzing ? 'Analyzing…' : 'Analyze Again'}
                   </Button>
                 </div>
                 <Button
@@ -625,10 +642,39 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
           open={isEditDialogOpen} 
           onOpenChange={setIsEditDialogOpen}
           venture={selectedStartup}
-          onSave={(updatedVenture) => {
-            setStartups(startups.map(s => 
-              s.id === updatedVenture.id ? { ...s, ...updatedVenture } : s
-            ));
+          onSave={async (updatedVenture) => {
+            try {
+              const payload = {
+                name: updatedVenture.name,
+                tagline: updatedVenture.tagline || undefined,
+                logo_url: updatedVenture.iconLogoUrl || undefined,
+                banner_url: updatedVenture.landscapeLogoUrl || undefined,
+                industry: mapIndustryToEnum(updatedVenture.sector),
+                stage: updatedVenture.stage || undefined,
+                problem_statement: updatedVenture.problem || undefined,
+                solution: updatedVenture.solution || undefined,
+                target_market: updatedVenture.targetMarket || undefined,
+                business_model: updatedVenture.competitiveEdge || undefined,
+              };
+
+              const ventureId = Number(updatedVenture.id);
+              let savedVenture = await apiClient.updateVenture(ventureId, payload);
+
+              if (updatedVenture.iconLogoFile instanceof File) {
+                savedVenture = await apiClient.uploadVentureLogo(ventureId, updatedVenture.iconLogoFile);
+              }
+
+              if (updatedVenture.landscapeLogoFile instanceof File) {
+                savedVenture = await apiClient.uploadVentureBanner(ventureId, updatedVenture.landscapeLogoFile);
+              }
+
+              const mapped = mapVentureToStartup(savedVenture);
+              setStartups(prev => prev.map(s => s.id === mapped.id ? mapped : s));
+              toast.success('Venture updated successfully');
+            } catch (error: any) {
+              console.error('Failed to update venture:', error);
+              toast.error(error?.message || 'Failed to update venture');
+            }
           }}
         />
       )}

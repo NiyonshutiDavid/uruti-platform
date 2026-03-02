@@ -1,5 +1,6 @@
 import { ArrowLeft, Printer } from 'lucide-react';
 import { Button } from '../ui/button';
+import { SUPPORT_EMAIL } from '../../lib/contact-info';
 
 interface PrivacyPolicyProps {
   onBack: () => void;
@@ -280,7 +281,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                 <li><strong>Withdraw Consent:</strong> Withdraw consent for data processing</li>
               </ul>
               <p className="text-muted-foreground mt-4">
-                To exercise these rights, please contact us at <a href="mailto:privacy@uruti.rw" className="text-[#76B947] hover:underline">privacy@uruti.rw</a>
+                To exercise these rights, please contact us at <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[#76B947] hover:underline">{SUPPORT_EMAIL}</a>
               </p>
             </section>
 
@@ -350,7 +351,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                   KN 78 St, Kigali, Rwanda
                 </p>
                 <p className="text-muted-foreground mb-2">
-                  Email: <a href="mailto:privacy@uruti.rw" className="text-[#76B947] hover:underline">privacy@uruti.rw</a>
+                  Email: <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[#76B947] hover:underline">{SUPPORT_EMAIL}</a>
                 </p>
                 <p className="text-muted-foreground">
                   Phone: <a href="tel:+250790636128" className="text-[#76B947] hover:underline">+250 790 636 128</a>

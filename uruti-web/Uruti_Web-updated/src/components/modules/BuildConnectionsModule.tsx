@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { apiClient } from '../../lib/api-client';
 import { useAuth } from '../../lib/auth-context';
 import { CallDialog } from '../CallDialog';
+import { BookingWeekDialog } from '../BookingWeekDialog';
 
 interface BuildConnectionsModuleProps {
   onModuleChange?: (module: string) => void;
@@ -60,6 +61,8 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
   const [callType, setCallType] = useState<'video' | 'voice'>('video');
   const [callContact, setCallContact] = useState<User | null>(null);
   const [currentMeetingId, setCurrentMeetingId] = useState<number | null>(null);
+  const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
+  const [bookingTarget, setBookingTarget] = useState<{ id: number; name: string } | null>(null);
 
   // Get localStorage data for debugging
   const getLocalStorageData = () => {
@@ -283,10 +286,10 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
     onModuleChange?.(`profile/${targetUserId}`);
   };
 
-  const handleBookSession = (targetUserId: number) => {
-    sessionStorage.setItem('bookSessionUserId', targetUserId.toString());
-    onModuleChange?.('calendar');
-    toast.info('Choose a time slot to book a session.');
+  const handleBookSession = (targetUserId: number, targetUserName?: string) => {
+    const fallbackName = users.find((candidate) => candidate.id === targetUserId)?.full_name || 'User';
+    setBookingTarget({ id: targetUserId, name: targetUserName || fallbackName });
+    setBookingDialogOpen(true);
   };
 
   const handleInitiateCall = async (user: User, type: 'video' | 'voice') => {
@@ -750,7 +753,7 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
                             size="sm"
                             variant="outline"
                             className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
-                            onClick={() => handleBookSession(conn.id)}
+                            onClick={() => handleBookSession(conn.id, conn.full_name)}
                           >
                             <Calendar className="h-4 w-4 mr-2" />
                             Book Session
@@ -913,7 +916,7 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
                                 size="sm"
                                 variant="outline"
                                 className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
-                                onClick={() => handleBookSession(request.counterpartUserId)}
+                                onClick={() => handleBookSession(request.counterpartUserId, request.name)}
                               >
                                 <Calendar className="h-4 w-4 mr-2" />
                                 Book Session
@@ -997,7 +1000,7 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
                                 size="sm"
                                 variant="outline"
                                 className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
-                                onClick={() => handleBookSession(request.counterpartUserId)}
+                                onClick={() => handleBookSession(request.counterpartUserId, request.name)}
                               >
                                 <Calendar className="h-4 w-4 mr-2" />
                                 Book Session
@@ -1016,6 +1019,15 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
       </Tabs>
 
       {/* Send Message Dialog (for connections) */}
+      {bookingTarget && (
+        <BookingWeekDialog
+          open={bookingDialogOpen}
+          onOpenChange={setBookingDialogOpen}
+          targetUserId={bookingTarget.id}
+          targetUserName={bookingTarget.name}
+        />
+      )}
+
       <Dialog open={messageDialog} onOpenChange={setMessageDialog}>
         <DialogContent>
           <DialogHeader>

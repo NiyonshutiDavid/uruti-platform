@@ -303,6 +303,16 @@ class ApiService {
   // ──────────────────── MESSAGES ────────────────────
   Future<List<dynamic>> getConversations([String? token]) async {
     try {
+      DateTime parseApiDateTime(dynamic raw) {
+        final value = (raw ?? '').toString().trim();
+        if (value.isEmpty) return DateTime.fromMillisecondsSinceEpoch(0);
+        final normalized = value.contains('Z') || value.contains('+')
+            ? value
+            : '${value}Z';
+        return DateTime.tryParse(normalized)?.toLocal() ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+      }
+
       final results = await Future.wait([
         http.get(
           Uri.parse('${AppConstants.apiV1}/connections/'),
@@ -340,8 +350,8 @@ class ApiService {
       }
 
       String fmtTime(dynamic isoTs) {
-        final parsed = DateTime.tryParse((isoTs ?? '').toString());
-        if (parsed == null) return '';
+        final parsed = parseApiDateTime(isoTs);
+        if (parsed.millisecondsSinceEpoch == 0) return '';
         final hour = parsed.hour % 12 == 0 ? 12 : parsed.hour % 12;
         final minute = parsed.minute.toString().padLeft(2, '0');
         final ampm = parsed.hour >= 12 ? 'PM' : 'AM';
@@ -360,12 +370,8 @@ class ApiService {
         ];
 
         thread.sort((a, b) {
-          final ta =
-              DateTime.tryParse((a['created_at'] ?? '').toString()) ??
-              DateTime.fromMillisecondsSinceEpoch(0);
-          final tb =
-              DateTime.tryParse((b['created_at'] ?? '').toString()) ??
-              DateTime.fromMillisecondsSinceEpoch(0);
+          final ta = parseApiDateTime(a['created_at']);
+          final tb = parseApiDateTime(b['created_at']);
           return ta.compareTo(tb);
         });
 
@@ -405,12 +411,8 @@ class ApiService {
       }).toList();
 
       conversations.sort((a, b) {
-        final ta =
-            DateTime.tryParse((a['last_message_time'] ?? '').toString()) ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        final tb =
-            DateTime.tryParse((b['last_message_time'] ?? '').toString()) ??
-            DateTime.fromMillisecondsSinceEpoch(0);
+        final ta = parseApiDateTime(a['last_message_time']);
+        final tb = parseApiDateTime(b['last_message_time']);
         return tb.compareTo(ta);
       });
 
@@ -445,8 +447,18 @@ class ApiService {
         ),
       ];
       thread.sort((a, b) {
-        final ta = a['created_at'] as String? ?? '';
-        final tb = b['created_at'] as String? ?? '';
+        DateTime parseApiDateTime(dynamic raw) {
+          final value = (raw ?? '').toString().trim();
+          if (value.isEmpty) return DateTime.fromMillisecondsSinceEpoch(0);
+          final normalized = value.contains('Z') || value.contains('+')
+              ? value
+              : '${value}Z';
+          return DateTime.tryParse(normalized)?.toLocal() ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+        }
+
+        final ta = parseApiDateTime(a['created_at']);
+        final tb = parseApiDateTime(b['created_at']);
         return ta.compareTo(tb);
       });
       return thread;
@@ -528,6 +540,29 @@ class ApiService {
     } catch (_) {
       return 0;
     }
+  }
+
+  Future<Map<String, dynamic>> sendCallSignal({
+    required int receiverId,
+    required String action,
+    required String callId,
+    required bool isVideo,
+    String? handle,
+  }) async {
+    final res = await http.post(
+      Uri.parse('${AppConstants.apiV1}/messages/call/signal'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({
+        'receiver_id': receiverId,
+        'action': action,
+        'call_id': callId,
+        'is_video': isVideo,
+        if (handle != null && handle.trim().isNotEmpty) 'handle': handle.trim(),
+      }),
+    );
+
+    final data = await _handleResponse(res);
+    return Map<String, dynamic>.from(data as Map);
   }
 
   // ──────────────────── NOTIFICATIONS ────────────────────
@@ -637,6 +672,82 @@ class ApiService {
       throw ApiException(
         statusCode: streamed.statusCode,
         message: json['detail']?.toString() ?? 'Pitch upload failed',
+      );
+    }
+
+    return json;
+  }
+
+  Future<Map<String, dynamic>> uploadVentureLogo(
+    int ventureId,
+    String filePath,
+  ) async {
+    final tok = await token;
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${AppConstants.apiV1}/ventures/$ventureId/logo'),
+    );
+
+    if (tok != null) {
+      request.headers['Authorization'] = 'Bearer $tok';
+    }
+
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'file',
+        filePath,
+        contentType: _imageMediaTypeFromPath(filePath),
+      ),
+    );
+
+    final streamed = await request.send();
+    final body = await streamed.stream.bytesToString();
+    final json = body.isEmpty
+        ? <String, dynamic>{}
+        : (jsonDecode(body) as Map<String, dynamic>);
+
+    if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+      throw ApiException(
+        statusCode: streamed.statusCode,
+        message: json['detail']?.toString() ?? 'Venture logo upload failed',
+      );
+    }
+
+    return json;
+  }
+
+  Future<Map<String, dynamic>> uploadVentureBanner(
+    int ventureId,
+    String filePath,
+  ) async {
+    final tok = await token;
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${AppConstants.apiV1}/ventures/$ventureId/banner'),
+    );
+
+    if (tok != null) {
+      request.headers['Authorization'] = 'Bearer $tok';
+    }
+
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'file',
+        filePath,
+        contentType: _imageMediaTypeFromPath(filePath),
+      ),
+    );
+
+    final streamed = await request.send();
+    final body = await streamed.stream.bytesToString();
+    final json = body.isEmpty
+        ? <String, dynamic>{}
+        : (jsonDecode(body) as Map<String, dynamic>);
+
+    if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+      throw ApiException(
+        statusCode: streamed.statusCode,
+        message: json['detail']?.toString() ?? 'Venture banner upload failed',
       );
     }
 
@@ -871,6 +982,15 @@ class ApiService {
       headers: await _headers(auth: true),
     );
     _handleResponse(res);
+  }
+
+  /// Triggers backend model analysis for a venture and returns updated venture.
+  Future<Map<String, dynamic>> analyzeVenture(int id) async {
+    final res = await http.post(
+      Uri.parse('${AppConstants.apiV1}/ventures/$id/analyze'),
+      headers: await _headers(auth: true),
+    );
+    return _handleResponse(res);
   }
 
   // ──────────────────── MEETINGS ────────────────────

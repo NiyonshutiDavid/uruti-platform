@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL } from '../../lib/contact-info';
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
@@ -109,7 +110,7 @@ export function SettingsModule({ userType }: SettingsModuleProps) {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl mb-2 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-              Account Settings ⚙️
+              Account Settings
             </h1>
             <p className="text-lg text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
               Manage your profile and preferences
@@ -639,7 +640,7 @@ export function SettingsModule({ userType }: SettingsModuleProps) {
                   <div>
                     <Label className="text-base">Email Support</Label>
                     <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                      uruti.info@gmail.com
+                        {SUPPORT_EMAIL}
                     </p>
                   </div>
                 </div>
@@ -647,7 +648,7 @@ export function SettingsModule({ userType }: SettingsModuleProps) {
                   variant="outline"
                   size="sm"
                   className="border-blue-500 text-blue-500 hover:bg-blue-500/10"
-                  onClick={() => window.location.href = 'mailto:uruti.info@gmail.com'}
+                    onClick={() => window.location.href = `mailto:${SUPPORT_EMAIL}`}
                 >
                   Send Email
                 </Button>

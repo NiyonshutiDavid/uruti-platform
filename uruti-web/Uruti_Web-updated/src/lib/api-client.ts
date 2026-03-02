@@ -335,6 +335,20 @@ class ApiClient {
     return this.normalizeVentureMedia(venture);
   }
 
+  async analyzeVenture(ventureId: number) {
+    const venture = await this.request<any>(`/api/v1/ventures/${ventureId}/analyze`, {
+      method: 'POST',
+      requiresAuth: true,
+    });
+    return this.normalizeVentureMedia(venture);
+  }
+
+  async getAdminModelPerformance() {
+    return this.request<any>('/api/v1/ventures/admin/model-performance', {
+      requiresAuth: true,
+    });
+  }
+
   async deleteVenture(ventureId: number) {
     return this.request<any>(`/api/v1/ventures/${ventureId}`, {
       method: 'DELETE',
@@ -478,6 +492,20 @@ class ApiClient {
     return this.request<any>(`/api/v1/messages/${messageId}/read`, {
       method: 'PUT',
       requiresAuth: true,
+    });
+  }
+
+  async sendCallSignal(data: {
+    receiver_id: number;
+    action: 'invite' | 'accept' | 'decline' | 'end';
+    call_id: string;
+    is_video?: boolean;
+    handle?: string;
+  }) {
+    return this.request<any>('/api/v1/messages/call/signal', {
+      method: 'POST',
+      requiresAuth: true,
+      body: JSON.stringify(data),
     });
   }
 
@@ -822,6 +850,23 @@ class ApiClient {
     return this.normalizeVentureMedia(result);
   }
 
+  async uploadVentureBanner(ventureId: number, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = this.getAuthToken();
+    const response = await fetch(`${this.baseUrl}/api/v1/ventures/${ventureId}/banner`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const result = await this.handleResponse<any>(response);
+    return this.normalizeVentureMedia(result);
+  }
+
   // Support endpoints (Customer Support)
   async getSupportMessages(skip: number = 0, limit: number = 100) {
     return this.request<any[]>(`/api/v1/support/messages?skip=${skip}&limit=${limit}`, {
@@ -960,7 +1005,18 @@ class ApiClient {
     const wsBaseUrl = this.baseUrl
       .replace(/^http:\/\//, 'ws://')
       .replace(/^https:\/\//, 'wss://');
-    return new WebSocket(`${wsBaseUrl}/api/v1/ws?token=${token}`);
+    return new WebSocket(`${wsBaseUrl}/api/v1/messages/ws?token=${token}`);
+  }
+
+  createMessagesWebSocket(token: string): WebSocket {
+    return this.createWebSocket(token);
+  }
+
+  createNotificationsWebSocket(token: string): WebSocket {
+    const wsBaseUrl = this.baseUrl
+      .replace(/^http:\/\//, 'ws://')
+      .replace(/^https:\/\//, 'wss://');
+    return new WebSocket(`${wsBaseUrl}/api/v1/notifications/ws?token=${token}`);
   }
 
   // AI Chat endpoints
@@ -1072,6 +1128,56 @@ class ApiClient {
       method: 'POST',
       requiresAuth: true,
       body: form,
+    });
+  }
+
+  async getAiModels() {
+    return this.request<any[]>('/api/v1/ai/models', {
+      requiresAuth: true,
+    });
+  }
+
+  async sendAiChat(data: {
+    message: string;
+    model?: string;
+    session_id?: string;
+    startup_context?: {
+      venture_id?: number;
+      name: string;
+      description?: string;
+      stage?: string;
+      industry?: string;
+      problem_statement?: string;
+      solution?: string;
+      target_market?: string;
+      business_model?: string;
+    };
+    file_content?: string;
+    file_name?: string;
+  }) {
+    return this.request<any>('/api/v1/ai/chat', {
+      method: 'POST',
+      requiresAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getAiHistorySessions() {
+    return this.request<any[]>('/api/v1/ai/history', {
+      requiresAuth: true,
+    });
+  }
+
+  async getAiSessionMessages(sessionId: string) {
+    return this.request<any[]>(`/api/v1/ai/history/${sessionId}`, {
+      requiresAuth: true,
+    });
+  }
+
+  async deleteAiSessionHistory(sessionId: string) {
+    return this.request<void>(`/api/v1/ai/history/${sessionId}`, {
+      method: 'DELETE',
+      requiresAuth: true,
     });
   }
 

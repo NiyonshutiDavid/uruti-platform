@@ -1,6 +1,7 @@
 import { Button } from '../ui/button';
 import { Facebook, Twitter, Linkedin, Instagram, Mail, MapPin, Phone } from 'lucide-react';
 import { UrutiLogo } from '../UrutiLogo';
+import { SUPPORT_EMAIL } from '../../lib/contact-info';
 
 interface LandingFooterProps {
   onNavigate: (page: string) => void;
@@ -118,8 +119,8 @@ export function LandingFooter({ onNavigate }: LandingFooterProps) {
               </li>
               <li className="flex items-center space-x-2">
                 <Mail className="h-4 w-4 text-[#76B947] flex-shrink-0" />
-                <a href="mailto:uruti.info@gmail.com" className="text-sm text-muted-foreground hover:text-[#76B947]" style={{ fontFamily: 'var(--font-body)' }}>
-                  uruti.info@gmail.com
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="text-sm text-muted-foreground hover:text-[#76B947]" style={{ fontFamily: 'var(--font-body)' }}>
+                  {SUPPORT_EMAIL}
                 </a>
               </li>
               <li className="flex items-center space-x-2">

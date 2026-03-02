@@ -3,15 +3,16 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import List
 from ..database import get_db
-from ..models import User, Bookmark, Venture
+from ..models import User, Bookmark, Venture, NotificationType
 from ..schemas import BookmarkCreate, BookmarkResponse, BookmarkUpdate
 from ..auth import get_current_active_user
+from .notifications import create_notification, publish_notification
 
 router = APIRouter(prefix="/bookmarks", tags=["Bookmarks"])
 
 
 @router.post("/", response_model=BookmarkResponse, status_code=status.HTTP_201_CREATED)
-def create_bookmark(
+async def create_bookmark(
     bookmark_data: BookmarkCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -46,6 +47,23 @@ def create_bookmark(
     
     # Load venture relationship
     db_bookmark.venture = venture
+
+    if venture.founder_id != current_user.id:
+      bookmark_notification = create_notification(
+          db,
+          user_id=venture.founder_id,
+          title="Your startup was bookmarked",
+          message=f"{current_user.display_name} bookmarked {venture.name}.",
+          notification_type=NotificationType.BOOKMARK,
+          data={
+              "kind": "bookmark_created",
+              "venture_id": venture.id,
+              "venture_name": venture.name,
+              "bookmark_id": db_bookmark.id,
+              "by_user_id": current_user.id,
+          },
+      )
+      await publish_notification(bookmark_notification, db)
     
     return db_bookmark
 
@@ -129,7 +147,7 @@ def update_bookmark(
 
 
 @router.delete("/{bookmark_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_bookmark(
+async def delete_bookmark(
     bookmark_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -144,8 +162,27 @@ def delete_bookmark(
     if bookmark.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
     
+    venture = db.query(Venture).filter(Venture.id == bookmark.venture_id).first()
+
     db.delete(bookmark)
     db.commit()
+
+    if venture and venture.founder_id != current_user.id:
+        notification = create_notification(
+            db,
+            user_id=venture.founder_id,
+            title="Startup bookmark removed",
+            message=f"{current_user.display_name} removed {venture.name} from bookmarks.",
+            notification_type=NotificationType.BOOKMARK,
+            data={
+                "kind": "bookmark_removed",
+                "venture_id": venture.id,
+                "venture_name": venture.name,
+                "by_user_id": current_user.id,
+                "route": "/deal-flow",
+            },
+        )
+        await publish_notification(notification, db)
     
     return None
 

@@ -92,6 +92,27 @@ class _MessagesHomeState extends State<_MessagesHome> {
     }
   }
 
+  Future<void> _openThreadAndMarkRead(String uid) async {
+    final otherUserId = int.tryParse(uid) ?? 0;
+    if (otherUserId > 0) {
+      await ApiService.instance.markThreadAsRead(otherUserId);
+      if (mounted) {
+        setState(() {
+          _conversations = _conversations.map((conversation) {
+            final other =
+                (conversation['other_user'] as Map?)?.cast<String, dynamic>() ??
+                {};
+            final id = int.tryParse('${other['id'] ?? 0}') ?? 0;
+            if (id == otherUserId) {
+              return {...conversation, 'unread_count': 0};
+            }
+            return conversation;
+          }).toList();
+        });
+      }
+    }
+  }
+
   List<Map<String, dynamic>> get _filtered {
     var list = _conversations;
     if (_filter == 'Unread') {
@@ -279,7 +300,11 @@ class _MessagesHomeState extends State<_MessagesHome> {
                           isOnline: isOnline,
                           avatarUrl: avatarUrl,
                           initials: initials,
-                          onTap: () => ctx.push('/messages/$uid'),
+                          onTap: () async {
+                            await _openThreadAndMarkRead(uid);
+                            if (!context.mounted) return;
+                            context.push('/messages/$uid');
+                          },
                         );
                       },
                     ),

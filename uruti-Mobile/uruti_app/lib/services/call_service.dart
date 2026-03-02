@@ -28,11 +28,15 @@ class CallService {
   }
 
   Future<void> showSystemIncomingCall(CallSession call) async {
+    final safeAvatar = (call.callerAvatarUrl?.trim().isNotEmpty ?? false)
+        ? call.callerAvatarUrl!.trim()
+        : null;
+
     final params = CallKitParams(
       id: call.id,
       nameCaller: call.callerName,
       appName: 'Uruti',
-      avatar: call.callerAvatarUrl,
+      avatar: safeAvatar,
       handle: call.handle ?? 'Uruti call',
       type: call.isVideo ? 1 : 0,
       duration: 30000,
@@ -51,11 +55,11 @@ class CallService {
         isShowCallID: false,
       ),
       ios: const IOSParams(
-        iconName: 'CallKitLogo',
+        iconName: 'AppIcon',
         handleType: 'generic',
         supportsVideo: true,
-        maximumCallGroups: 1,
-        maximumCallsPerCallGroup: 1,
+        maximumCallGroups: 2,
+        maximumCallsPerCallGroup: 2,
         audioSessionMode: 'default',
         audioSessionActive: true,
         audioSessionPreferredSampleRate: 44100.0,

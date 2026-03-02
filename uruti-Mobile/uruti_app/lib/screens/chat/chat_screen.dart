@@ -173,9 +173,19 @@ class _ConversationTile extends StatelessWidget {
     final isOnline = other['is_online'] == true;
     final userId = _asText(other['id']);
 
+    Future<void> openThread() async {
+      final parsed = int.tryParse(userId) ?? 0;
+      if (parsed > 0) {
+        await ApiService.instance.markThreadAsRead(parsed);
+      }
+      if (context.mounted) {
+        context.push('/messages/$userId');
+      }
+    }
+
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      onTap: () => context.push('/messages/$userId'),
+      onTap: openThread,
       leading: Stack(
         children: [
           CircleAvatar(

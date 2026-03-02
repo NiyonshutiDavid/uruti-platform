@@ -355,8 +355,14 @@ class _ConnectedCardState extends State<_ConnectedCard> {
     showModalBottomSheet(
       context: ctx,
       isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _BookSessionSheet(userId: uid, userName: name),
+      builder: (_) => FractionallySizedBox(
+        heightFactor: 0.86,
+        alignment: Alignment.bottomCenter,
+        child: _BookSessionSheet(userId: uid, userName: name),
+      ),
     );
   }
 
@@ -728,7 +734,8 @@ class _DiscoverTabState extends State<_DiscoverTab> {
   List<Map<String, dynamic>> _users = [];
   bool _loading = true;
   String _error = '';
-  final Set<int> _sentIds = {};
+  final Set<int> _pendingIds = {};
+  final Set<int> _connectedIds = {};
   String _selectedRole = 'All';
   String _search = '';
 
@@ -748,7 +755,31 @@ class _DiscoverTabState extends State<_DiscoverTab> {
     try {
       final me = context.read<AuthProvider>().user?.id;
       final role = _selectedRole == 'All' ? null : _selectedRole;
-      final data = await ApiService.instance.getDiscoverUsers(null, role: role);
+      final results = await Future.wait([
+        ApiService.instance.getDiscoverUsers(null, role: role),
+        ApiService.instance.getConnections(),
+        ApiService.instance.getPendingRequests(),
+      ]);
+      final data = results[0];
+      final conns = List<Map<String, dynamic>>.from(results[1]);
+      final pends = List<Map<String, dynamic>>.from(results[2]);
+
+      final connectedIds = <int>{};
+      final pendingIds = <int>{};
+
+      for (final conn in conns) {
+        final id = (conn['id'] as num?)?.toInt();
+        if (id != null) connectedIds.add(id);
+      }
+
+      for (final req in pends) {
+        final counterpart = req['counterpart'];
+        final counterpartId = counterpart is Map
+            ? (counterpart['id'] as num?)?.toInt()
+            : null;
+        if (counterpartId != null) pendingIds.add(counterpartId);
+      }
+
       if (!mounted) return;
       setState(() {
         _users = List<Map<String, dynamic>>.from(data)
@@ -759,6 +790,12 @@ class _DiscoverTabState extends State<_DiscoverTab> {
                   u['role'] != 'admin',
             )
             .toList();
+        _connectedIds
+          ..clear()
+          ..addAll(connectedIds);
+        _pendingIds
+          ..clear()
+          ..addAll(pendingIds);
         _loading = false;
       });
     } catch (e) {
@@ -944,7 +981,8 @@ class _DiscoverTabState extends State<_DiscoverTab> {
                         title,
                         company,
                       ].where((s) => s.isNotEmpty).join(' @ ');
-                      final sent = _sentIds.contains(uid);
+                      final isConnected = _connectedIds.contains(uid);
+                      final isPending = _pendingIds.contains(uid);
 
                       return _DiscoverCard(
                         uid: uid,
@@ -953,15 +991,19 @@ class _DiscoverTabState extends State<_DiscoverTab> {
                         bio: bio,
                         subtitle: subtitle,
                         avatarUrl: avatarUrl,
-                        sent: sent,
+                        connectionState: isConnected
+                            ? 'connected'
+                            : (isPending ? 'pending' : 'none'),
+                        onMessage: () => context.go('/messages/$uid'),
                         onConnect: () async {
+                          if (isConnected || isPending) return;
                           final messenger = ScaffoldMessenger.of(context);
                           try {
                             await ApiService.instance.sendConnectionRequest(
                               uid,
                             );
                             if (!context.mounted) return;
-                            setState(() => _sentIds.add(uid));
+                            setState(() => _pendingIds.add(uid));
                             messenger.showSnackBar(
                               SnackBar(
                                 content: Text('Request sent to $name!'),
@@ -1129,7 +1171,8 @@ class _DiscoverCard extends StatelessWidget {
   final String bio;
   final String subtitle;
   final String? avatarUrl;
-  final bool sent;
+  final String connectionState;
+  final VoidCallback onMessage;
   final VoidCallback onConnect;
 
   const _DiscoverCard({
@@ -1139,7 +1182,8 @@ class _DiscoverCard extends StatelessWidget {
     required this.bio,
     required this.subtitle,
     required this.avatarUrl,
-    required this.sent,
+    required this.connectionState,
+    required this.onMessage,
     required this.onConnect,
   });
 
@@ -1215,12 +1259,26 @@ class _DiscoverCard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: _SmallBtn(
-                icon: sent
-                    ? Icons.check_circle_outline
+                icon: connectionState == 'connected'
+                    ? Icons.message_outlined
+                    : connectionState == 'pending'
+                    ? Icons.hourglass_top_rounded
                     : Icons.person_add_alt_1,
-                label: sent ? 'Sent' : 'Connect',
-                color: sent ? context.colors.textSecondary : AppColors.primary,
-                onTap: sent ? () {} : onConnect,
+                label: connectionState == 'connected'
+                    ? 'Message'
+                    : connectionState == 'pending'
+                    ? 'Pending'
+                    : 'Connect',
+                color: connectionState == 'connected'
+                    ? const Color(0xFF3B82F6)
+                    : connectionState == 'pending'
+                    ? context.colors.textSecondary
+                    : AppColors.primary,
+                onTap: connectionState == 'connected'
+                    ? onMessage
+                    : connectionState == 'pending'
+                    ? () {}
+                    : onConnect,
               ),
             ),
             const SizedBox(height: 6),
@@ -1263,6 +1321,11 @@ class _BookSessionSheetState extends State<_BookSessionSheet> {
   TimeOfDay _time = const TimeOfDay(hour: 10, minute: 0);
   int _duration = 60;
   bool _submitting = false;
+  bool _loadingAvailability = true;
+  int _weekOffset = 0;
+  List<Map<String, dynamic>> _availability = [];
+  DateTime? _selectedDay;
+  Map<String, dynamic>? _selectedSlot;
 
   static const _types = [
     ('general_meeting', 'General Meeting'),
@@ -1270,6 +1333,92 @@ class _BookSessionSheetState extends State<_BookSessionSheet> {
     ('mentor_session', 'Mentor Session'),
     ('workshop', 'Workshop'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl.text = 'Session with ${widget.userName}';
+    _loadAvailability();
+  }
+
+  Future<void> _loadAvailability() async {
+    setState(() => _loadingAvailability = true);
+    try {
+      final slots = await ApiService.instance.getUserAvailability(
+        widget.userId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _availability = List<Map<String, dynamic>>.from(
+          slots,
+        ).where((slot) => slot['is_available'] == true).toList();
+        _loadingAvailability = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _availability = [];
+        _loadingAvailability = false;
+      });
+    }
+  }
+
+  DateTime _startOfWeek(DateTime date) {
+    final normalized = DateTime(date.year, date.month, date.day);
+    final mondayOffset = (normalized.weekday + 6) % 7;
+    return normalized.subtract(Duration(days: mondayOffset));
+  }
+
+  List<DateTime> get _visibleWeekDays {
+    final base = _startOfWeek(
+      DateTime.now(),
+    ).add(Duration(days: _weekOffset * 7));
+    return List.generate(7, (index) => base.add(Duration(days: index)));
+  }
+
+  int _dayOfWeekIndex(DateTime day) => day.weekday - 1;
+
+  List<Map<String, dynamic>> _slotsForDay(DateTime day) {
+    final expected = _dayOfWeekIndex(day);
+    final slots = _availability
+        .where((slot) => (slot['day_of_week'] as int?) == expected)
+        .toList();
+    slots.sort(
+      (a, b) => (a['start_time'] as String? ?? '').compareTo(
+        b['start_time'] as String? ?? '',
+      ),
+    );
+    return slots;
+  }
+
+  String _formatShortDate(DateTime d) => '${d.day}/${d.month}';
+
+  String _formatDayName(DateTime d) {
+    const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return names[d.weekday - 1];
+  }
+
+  String _timeRangeLabel(Map<String, dynamic> slot) {
+    final start = (slot['start_time'] as String? ?? '00:00').split(':');
+    final end = (slot['end_time'] as String? ?? '00:00').split(':');
+    return '${start[0]}:${start[1]} - ${end[0]}:${end[1]}';
+  }
+
+  TimeOfDay _timeFromSlotValue(String value) {
+    final pieces = value.split(':');
+    final hour = int.tryParse(pieces.isNotEmpty ? pieces[0] : '0') ?? 0;
+    final minute = int.tryParse(pieces.length > 1 ? pieces[1] : '0') ?? 0;
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  int _durationFromSlot(Map<String, dynamic> slot) {
+    final start = _timeFromSlotValue(slot['start_time'] as String? ?? '00:00');
+    final end = _timeFromSlotValue(slot['end_time'] as String? ?? '00:00');
+    final startMinutes = start.hour * 60 + start.minute;
+    final endMinutes = end.hour * 60 + end.minute;
+    final delta = endMinutes - startMinutes;
+    return delta > 0 ? delta : 60;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1299,15 +1448,202 @@ class _BookSessionSheetState extends State<_BookSessionSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              Text(
-                'Book Session with ${widget.userName}',
-                style: TextStyle(
-                  color: context.colors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Book Session with ${widget.userName}',
+                      style: TextStyle(
+                        color: context.colors.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: context.colors.textSecondary,
+                    ),
+                    tooltip: 'Close',
+                  ),
+                ],
               ),
               const SizedBox(height: 20),
+              _label('Available Slots (Week View)', context),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: _weekOffset > 0
+                        ? () => setState(() => _weekOffset -= 1)
+                        : null,
+                    icon: const Icon(Icons.chevron_left),
+                    color: context.colors.textPrimary,
+                  ),
+                  Expanded(
+                    child: Text(
+                      '${_formatShortDate(_visibleWeekDays.first)} - ${_formatShortDate(_visibleWeekDays.last)}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: context.colors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => setState(() => _weekOffset += 1),
+                    icon: const Icon(Icons.chevron_right),
+                    color: context.colors.textPrimary,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 70,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _visibleWeekDays.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (_, index) {
+                    final day = _visibleWeekDays[index];
+                    final selected =
+                        _selectedDay != null &&
+                        _selectedDay!.year == day.year &&
+                        _selectedDay!.month == day.month &&
+                        _selectedDay!.day == day.day;
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedDay = day;
+                          _selectedSlot = null;
+                        });
+                      },
+                      child: Container(
+                        width: 74,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? AppColors.primary.withValues(alpha: 0.16)
+                              : context.colors.background,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: selected
+                                ? AppColors.primary
+                                : context.colors.textSecondary.withValues(
+                                    alpha: 0.25,
+                                  ),
+                          ),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 8,
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _formatDayName(day),
+                              style: TextStyle(
+                                color: context.colors.textSecondary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _formatShortDate(day),
+                              style: TextStyle(
+                                color: context.colors.textPrimary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+              if (_loadingAvailability)
+                Row(
+                  children: [
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Loading available slots...',
+                      style: TextStyle(
+                        color: context.colors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                )
+              else if (_availability.isEmpty)
+                Text(
+                  'No availability has been set yet for this user.',
+                  style: TextStyle(
+                    color: context.colors.textSecondary,
+                    fontSize: 12,
+                  ),
+                )
+              else if (_selectedDay != null)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _slotsForDay(_selectedDay!).map((slot) {
+                    final selected =
+                        identical(_selectedSlot, slot) ||
+                        (_selectedSlot != null &&
+                            _selectedSlot!['id'] == slot['id']);
+                    return ChoiceChip(
+                      selected: selected,
+                      onSelected: (_) {
+                        setState(() {
+                          _selectedSlot = slot;
+                          _date = _selectedDay!;
+                          _time = _timeFromSlotValue(
+                            slot['start_time'] as String? ?? '09:00',
+                          );
+                          _duration = _durationFromSlot(slot);
+                        });
+                      },
+                      label: Text(_timeRangeLabel(slot)),
+                      selectedColor: AppColors.primary.withValues(alpha: 0.18),
+                      labelStyle: TextStyle(
+                        color: selected
+                            ? AppColors.primary
+                            : context.colors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      side: BorderSide(
+                        color: selected
+                            ? AppColors.primary
+                            : context.colors.textSecondary.withValues(
+                                alpha: 0.25,
+                              ),
+                      ),
+                      backgroundColor: context.colors.background,
+                    );
+                  }).toList(),
+                )
+              else
+                Text(
+                  'Select a day to view slots.',
+                  style: TextStyle(
+                    color: context.colors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+
+              const SizedBox(height: 14),
               _label('Title', context),
               const SizedBox(height: 6),
               _field(
@@ -1441,16 +1777,58 @@ class _BookSessionSheetState extends State<_BookSessionSheet> {
       ).showSnackBar(const SnackBar(content: Text('Please enter a title')));
       return;
     }
+
+    final hasAvailability = _availability.isNotEmpty;
+    if (hasAvailability && (_selectedDay == null || _selectedSlot == null)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select one available slot from the week view'),
+        ),
+      );
+      return;
+    }
+
     setState(() => _submitting = true);
     try {
-      final startDt = DateTime(
-        _date.year,
-        _date.month,
-        _date.day,
-        _time.hour,
-        _time.minute,
-      );
-      final endDt = startDt.add(Duration(minutes: _duration));
+      DateTime startDt;
+      DateTime endDt;
+
+      if (hasAvailability && _selectedDay != null && _selectedSlot != null) {
+        final start = _timeFromSlotValue(
+          _selectedSlot!['start_time'] as String? ?? '09:00',
+        );
+        final end = _timeFromSlotValue(
+          _selectedSlot!['end_time'] as String? ?? '10:00',
+        );
+        startDt = DateTime(
+          _selectedDay!.year,
+          _selectedDay!.month,
+          _selectedDay!.day,
+          start.hour,
+          start.minute,
+        );
+        endDt = DateTime(
+          _selectedDay!.year,
+          _selectedDay!.month,
+          _selectedDay!.day,
+          end.hour,
+          end.minute,
+        );
+      } else {
+        startDt = DateTime(
+          _date.year,
+          _date.month,
+          _date.day,
+          _time.hour,
+          _time.minute,
+        );
+        endDt = startDt.add(Duration(minutes: _duration));
+      }
+
+      if (startDt.isBefore(DateTime.now())) {
+        throw Exception('Please choose a future slot');
+      }
+
       await ApiService.instance.createMeeting({
         'participant_id': widget.userId,
         'title': title,

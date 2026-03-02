@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 import '../../core/app_colors.dart';
-import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 
 class StartupLeaderboardScreen extends StatefulWidget {
@@ -13,7 +11,7 @@ class StartupLeaderboardScreen extends StatefulWidget {
 }
 
 class _StartupLeaderboardScreenState extends State<StartupLeaderboardScreen> {
-  List _startups = [];
+  List<Map<String, dynamic>> _startups = [];
   bool _loading = true;
 
   @override
@@ -24,16 +22,20 @@ class _StartupLeaderboardScreenState extends State<StartupLeaderboardScreen> {
 
   Future<void> _load() async {
     try {
-      final token = context.read<AuthProvider>().token ?? '';
-      final data = await ApiService.instance.getDiscoverUsers(token);
+      final data = await ApiService.instance.getVentures(limit: 300);
+      final ventures = data
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+
       if (mounted) {
-        data.sort(
-          (a, b) =>
-              ((b['readiness_score'] as int? ?? 0) -
-              (a['readiness_score'] as int? ?? 0)),
+        ventures.sort(
+          (a, b) => ((b['uruti_score'] as num?)?.toDouble() ?? 0.0).compareTo(
+            (a['uruti_score'] as num?)?.toDouble() ?? 0.0,
+          ),
         );
         setState(() {
-          _startups = data;
+          _startups = ventures;
           _loading = false;
         });
       }
@@ -114,10 +116,8 @@ class _StartupLeaderboardScreenState extends State<StartupLeaderboardScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: _startups.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (_, i) => _LeaderboardRow(
-                      data: _startups[i] as Map<String, dynamic>,
-                      rank: i + 1,
-                    ),
+                    itemBuilder: (_, i) =>
+                        _LeaderboardRow(data: _startups[i], rank: i + 1),
                   ),
                 ),
               ],
@@ -142,8 +142,8 @@ class _LeaderboardRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name =
-        data['full_name'] as String? ?? data['company'] as String? ?? 'Startup';
-    final score = data['readiness_score'] as int? ?? 0;
+        data['name'] as String? ?? data['company'] as String? ?? 'Startup';
+    final score = ((data['uruti_score'] as num?)?.toDouble() ?? 0).round();
     final sector = data['industry'] as String? ?? '';
     final stage = data['stage'] as String? ?? '';
     final risk = score > 80
@@ -156,16 +156,19 @@ class _LeaderboardRow extends StatelessWidget {
         : score > 60
         ? const Color(0xFFFFB800)
         : AppColors.error;
-    final logo = data['avatar_url'] as String?;
+    final logo = data['logo_url'] as String?;
     final initials = name
         .split(' ')
         .map((e) => e[0])
         .take(2)
         .join()
         .toUpperCase();
+    final founderId = (data['founder_id'] as num?)?.toInt();
 
     return GestureDetector(
-      onTap: () => context.go('/profile/${data['id']}'),
+      onTap: founderId == null
+          ? null
+          : () => context.go('/profile/view/$founderId'),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -286,7 +289,7 @@ class _LeaderboardRow extends StatelessWidget {
                       size: 12,
                     ),
                     Text(
-                      '+5',
+                      'Uruti',
                       style: TextStyle(color: AppColors.primary, fontSize: 11),
                     ),
                   ],

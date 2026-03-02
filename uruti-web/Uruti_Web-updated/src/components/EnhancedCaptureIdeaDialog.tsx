@@ -30,15 +30,18 @@ interface EnhancedCaptureIdeaDialogProps {
 export function EnhancedCaptureIdeaDialog({ open, onOpenChange, onSave }: EnhancedCaptureIdeaDialogProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string>('');
+  const [iconLogoFile, setIconLogoFile] = useState<File | null>(null);
+  const [iconLogoPreview, setIconLogoPreview] = useState<string>('');
+  const [landscapeLogoFile, setLandscapeLogoFile] = useState<File | null>(null);
+  const [landscapeLogoPreview, setLandscapeLogoPreview] = useState<string>('');
 
   const [formData, setFormData] = useState({
     // Step 1: Basic Information
     name: '',
     tagline: '',
     sector: '',
-    logoUrl: '',
+    iconLogoUrl: '',
+    landscapeLogoUrl: '',
     
     // Step 2: Problem & Solution
     problem: '',
@@ -104,7 +107,8 @@ export function EnhancedCaptureIdeaDialog({ open, onOpenChange, onSave }: Enhanc
 
     const ventureData = {
       ...formData,
-      logoFile,
+      iconLogoFile,
+      landscapeLogoFile,
       highlights: cleanedHighlights,
       milestones: cleanedMilestones,
       createdAt: new Date().toISOString()
@@ -116,13 +120,16 @@ export function EnhancedCaptureIdeaDialog({ open, onOpenChange, onSave }: Enhanc
     
     // Reset form
     setCurrentStep(1);
-    setLogoFile(null);
-    setLogoPreview('');
+    setIconLogoFile(null);
+    setIconLogoPreview('');
+    setLandscapeLogoFile(null);
+    setLandscapeLogoPreview('');
     setFormData({
       name: '',
       tagline: '',
       sector: '',
-      logoUrl: '',
+      iconLogoUrl: '',
+      landscapeLogoUrl: '',
       problem: '',
       solution: '',
       competitiveEdge: '',
@@ -154,7 +161,7 @@ export function EnhancedCaptureIdeaDialog({ open, onOpenChange, onSave }: Enhanc
     setFormData({ ...formData, milestones: newMilestones });
   };
 
-  const handleLogoFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'landscape') => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -168,8 +175,14 @@ export function EnhancedCaptureIdeaDialog({ open, onOpenChange, onSave }: Enhanc
       return;
     }
 
-    setLogoFile(file);
-    setLogoPreview(URL.createObjectURL(file));
+    const preview = URL.createObjectURL(file);
+    if (type === 'icon') {
+      setIconLogoFile(file);
+      setIconLogoPreview(preview);
+    } else {
+      setLandscapeLogoFile(file);
+      setLandscapeLogoPreview(preview);
+    }
   };
 
   const progressPercentage = (currentStep / totalSteps) * 100;
@@ -265,34 +278,67 @@ export function EnhancedCaptureIdeaDialog({ open, onOpenChange, onSave }: Enhanc
               </div>
 
               <div>
-                <Label htmlFor="logoUrl">Startup Logo URL (Landscape)</Label>
+                <Label htmlFor="iconLogoUrl">Icon Logo URL (Square)</Label>
                 <Input
-                  id="logoUrl"
-                  value={formData.logoUrl}
-                  onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
-                  placeholder="https://example.com/logo-landscape.png"
+                  id="iconLogoUrl"
+                  value={formData.iconLogoUrl}
+                  onChange={(e) => setFormData({ ...formData, iconLogoUrl: e.target.value })}
+                  placeholder="https://example.com/logo-icon.png"
                   className="mt-1"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Use a landscape logo (recommended ratio: 3:1) to stand out in Startup Discovery.
+                  Use a square logo for cards and compact list avatars.
                 </p>
               </div>
 
               <div>
-                <Label htmlFor="logoFile">Upload Startup Logo</Label>
+                <Label htmlFor="iconLogoFile">Upload Icon Logo</Label>
                 <Input
-                  id="logoFile"
+                  id="iconLogoFile"
                   type="file"
                   accept="image/*"
-                  onChange={handleLogoFileChange}
+                  onChange={(e) => handleLogoFileChange(e, 'icon')}
                   className="mt-1"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Prefer a landscape logo for better card presentation.
+                  Recommended: square image (1:1), max 5MB.
                 </p>
-                {logoPreview && (
+                {iconLogoPreview && (
                   <div className="mt-3 p-3 rounded-md border border-black/10 dark:border-white/10 bg-white/60 dark:bg-black/20">
-                    <img src={logoPreview} alt="Logo preview" className="max-h-20 max-w-full object-contain" />
+                    <img src={iconLogoPreview} alt="Icon logo preview" className="h-20 w-20 object-cover rounded-md" />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="landscapeLogoUrl">Landscape Logo URL</Label>
+                <Input
+                  id="landscapeLogoUrl"
+                  value={formData.landscapeLogoUrl}
+                  onChange={(e) => setFormData({ ...formData, landscapeLogoUrl: e.target.value })}
+                  placeholder="https://example.com/logo-landscape.png"
+                  className="mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Use this in startup detail headers (recommended ratio: 3:1).
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="landscapeLogoFile">Upload Landscape Logo</Label>
+                <Input
+                  id="landscapeLogoFile"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleLogoFileChange(e, 'landscape')}
+                  className="mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Recommended: wide image (3:1), max 5MB.
+                </p>
+                {landscapeLogoPreview && (
+                  <div className="mt-3 p-3 rounded-md border border-black/10 dark:border-white/10 bg-white/60 dark:bg-black/20">
+                    <img src={landscapeLogoPreview} alt="Landscape logo preview" className="max-h-24 max-w-full object-contain" />
                   </div>
                 )}
               </div>

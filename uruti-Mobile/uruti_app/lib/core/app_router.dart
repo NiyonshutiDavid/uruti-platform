@@ -30,7 +30,6 @@ import '../screens/notifications/notifications_screen.dart';
 import '../screens/advisory/advisory_tracks_screen.dart';
 import '../screens/founder/founder_snapshot_screen.dart';
 import '../screens/investor/deal_flow_screen.dart';
-import '../screens/investor/investor_dashboard_screen.dart';
 import '../screens/documents/document_vault_screen.dart';
 import '../screens/analytics/analytics_screen.dart';
 import '../screens/support/help_support_screen.dart';
@@ -186,7 +185,18 @@ GoRouter createRouter(AuthProvider authProvider) {
               if (role == 'founder') return null;
               return '/home';
             },
-            builder: (_, __) => const AddVentureScreen(),
+            builder: (_, state) {
+              final extra = state.extra;
+              if (extra is Map<String, dynamic>) {
+                return AddVentureScreen(initialVenture: extra);
+              }
+              if (extra is Map) {
+                return AddVentureScreen(
+                  initialVenture: Map<String, dynamic>.from(extra),
+                );
+              }
+              return const AddVentureScreen();
+            },
           ),
           // Connections & discovery
           GoRoute(
@@ -242,15 +252,6 @@ GoRouter createRouter(AuthProvider authProvider) {
               return '/home';
             },
             builder: (_, __) => const DealFlowScreen(),
-          ),
-          GoRoute(
-            path: '/investor-dashboard',
-            redirect: (_, __) {
-              final role = authProvider.user?.role.toLowerCase();
-              if (role == 'investor') return null;
-              return '/home';
-            },
-            builder: (_, __) => const InvestorDashboardScreen(),
           ),
           // Misc
           GoRoute(

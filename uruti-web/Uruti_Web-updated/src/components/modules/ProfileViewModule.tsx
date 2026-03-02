@@ -26,6 +26,7 @@ import {
 import { toast } from 'sonner';
 import { apiClient } from '../../lib/api-client';
 import { useAuth } from '../../lib/auth-context';
+import { BookingWeekDialog } from '../BookingWeekDialog';
 
 interface ProfileViewModuleProps {
   userId: number;
@@ -63,6 +64,7 @@ export function ProfileViewModule({ userId, onBack, onModuleChange }: ProfileVie
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'none' | 'pending' | 'connected'>('none');
+  const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -110,13 +112,7 @@ export function ProfileViewModule({ userId, onBack, onModuleChange }: ProfileVie
         return;
       }
 
-      // Navigate to booking/calendar view
-      if (onModuleChange) {
-        onModuleChange('calendar');
-        sessionStorage.setItem('bookSessionUserId', userId.toString());
-      } else {
-        toast.info('Session booking coming soon!');
-      }
+      setBookingDialogOpen(true);
     } catch (error) {
       console.error('Failed to initiate booking:', error);
       toast.error('Failed to start booking process');
@@ -520,6 +516,13 @@ export function ProfileViewModule({ userId, onBack, onModuleChange }: ProfileVie
           </CardContent>
         </Card>
       </div>
+
+      <BookingWeekDialog
+        open={bookingDialogOpen}
+        onOpenChange={setBookingDialogOpen}
+        targetUserId={userId}
+        targetUserName={profile.full_name}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_colors.dart';
 import '../../services/api_service.dart';
+import '../../widgets/top_notification.dart';
 import '../main_scaffold.dart';
 
 class AdvisoryTracksScreen extends StatefulWidget {
@@ -112,15 +113,19 @@ class _AdvisoryTracksScreenState extends State<AdvisoryTracksScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _TrackDetailSheet(
-        track: track,
-        onUpdated: (updated) {
-          final id = updated['id'];
-          final idx = _tracks.indexWhere((e) => e['id'] == id);
-          if (idx >= 0) {
-            setState(() => _tracks[idx] = updated);
-          }
-        },
+      builder: (_) => FractionallySizedBox(
+        heightFactor: 0.9,
+        alignment: Alignment.bottomCenter,
+        child: _TrackDetailSheet(
+          track: track,
+          onUpdated: (updated) {
+            final id = updated['id'];
+            final idx = _tracks.indexWhere((e) => e['id'] == id);
+            if (idx >= 0) {
+              setState(() => _tracks[idx] = updated);
+            }
+          },
+        ),
       ),
     );
   }
@@ -462,80 +467,84 @@ class _TrackDetailSheetState extends State<_TrackDetailSheet> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        builder: (_) => SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: context.colors.divider,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: context.colors.textPrimary,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  type,
-                  style: TextStyle(
-                    color: context.colors.textMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: SelectableText(
-                      content.isNotEmpty ? content : description,
-                      style: TextStyle(
-                        color: context.colors.textSecondary,
-                        height: 1.45,
+        builder: (_) => FractionallySizedBox(
+          heightFactor: 0.88,
+          alignment: Alignment.bottomCenter,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: context.colors.divider,
+                        borderRadius: BorderRadius.circular(999),
                       ),
                     ),
                   ),
-                ),
-                if (rawUrl.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.open_in_new_rounded),
-                      label: const Text('Open source link'),
-                      onPressed: () async {
-                        final uri = Uri.tryParse(rawUrl);
-                        if (uri == null ||
-                            !await launchUrl(
-                              uri,
-                              mode: LaunchMode.externalApplication,
-                            )) {
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Unable to open link.'),
-                            ),
-                          );
-                        }
-                      },
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: context.colors.textPrimary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
+                  const SizedBox(height: 4),
+                  Text(
+                    type,
+                    style: TextStyle(
+                      color: context.colors.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: SelectableText(
+                        content.isNotEmpty ? content : description,
+                        style: TextStyle(
+                          color: context.colors.textSecondary,
+                          height: 1.45,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (rawUrl.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.open_in_new_rounded),
+                        label: const Text('Open source link'),
+                        onPressed: () async {
+                          final uri = Uri.tryParse(rawUrl);
+                          if (uri == null ||
+                              !await launchUrl(
+                                uri,
+                                mode: LaunchMode.externalApplication,
+                              )) {
+                            if (!mounted) return;
+                            TopNotification.show(
+                              context,
+                              message: 'Unable to open link.',
+                              isError: true,
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -552,10 +561,10 @@ class _TrackDetailSheetState extends State<_TrackDetailSheet> {
     }
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('No readable content found for this material.'),
-      ),
+    TopNotification.show(
+      context,
+      message: 'No readable content found for this material.',
+      isError: true,
     );
   }
 
@@ -590,10 +599,10 @@ class _TrackDetailSheetState extends State<_TrackDetailSheet> {
       widget.onUpdated(_track);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to update progress. Please retry.'),
-        ),
+      TopNotification.show(
+        context,
+        message: 'Failed to update progress. Please retry.',
+        isError: true,
       );
     } finally {
       if (mounted) setState(() => _saving = false);

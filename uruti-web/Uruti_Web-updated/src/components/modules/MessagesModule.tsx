@@ -73,8 +73,45 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
   const [loading, setLoading] = useState(false);
   const { startCall } = useCall();
 
+  const parseServerTimestamp = (timestamp?: string | null): Date => {
+    const value = (timestamp || '').trim();
+    if (!value) return new Date(0);
+    const normalized = /z$|[+-]\d{2}:?\d{2}$/i.test(value) ? value : `${value}Z`;
+    const parsed = new Date(normalized);
+    return Number.isNaN(parsed.getTime()) ? new Date(0) : parsed;
+  };
+
   useEffect(() => {
     void loadConversations();
+  }, [user?.id]);
+
+  useEffect(() => {
+    const token = sessionStorage.getItem('uruti_token');
+    if (!token) return;
+
+    const socket = apiClient.createMessagesWebSocket(token);
+
+    socket.onmessage = (event) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        if (parsed?.event === 'message_created') {
+          void loadConversations();
+        }
+      } catch {
+        // ignore malformed realtime payloads
+      }
+    };
+
+    const ping = window.setInterval(() => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ event: 'ping' }));
+      }
+    }, 15000);
+
+    return () => {
+      window.clearInterval(ping);
+      socket.close();
+    };
   }, [user?.id]);
 
   const mapApiMessages = (messages: any[], currentUserId: number): Message[] => {
@@ -82,7 +119,7 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
       id: String(message.id),
       senderId: Number(message.sender_id) === currentUserId ? 'me' : String(message.sender_id),
       text: message.body || '',
-      timestamp: message.created_at || new Date().toISOString(),
+      timestamp: parseServerTimestamp(message.created_at).toISOString(),
       read: Boolean(message.is_read),
     }));
   };
@@ -120,7 +157,8 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
       );
 
       builtConversations.sort((left, right) =>
-        new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime()
+        parseServerTimestamp(right.timestamp).getTime() -
+        parseServerTimestamp(left.timestamp).getTime()
       );
 
       setConversations(builtConversations);
@@ -143,7 +181,7 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
   }, [totalUnread]);
 
   const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
+    const date = parseServerTimestamp(timestamp);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const hours = Math.floor(diff / 3600000);
@@ -156,7 +194,7 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
   };
 
   const formatMessageTime = (timestamp: string) => {
-    const date = new Date(timestamp);
+    const date = parseServerTimestamp(timestamp);
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
@@ -228,7 +266,13 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
 
   const handleStartCall = (type: 'voice' | 'video') => {
     if (selectedConversation) {
-      startCall(type, selectedConversation.name, selectedConversation.avatar, selectedConversation.online);
+      void startCall(
+        type,
+        selectedConversation.userId,
+        selectedConversation.name,
+        selectedConversation.avatar,
+        selectedConversation.online,
+      );
     }
   };
 

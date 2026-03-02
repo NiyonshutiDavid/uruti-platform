@@ -7,12 +7,14 @@ interface FloatingCallWidgetProps {
   open: boolean;
   onClose: () => void;
   type: 'voice' | 'video';
+  isRinging: boolean;
+  isIncoming: boolean;
   contactName: string;
   contactAvatar?: string;
   contactOnline: boolean;
 }
 
-export function FloatingCallWidget({ open, onClose, type, contactName, contactAvatar, contactOnline }: FloatingCallWidgetProps) {
+export function FloatingCallWidget({ open, onClose, type, isRinging, isIncoming, contactName, contactAvatar, contactOnline }: FloatingCallWidgetProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
@@ -22,6 +24,9 @@ export function FloatingCallWidget({ open, onClose, type, contactName, contactAv
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const previewVideoRef = useRef<HTMLVideoElement>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
   
   // Initialize centered position on first open
   useEffect(() => {
@@ -47,10 +52,99 @@ export function FloatingCallWidget({ open, onClose, type, contactName, contactAv
       setIsVideoOff(false);
       setIsMinimized(false);
       setPosition(null); // Reset position when call ends
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      }
+      if (videoRef.current) videoRef.current.srcObject = null;
+      if (previewVideoRef.current) previewVideoRef.current.srcObject = null;
     }
     
     return () => clearInterval(interval);
   }, [open]);
+
+  useEffect(() => {
+    const shouldAttachMedia = open && type === 'video';
+    if (!shouldAttachMedia) return;
+
+    let cancelled = false;
+
+    const setupMedia = async () => {
+      try {
+        if (mediaStreamRef.current == null) {
+          mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: true,
+          });
+        }
+
+        if (cancelled) return;
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStreamRef.current;
+        }
+        if (previewVideoRef.current) {
+          previewVideoRef.current.srcObject = mediaStreamRef.current;
+        }
+      } catch {
+        // Keep UI usable even if media permission/device is unavailable.
+      }
+    };
+
+    void setupMedia();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, type]);
+
+  useEffect(() => {
+    if (!mediaStreamRef.current) return;
+    mediaStreamRef.current
+      .getAudioTracks()
+      .forEach((track) => (track.enabled = !isMuted));
+  }, [isMuted]);
+
+  useEffect(() => {
+    if (!mediaStreamRef.current) return;
+    mediaStreamRef.current
+      .getVideoTracks()
+      .forEach((track) => (track.enabled = !isVideoOff));
+  }, [isVideoOff]);
+
+  useEffect(() => {
+    const cleanup = () => {
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => track.stop());
+        localStreamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    };
+
+    const setup = async () => {
+      if (!open || isMinimized) return;
+      const wantsVideo = type === 'video' && !isVideoOff;
+      const constraints: MediaStreamConstraints = {
+        audio: true,
+        video: wantsVideo,
+      };
+
+      try {
+        cleanup();
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        localStreamRef.current = stream;
+        if (videoRef.current && wantsVideo) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch {
+        cleanup();
+      }
+    };
+
+    void setup();
+    return cleanup;
+  }, [open, type, isVideoOff, isMinimized]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -107,8 +201,15 @@ export function FloatingCallWidget({ open, onClose, type, contactName, contactAv
   };
 
   const handleEndCall = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
     onClose();
   };
+
+  const showOutgoingPreview = type === 'video' && isRinging && !isIncoming && !isVideoOff;
+  const showConnectedVideo = type === 'video' && !isRinging && !isVideoOff;
 
   if (!open) return null;
 
@@ -168,8 +269,8 @@ export function FloatingCallWidget({ open, onClose, type, contactName, contactAv
 
       {/* Call Content */}
       <div className={`relative w-full h-full bg-gradient-to-br from-black to-gray-900`}>
-        {/* Video Feed (for video calls) */}
-        {type === 'video' && !isVideoOff && !isMinimized && (
+        {/* Before pickup: show our own camera feed as full background */}
+        {showOutgoingPreview && !isMinimized && (
           <div className="absolute inset-0">
             <video
               ref={videoRef}
@@ -182,8 +283,8 @@ export function FloatingCallWidget({ open, onClose, type, contactName, contactAv
           </div>
         )}
 
-        {/* Contact Avatar (for voice calls or video off) */}
-        {((type === 'voice' || isVideoOff) && !isMinimized) && (
+        {/* Connected or voice state: focus contact area */}
+        {(!showOutgoingPreview && !isMinimized) && (
           <div className="absolute inset-0 flex items-center justify-center pt-16">
             <div className="text-center">
               <Avatar className="h-40 w-40 mx-auto mb-4 border-4 border-[#76B947]">
@@ -192,37 +293,30 @@ export function FloatingCallWidget({ open, onClose, type, contactName, contactAv
                   {contactName.split(' ').map(n => n[0]).join('')}
                 </AvatarFallback>
               </Avatar>
-              {contactOnline && (
+              {contactOnline && !isRinging && (
                 <div className="flex items-center justify-center space-x-2 text-green-400">
                   <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
                   <span className="text-sm">Online</span>
                 </div>
               )}
+              {isRinging && !isIncoming && (
+                <p className="text-white/70 text-sm">Ringing… waiting for pickup</p>
+              )}
             </div>
           </div>
         )}
 
-        {/* My Video Thumbnails (Picture-in-Picture for video calls) */}
-        {type === 'video' && !isVideoOff && !isMinimized && (
-          <div className="absolute bottom-28 right-6 flex space-x-2">
-            {/* Their Video Thumbnail */}
-            <div className="w-32 aspect-video rounded-lg overflow-hidden border-2 border-white/30 shadow-lg bg-gray-800">
-              <div className="w-full h-full flex items-center justify-center">
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src={contactAvatar} />
-                  <AvatarFallback className="bg-[#76B947]/20 text-[#76B947] text-xs">
-                    {contactName.split(' ').map(n => n[0]).join('')}
-                  </AvatarFallback>
-                </Avatar>
-              </div>
-            </div>
-            
-            {/* My Video Thumbnail */}
-            <div className="w-32 aspect-video rounded-lg overflow-hidden border-2 border-[#76B947] shadow-lg bg-gray-800">
-              <div className="w-full h-full flex items-center justify-center">
-                <p className="text-white text-xs" style={{ fontFamily: 'var(--font-body)' }}>You</p>
-              </div>
-            </div>
+        {/* After pickup: move our feed down to picture-in-picture */}
+        {showConnectedVideo && !isMinimized && (
+          <div className="absolute bottom-28 right-6 w-36 aspect-video rounded-lg overflow-hidden border-2 border-[#76B947] shadow-lg bg-black/80">
+            <video
+              ref={previewVideoRef}
+              className="w-full h-full object-cover"
+              autoPlay
+              playsInline
+              muted
+            />
+            <div className="absolute left-2 bottom-1 text-[10px] text-white/90">You</div>
           </div>
         )}
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/app_colors.dart';
 import '../../providers/auth_provider.dart';
@@ -63,6 +64,64 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  Future<void> _handleNotificationTap(Map<String, dynamic> data) async {
+    final id = (data['id'] as num?)?.toInt();
+    if (id != null && data['is_read'] != true) {
+      await ApiService.instance.markNotificationRead(id);
+      if (!mounted) return;
+      setState(() {
+        data['is_read'] = true;
+      });
+    }
+
+    final payloadRaw = data['data'];
+    final payload = payloadRaw is Map
+        ? Map<String, dynamic>.from(payloadRaw.cast<dynamic, dynamic>())
+        : <String, dynamic>{};
+    final kind = (payload['kind'] ?? '').toString();
+    final type = (data['type'] ?? '').toString();
+
+    if (!mounted) return;
+
+    if (type == 'message' || kind == 'message') {
+      final threadUserId =
+          int.tryParse(
+            '${payload['thread_user_id'] ?? payload['sender_id'] ?? 0}',
+          ) ??
+          0;
+      if (threadUserId > 0) {
+        context.go('/messages/$threadUserId');
+        return;
+      }
+      context.go('/inbox');
+      return;
+    }
+
+    if (kind.startsWith('connection')) {
+      context.go('/connections');
+      return;
+    }
+
+    if (kind == 'bookmark_created' || kind == 'bookmark_removed') {
+      context.go('/deal-flow');
+      return;
+    }
+
+    if (kind == 'new_venture' || kind == 'venture_updated') {
+      context.go('/discovery');
+      return;
+    }
+
+    context.go('/home');
+  }
+
+  void _dismissNotification(int index) {
+    if (index < 0 || index >= _notifs.length) return;
+    setState(() {
+      _notifs.removeAt(index);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -118,16 +177,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               itemBuilder: (_, i) {
                 final data = _notifs[i] as Map<String, dynamic>;
                 return GestureDetector(
-                  onTap: () async {
-                    final id = (data['id'] as num?)?.toInt();
-                    if (id == null || data['is_read'] == true) return;
-                    await ApiService.instance.markNotificationRead(id);
-                    if (!mounted) return;
-                    setState(() {
-                      data['is_read'] = true;
-                    });
-                  },
-                  child: _NotifCard(data: data),
+                  onTap: () => _handleNotificationTap(data),
+                  child: _NotifCard(
+                    data: data,
+                    onClose: () => _dismissNotification(i),
+                  ),
                 );
               },
             ),
@@ -137,7 +191,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
 class _NotifCard extends StatelessWidget {
   final Map<String, dynamic> data;
-  const _NotifCard({required this.data});
+  final VoidCallback onClose;
+  const _NotifCard({required this.data, required this.onClose});
 
   IconData get _icon {
     final type = data['type'] as String? ?? '';
@@ -146,6 +201,10 @@ class _NotifCard extends StatelessWidget {
         : '';
     return kind.startsWith('connection') || type == 'connection'
         ? Icons.people_outline
+        : kind == 'venture_updated'
+        ? Icons.edit_outlined
+        : kind == 'bookmark_created' || kind == 'bookmark_removed'
+        ? Icons.bookmark_outline
         : kind == 'new_venture'
         ? Icons.rocket_launch_outlined
         : type == 'message'
@@ -162,6 +221,10 @@ class _NotifCard extends StatelessWidget {
         : '';
     return kind.startsWith('connection') || type == 'connection'
         ? AppColors.primary
+        : kind == 'venture_updated'
+        ? const Color(0xFF0EA5E9)
+        : kind == 'bookmark_created' || kind == 'bookmark_removed'
+        ? const Color(0xFFF59E0B)
         : kind == 'new_venture'
         ? const Color(0xFF8B5CF6)
         : type == 'message'
@@ -223,6 +286,15 @@ class _NotifCard extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.close_rounded,
+              color: context.colors.textSecondary,
+            ),
+            tooltip: 'Dismiss',
+            onPressed: onClose,
+            visualDensity: VisualDensity.compact,
           ),
           if (!isRead)
             Container(

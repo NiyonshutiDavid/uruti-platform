@@ -9,7 +9,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { 
   Users, Building2, TrendingUp, MessageSquare, Settings, 
   UserPlus, Search, BarChart3, DollarSign, Sparkles, Upload,
-  MessageCircle, CheckCircle, Clock, X
+  MessageCircle, CheckCircle, Clock, X, BrainCircuit, Gauge, Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '../../lib/api-client';
@@ -26,6 +26,7 @@ export function AdminDashboardModule() {
     initialTabParam === 'overview' ||
     initialTabParam === 'users' ||
     initialTabParam === 'ventures' ||
+    initialTabParam === 'model-metrics' ||
     initialTabParam === 'support'
       ? initialTabParam
       : 'overview';
@@ -43,6 +44,7 @@ export function AdminDashboardModule() {
   const [users, setUsers] = useState<any[]>([]);
   const [ventures, setVentures] = useState<any[]>([]);
   const [supportMessages, setSupportMessages] = useState<any[]>([]);
+  const [modelPerformance, setModelPerformance] = useState<any | null>(null);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [activeTab, setActiveTab] = useState(initialTab);
 
@@ -105,6 +107,14 @@ export function AdminDashboardModule() {
       } catch (error) {
         console.log('Support messages not yet available');
         setSupportMessages([]);
+      }
+
+      try {
+        const modelData = await apiClient.getAdminModelPerformance();
+        setModelPerformance(modelData);
+      } catch (error) {
+        console.log('Model performance metrics not available');
+        setModelPerformance(null);
       }
 
       // Calculate stats
@@ -263,7 +273,7 @@ export function AdminDashboardModule() {
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-[#76B947]/10 backdrop-blur-sm">
+        <TabsList className="grid w-full grid-cols-5 bg-[#76B947]/10 backdrop-blur-sm">
           <TabsTrigger value="overview" style={{ fontFamily: 'var(--font-heading)' }}>
             Overview
           </TabsTrigger>
@@ -272,6 +282,9 @@ export function AdminDashboardModule() {
           </TabsTrigger>
           <TabsTrigger value="ventures" style={{ fontFamily: 'var(--font-heading)' }}>
             Ventures
+          </TabsTrigger>
+          <TabsTrigger value="model-metrics" style={{ fontFamily: 'var(--font-heading)' }}>
+            Model Metrics
           </TabsTrigger>
           <TabsTrigger value="support" style={{ fontFamily: 'var(--font-heading)' }}>
             Support ({supportMessages.filter((m: any) => m.status === 'open').length})
@@ -567,6 +580,138 @@ export function AdminDashboardModule() {
                   </div>
                 )}
               </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Model Metrics Tab */}
+        <TabsContent value="model-metrics" className="space-y-4 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="backdrop-blur-sm bg-[#76B947]/5 dark:bg-black/20 border-[#76B947]/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground" style={{ fontFamily: 'var(--font-heading)' }}>
+                  Model Name
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-lg font-bold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                      {modelPerformance?.model_info?.model_name || 'Unavailable'}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: 'var(--font-body)' }}>
+                      Source: {modelPerformance?.model_info?.model_source || 'N/A'}
+                    </p>
+                  </div>
+                  <BrainCircuit className="h-8 w-8 text-[#76B947]" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="backdrop-blur-sm bg-[#76B947]/5 dark:bg-black/20 border-[#76B947]/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground" style={{ fontFamily: 'var(--font-heading)' }}>
+                  Average Score
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-3xl font-bold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                      {modelPerformance?.performance?.average_score ?? 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: 'var(--font-body)' }}>
+                      Across scored ventures
+                    </p>
+                  </div>
+                  <Gauge className="h-8 w-8 text-[#76B947]" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="backdrop-blur-sm bg-[#76B947]/5 dark:bg-black/20 border-[#76B947]/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground" style={{ fontFamily: 'var(--font-heading)' }}>
+                  Scored Ventures
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-3xl font-bold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                      {modelPerformance?.performance?.scored_ventures ?? 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: 'var(--font-body)' }}>
+                      Total: {modelPerformance?.performance?.total_ventures ?? 0}
+                    </p>
+                  </div>
+                  <Activity className="h-8 w-8 text-[#76B947]" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="backdrop-blur-sm bg-[#76B947]/5 dark:bg-black/20 border-[#76B947]/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground" style={{ fontFamily: 'var(--font-heading)' }}>
+                  Feature Count
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-3xl font-bold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                      {modelPerformance?.model_info?.expected_feature_count ?? 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: 'var(--font-body)' }}>
+                      Input features
+                    </p>
+                  </div>
+                  <BarChart3 className="h-8 w-8 text-[#76B947]" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="backdrop-blur-sm bg-[#76B947]/5 dark:bg-black/20 border-[#76B947]/30">
+            <CardHeader>
+              <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>Model Details</CardTitle>
+              <CardDescription style={{ fontFamily: 'var(--font-body)' }}>
+                Runtime metadata and score class distribution
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="p-4 rounded-lg bg-[#76B947]/10 backdrop-blur-sm">
+                  <p className="text-xs text-muted-foreground mb-2" style={{ fontFamily: 'var(--font-body)' }}>
+                    Inference backend
+                  </p>
+                  <p className="font-semibold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                    {modelPerformance?.model_info?.inference_backend || 'N/A'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-3 mb-2" style={{ fontFamily: 'var(--font-body)' }}>
+                    Score definition
+                  </p>
+                  <p className="text-sm dark:text-white" style={{ fontFamily: 'var(--font-body)' }}>
+                    {modelPerformance?.model_info?.score_definition || 'N/A'}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-lg bg-[#76B947]/10 backdrop-blur-sm">
+                  <p className="text-xs text-muted-foreground mb-3" style={{ fontFamily: 'var(--font-body)' }}>
+                    Class distribution
+                  </p>
+                  <div className="space-y-2">
+                    {Object.entries(modelPerformance?.performance?.class_distribution || {}).map(([label, count]) => (
+                      <div key={label} className="flex items-center justify-between">
+                        <Badge variant="outline" className="bg-[#76B947]/20 text-[#76B947]">{label}</Badge>
+                        <span className="text-sm dark:text-white" style={{ fontFamily: 'var(--font-body)' }}>
+                          {String(count)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

@@ -428,9 +428,11 @@ export function ProfileModule({
             <TabsTrigger value={userType === 'founder' ? 'startups' : 'portfolio'} className="data-[state=active]:border-b-2 data-[state=active]:border-[#76B947] rounded-none">
               {userType === 'founder' ? 'Startups' : 'Portfolio'}
             </TabsTrigger>
-            <TabsTrigger value="activity" className="data-[state=active]:border-b-2 data-[state=active]:border-[#76B947] rounded-none">
-              Activity
-            </TabsTrigger>
+            {userType === 'founder' && (
+              <TabsTrigger value="activity" className="data-[state=active]:border-b-2 data-[state=active]:border-[#76B947] rounded-none">
+                Activity
+              </TabsTrigger>
+            )}
           </TabsList>
         </Card>
 
@@ -904,72 +906,74 @@ export function ProfileModule({
         </TabsContent>
 
         {/* Activity Tab */}
-        <TabsContent value="activity" className="space-y-4">
-          <Card className="glass-card border-black/5 dark:border-white/10">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>
-                <TrendingUp className="h-5 w-5 inline mr-2 text-[#76B947]" />
-                Recent Activity
-              </CardTitle>
-              {isOwnProfile && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setAddActivityOpen(true)}
-                  className="hover:bg-[#76B947]/10 hover:text-[#76B947]"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Activity
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {profile.activity.length === 0 ? (
-                <div className="text-center py-12">
-                  <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground mb-4" style={{ fontFamily: 'var(--font-body)' }}>
-                    No activity yet. Start tracking your entrepreneurial journey!
-                  </p>
-                  {isOwnProfile && (
-                    <Button 
-                      onClick={() => setAddActivityOpen(true)}
-                      className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Your First Activity
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                profile.activity.map((item, index) => (
-                  <div key={index} className="glass-panel p-4 rounded-lg hover:bg-[#76B947]/5 transition-all">
-                    <div className="flex items-start gap-4">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        item.type === 'pitch' ? 'bg-blue-500/10' :
-                        item.type === 'milestone' ? 'bg-[#76B947]/10' :
-                        item.type === 'funding' ? 'bg-purple-500/10' :
-                        item.type === 'investment' ? 'bg-green-500/10' :
-                        'bg-gray-500/10'
-                      }`}>
-                        {item.type === 'pitch' && <FileText className="h-5 w-5 text-blue-500" />}
-                        {item.type === 'milestone' && <Target className="h-5 w-5 text-[#76B947]" />}
-                        {item.type === 'funding' && <DollarSign className="h-5 w-5 text-purple-500" />}
-                        {item.type === 'investment' && <TrendingUp className="h-5 w-5 text-green-500" />}
-                        {item.type === 'event' && <Calendar className="h-5 w-5 text-orange-500" />}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm dark:text-white" style={{ fontFamily: 'var(--font-body)' }}>
-                          {item.content}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">{item.date}</p>
+        {userType === 'founder' && (
+          <TabsContent value="activity" className="space-y-4">
+            <Card className="glass-card border-black/5 dark:border-white/10">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>
+                  <TrendingUp className="h-5 w-5 inline mr-2 text-[#76B947]" />
+                  Recent Activity
+                </CardTitle>
+                {isOwnProfile && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setAddActivityOpen(true)}
+                    className="hover:bg-[#76B947]/10 hover:text-[#76B947]"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Activity
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {profile.activity.length === 0 ? (
+                  <div className="text-center py-12">
+                    <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground mb-4" style={{ fontFamily: 'var(--font-body)' }}>
+                      No activity yet. Start tracking your entrepreneurial journey!
+                    </p>
+                    {isOwnProfile && (
+                      <Button 
+                        onClick={() => setAddActivityOpen(true)}
+                        className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Your First Activity
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  profile.activity.map((item, index) => (
+                    <div key={index} className="glass-panel p-4 rounded-lg hover:bg-[#76B947]/5 transition-all">
+                      <div className="flex items-start gap-4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          item.type === 'pitch' ? 'bg-blue-500/10' :
+                          item.type === 'milestone' ? 'bg-[#76B947]/10' :
+                          item.type === 'funding' ? 'bg-purple-500/10' :
+                          item.type === 'investment' ? 'bg-green-500/10' :
+                          'bg-gray-500/10'
+                        }`}>
+                          {item.type === 'pitch' && <FileText className="h-5 w-5 text-blue-500" />}
+                          {item.type === 'milestone' && <Target className="h-5 w-5 text-[#76B947]" />}
+                          {item.type === 'funding' && <DollarSign className="h-5 w-5 text-purple-500" />}
+                          {item.type === 'investment' && <TrendingUp className="h-5 w-5 text-green-500" />}
+                          {item.type === 'event' && <Calendar className="h-5 w-5 text-orange-500" />}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm dark:text-white" style={{ fontFamily: 'var(--font-body)' }}>
+                            {item.content}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">{item.date}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Dialogs */}

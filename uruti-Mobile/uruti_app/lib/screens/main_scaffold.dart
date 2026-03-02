@@ -8,6 +8,7 @@ import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/api_service.dart';
 import '../services/realtime_service.dart';
+import '../widgets/top_notification.dart';
 
 // ─── Nav item data ─────────────────────────────────────────────────────────
 class _NavItem {
@@ -65,6 +66,7 @@ class _MainScaffoldState extends State<MainScaffold>
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
   String? _connectedRealtimeToken;
   int _inboxUnreadCount = 0;
+  Timer? _unreadPollTimer;
 
   @override
   void initState() {
@@ -75,7 +77,11 @@ class _MainScaffoldState extends State<MainScaffold>
     );
     _resetAnimations(widget.currentIndex, widget.currentIndex);
     _realtimeSub = RealtimeService.instance.events.listen(_handleRealtimeEvent);
-    _refreshInboxUnread(showNotification: false);
+    _refreshInboxUnread();
+    _unreadPollTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!mounted) return;
+      _refreshInboxUnread();
+    });
   }
 
   @override
@@ -104,13 +110,14 @@ class _MainScaffoldState extends State<MainScaffold>
   @override
   void dispose() {
     _realtimeSub?.cancel();
+    _unreadPollTimer?.cancel();
     _indicatorCtrl.dispose();
     super.dispose();
   }
 
   void _handleRealtimeEvent(Map<String, dynamic> event) {
     if (event['event'] == 'message_created') {
-      _refreshInboxUnread(showNotification: true);
+      _refreshInboxUnread();
       return;
     }
 
@@ -128,16 +135,11 @@ class _MainScaffoldState extends State<MainScaffold>
   void _showInAppNotification(Map<String, dynamic> notification) {
     final title = (notification['title'] ?? '').toString().trim();
     final message = (notification['message'] ?? '').toString().trim();
-    final text = title.isNotEmpty
-        ? '$title${message.isNotEmpty ? '\n$message' : ''}'
-        : (message.isNotEmpty ? message : 'New update');
-
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    messenger?.showSnackBar(
-      SnackBar(
-        content: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis),
-        duration: const Duration(seconds: 3),
-      ),
+    TopNotification.show(
+      context,
+      title: title.isNotEmpty ? title : null,
+      message: message.isNotEmpty ? message : 'New update',
+      duration: const Duration(seconds: 3),
     );
   }
 
@@ -159,11 +161,11 @@ class _MainScaffoldState extends State<MainScaffold>
     if (_connectedRealtimeToken != token) {
       _connectedRealtimeToken = token;
       RealtimeService.instance.connect(token);
-      _refreshInboxUnread(showNotification: false);
+      _refreshInboxUnread();
     }
   }
 
-  Future<void> _refreshInboxUnread({required bool showNotification}) async {
+  Future<void> _refreshInboxUnread() async {
     final auth = context.read<AuthProvider>();
     if (!auth.isAuthenticated) {
       if (!mounted) return;
@@ -184,17 +186,8 @@ class _MainScaffoldState extends State<MainScaffold>
       }
 
       if (!mounted) return;
-      final hadUnread = _inboxUnreadCount;
       if (unread != _inboxUnreadCount) {
         setState(() => _inboxUnreadCount = unread);
-      }
-
-      final isInboxTab = widget.currentIndex == 3;
-      if (showNotification && unread > hadUnread && !isInboxTab) {
-        final messenger = ScaffoldMessenger.maybeOf(context);
-        messenger?.showSnackBar(
-          const SnackBar(content: Text('New message received')),
-        );
       }
     } catch (_) {}
   }
@@ -212,25 +205,38 @@ class _MainScaffoldState extends State<MainScaffold>
   }
 
   List<String> _tabsForUser(user) {
-    if (user?.isFounder == true)
+    if (user?.isFounder == true) {
       return const ['/home', '/chat', '/coach', '/inbox'];
+    }
     if (user?.isInvestor == true) {
       return const ['/home', '/chat', '/discovery', '/inbox'];
     }
     return const ['/home', '/chat', '/connections', '/inbox'];
   }
 
+  bool _shouldShowBottomNavForLocation(String location, dynamic user) {
+    final tabs = _tabsForUser(user);
+    for (final tab in tabs) {
+      if (location == tab || location.startsWith('$tab/')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.user;
+    final location = GoRouterState.of(context).uri.path;
+    final showBottomNav = _shouldShowBottomNavForLocation(location, user);
     _syncRealtimeConnection(auth);
 
     return Scaffold(
       key: MainScaffold.scaffoldKey,
       backgroundColor: context.colors.background,
       body: widget.child,
-      bottomNavigationBar: _buildBottomNav(context),
+      bottomNavigationBar: showBottomNav ? _buildBottomNav(context) : null,
       drawer: _buildDrawer(context, user, auth),
     );
   }
@@ -636,13 +642,14 @@ class _MainScaffoldState extends State<MainScaffold>
                               'Messages',
                               '/inbox',
                               currentRoute,
+                              badgeCount: _inboxUnreadCount,
                             ),
                           ] else if (isInvestor) ...[
                             _item(
                               context,
-                              Icons.dashboard_outlined,
-                              'Investor Dashboard',
-                              '/investor-dashboard',
+                              Icons.home_outlined,
+                              'Home',
+                              '/home',
                               currentRoute,
                             ),
                             _item(
@@ -707,6 +714,7 @@ class _MainScaffoldState extends State<MainScaffold>
                               'Messages',
                               '/inbox',
                               currentRoute,
+                              badgeCount: _inboxUnreadCount,
                             ),
                           ] else ...[
                             _item(
@@ -729,6 +737,7 @@ class _MainScaffoldState extends State<MainScaffold>
                               'Messages',
                               '/inbox',
                               currentRoute,
+                              badgeCount: _inboxUnreadCount,
                             ),
                           ],
 
@@ -890,9 +899,11 @@ class _MainScaffoldState extends State<MainScaffold>
     IconData icon,
     String title,
     String route,
-    String currentRoute,
-  ) {
+    String currentRoute, {
+    int badgeCount = 0,
+  }) {
     final isActive = currentRoute == route;
+    final showBadge = route == '/inbox' && badgeCount > 0;
     return Container(
       margin: const EdgeInsets.only(bottom: 2),
       decoration: BoxDecoration(
@@ -920,6 +931,25 @@ class _MainScaffoldState extends State<MainScaffold>
             fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
+        trailing: showBadge
+            ? Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isActive ? Colors.redAccent : Colors.redAccent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                constraints: const BoxConstraints(minWidth: 18, minHeight: 16),
+                child: Text(
+                  badgeCount > 99 ? '99+' : '$badgeCount',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              )
+            : null,
         onTap: () {
           Navigator.pop(context);
           context.go(route);

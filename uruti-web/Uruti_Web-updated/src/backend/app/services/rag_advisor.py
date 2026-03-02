@@ -8,12 +8,21 @@ import json
 import os
 import re
 import tempfile
+import warnings
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"`clean_up_tokenization_spaces` was not set.*",
+    category=FutureWarning,
+)
 
 try:
     import torch

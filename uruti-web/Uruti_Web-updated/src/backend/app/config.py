@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     SMTP_PORT: Optional[int] = None
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM_EMAIL: Optional[str] = None
+    SUPPORT_EMAIL: str = "uruti.info@gmail.com"
     
     # AI Settings (for future AI integration)
     OPENAI_API_KEY: Optional[str] = None

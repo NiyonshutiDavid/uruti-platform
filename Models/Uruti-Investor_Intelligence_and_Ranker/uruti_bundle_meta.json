@@ -1,0 +1,12 @@
+{
+  "bundle_path":"\/content\/deployment_artifacts\/uruti_bundle.joblib",
+  "module_path":"\/content\/deployment_artifacts\/uruti_inference.py",
+  "model_name":"XGBoost",
+  "expected_feature_count":10,
+  "class_names":[
+    "not_ready",
+    "mentorship_needed",
+    "investment_ready"
+  ],
+  "score":"Uruti score is 0-100 and calibrated for investor-facing profiles"
+}

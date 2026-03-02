@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/app_constants.dart';
 import '../../core/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../screens/main_scaffold.dart';
+
+String? _mediaUrl(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return null;
+  if (raw.startsWith('http')) return raw;
+  return '${AppConstants.apiBaseUrl}$raw';
+}
 
 class StartupDiscoveryScreen extends StatefulWidget {
   const StartupDiscoveryScreen({super.key});
@@ -195,6 +202,247 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
     }
   }
 
+  void _showVentureDetails(Map<String, dynamic> venture) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final name = _s(venture['name'], 'Startup');
+        final tagline = _s(venture['tagline']);
+        final description = _s(venture['description']);
+        final problem = _s(venture['problem_statement']);
+        final solution = _s(venture['solution']);
+        final market = _s(venture['target_market']);
+        final stage = _s(venture['stage']);
+        final industry = _s(venture['industry']);
+        final score = (venture['uruti_score'] as num?)?.toInt() ?? 0;
+        final founderId = (venture['founder_id'] as num?)?.toInt();
+        final logoUrl = _mediaUrl(venture['logo_url'] as String?);
+        final bannerUrl = _mediaUrl(venture['banner_url'] as String?);
+
+        return DraggableScrollableSheet(
+          initialChildSize: 0.72,
+          maxChildSize: 0.94,
+          minChildSize: 0.45,
+          expand: false,
+          builder: (_, scrollCtrl) => ListView(
+            controller: scrollCtrl,
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    color: ctx.colors.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              if (bannerUrl != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    bannerUrl,
+                    height: 120,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: ctx.colors.darkGreenMid,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: logoUrl != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.network(
+                              logoUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.rocket_launch_rounded,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          )
+                        : const Icon(
+                            Icons.rocket_launch_rounded,
+                            color: AppColors.primary,
+                          ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: TextStyle(
+                            color: ctx.colors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 18,
+                          ),
+                        ),
+                        if (tagline.isNotEmpty)
+                          Text(
+                            tagline,
+                            style: TextStyle(
+                              color: ctx.colors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Uruti: $score',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (stage.isNotEmpty) _Tag(stage),
+                  if (industry.isNotEmpty) _Tag(industry),
+                ],
+              ),
+              if (description.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Text(
+                  'Overview',
+                  style: TextStyle(
+                    color: ctx.colors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  description,
+                  style: TextStyle(
+                    color: ctx.colors.textSecondary,
+                    fontSize: 14,
+                    height: 1.6,
+                  ),
+                ),
+              ],
+              if (problem.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Problem',
+                  style: TextStyle(
+                    color: ctx.colors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  problem,
+                  style: TextStyle(
+                    color: ctx.colors.textSecondary,
+                    fontSize: 14,
+                    height: 1.6,
+                  ),
+                ),
+              ],
+              if (solution.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Solution',
+                  style: TextStyle(
+                    color: ctx.colors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  solution,
+                  style: TextStyle(
+                    color: ctx.colors.textSecondary,
+                    fontSize: 14,
+                    height: 1.6,
+                  ),
+                ),
+              ],
+              if (market.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Target Market',
+                  style: TextStyle(
+                    color: ctx.colors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  market,
+                  style: TextStyle(
+                    color: ctx.colors.textSecondary,
+                    fontSize: 14,
+                    height: 1.6,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              if (founderId != null)
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      context.go('/profile/view/$founderId');
+                    },
+                    icon: const Icon(Icons.person_outline_rounded),
+                    label: const Text('View Founder Profile'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(
+                        color: AppColors.primary.withValues(alpha: 0.35),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -215,10 +463,10 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
         actions: [
           IconButton(
             icon: Icon(
-              Icons.trending_up_rounded,
+              Icons.emoji_events_outlined,
               color: context.colors.textPrimary,
             ),
-            onPressed: () => context.go('/deal-flow'),
+            onPressed: () => context.go('/leaderboard'),
           ),
         ],
       ),
@@ -288,6 +536,7 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
                   data: venture,
                   isBookmarked: bookmarked,
                   onToggleBookmark: () => _toggleBookmark(venture),
+                  onViewDetails: () => _showVentureDetails(venture),
                 );
               }),
           ],
@@ -428,11 +677,13 @@ class _StartupCard extends StatelessWidget {
   final Map<String, dynamic> data;
   final bool isBookmarked;
   final VoidCallback onToggleBookmark;
+  final VoidCallback onViewDetails;
 
   const _StartupCard({
     required this.data,
     required this.isBookmarked,
     required this.onToggleBookmark,
+    required this.onViewDetails,
   });
 
   String _s(dynamic value, [String fallback = '']) {
@@ -448,6 +699,7 @@ class _StartupCard extends StatelessWidget {
     final stage = _s(data['stage']);
     final industry = _s(data['industry']);
     final tagline = _s(data['tagline']);
+    final logoUrl = _mediaUrl(data['logo_url'] as String?);
 
     final initials = name
         .split(' ')
@@ -457,108 +709,129 @@ class _StartupCard extends StatelessWidget {
         .join()
         .toUpperCase();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.colors.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.colors.divider),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: context.colors.darkGreenMid,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Text(
-                initials,
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                ),
+    return GestureDetector(
+      onTap: onViewDetails,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.colors.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: context.colors.divider),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: context.colors.darkGreenMid,
+                borderRadius: BorderRadius.circular(12),
               ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        name,
-                        style: TextStyle(
-                          color: context.colors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
+              child: logoUrl != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        logoUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Center(
+                          child: Text(
+                            initials,
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                    )
+                  : Center(
                       child: Text(
-                        '$score',
+                        initials,
                         style: TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w800,
-                          fontSize: 13,
+                          fontSize: 16,
                         ),
                       ),
                     ),
-                  ],
-                ),
-                if (tagline.isNotEmpty) ...[
-                  const SizedBox(height: 5),
-                  Text(
-                    tagline,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: context.colors.textSecondary,
-                      fontSize: 12,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          name,
+                          style: TextStyle(
+                            color: context.colors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '$score',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (tagline.isNotEmpty) ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      tagline,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: context.colors.textSecondary,
+                        fontSize: 12,
+                      ),
                     ),
+                  ],
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      if (stage.isNotEmpty) _Tag(stage),
+                      if (industry.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        _Tag(industry),
+                      ],
+                    ],
                   ),
                 ],
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    if (stage.isNotEmpty) _Tag(stage),
-                    if (industry.isNotEmpty) ...[
-                      const SizedBox(width: 6),
-                      _Tag(industry),
-                    ],
-                  ],
-                ),
-              ],
+              ),
             ),
-          ),
-          IconButton(
-            onPressed: onToggleBookmark,
-            icon: Icon(
-              isBookmarked
-                  ? Icons.bookmark_rounded
-                  : Icons.bookmark_border_rounded,
-              color: isBookmarked
-                  ? AppColors.primary
-                  : context.colors.textSecondary,
+            IconButton(
+              onPressed: onToggleBookmark,
+              icon: Icon(
+                isBookmarked
+                    ? Icons.bookmark_rounded
+                    : Icons.bookmark_border_rounded,
+                color: isBookmarked
+                    ? AppColors.primary
+                    : context.colors.textSecondary,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

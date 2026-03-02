@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { LandingHeader } from './LandingHeader';
 import { LandingFooter } from './LandingFooter';
+import { SUPPORT_EMAIL } from '../../lib/contact-info';
 
 interface HelpCenterProps {
   onNavigate: (page: string) => void;
@@ -1099,7 +1100,7 @@ export function HelpCenter({ onNavigate, onBack }: HelpCenterProps) {
     },
     {
       question: 'How do I contact support?',
-      answer: 'You can reach our support team through the live chat widget, email us at uruti.info@gmail.com, or call +250 790 636 128 during business hours.'
+      answer: `You can reach our support team through the live chat widget, email us at ${SUPPORT_EMAIL}, or call +250 790 636 128 during business hours.`
     }
   ];
 
@@ -1501,9 +1502,9 @@ export function HelpCenter({ onNavigate, onBack }: HelpCenterProps) {
 
               <div className="mt-6 pt-6 border-t border-black/5 dark:border-white/10">
                 <div className="flex items-center justify-center space-x-6 text-sm text-muted-foreground">
-                  <a href="mailto:uruti.info@gmail.com" className="flex items-center hover:text-[#76B947]">
+                  <a href={`mailto:${SUPPORT_EMAIL}`} className="flex items-center hover:text-[#76B947]">
                     <Mail className="h-4 w-4 mr-2" />
-                    uruti.info@gmail.com
+                    {SUPPORT_EMAIL}
                   </a>
                   <a href="tel:+250790636128" className="flex items-center hover:text-[#76B947]">
                     <Phone className="h-4 w-4 mr-2" />
