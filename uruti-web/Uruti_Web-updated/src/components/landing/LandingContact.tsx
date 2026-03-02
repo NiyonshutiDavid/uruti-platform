@@ -34,7 +34,7 @@ import {
 } from '../ui/select';
 import { toast } from 'sonner';
 import apiClient from '../../lib/api-client';
-import { SUPPORT_EMAIL, supportMailtoLink } from '../../lib/contact-info';
+import { SUPPORT_EMAIL } from '../../lib/contact-info';
 
 interface LandingContactProps {
   onNavigate: (page: string) => void;
@@ -186,12 +186,6 @@ export function LandingContact({ onNavigate }: LandingContactProps) {
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    const formattedMessage =
-      `Name: ${formData.fullname}\n` +
-      `Email: ${formData.email}\n` +
-      `Role: ${formData.role}\n` +
-      `Subject: ${formData.subject}\n\n` +
-      `Message:\n${formData.message}`;
 
     try {
       await apiClient.createSupportMessage({
@@ -202,14 +196,8 @@ export function LandingContact({ onNavigate }: LandingContactProps) {
 
       setShowSuccessModal(true);
     } catch (error) {
-      console.error('Error submitting form to backend, falling back to mailto:', error);
-
-      const subject = `Contact Form: ${formData.subject}`;
-      const mailtoLink = supportMailtoLink(subject, formattedMessage);
-      window.location.href = mailtoLink;
-      toast.info('Opened your email app as fallback.');
-
-      setShowSuccessModal(true);
+      console.error('Error submitting form to backend:', error);
+      toast.error('Failed to send message. Please try again in a moment.');
     } finally {
       setIsSubmitting(false);
     }
@@ -265,7 +253,7 @@ export function LandingContact({ onNavigate }: LandingContactProps) {
                 Get in touch for general inquiries
               </p>
             </div>
-      );
+      
       
 
             {/* Call Us */}
