@@ -6,7 +6,6 @@ import { Progress } from './ui/progress';
 import { VentureActivitySection } from './VentureActivitySection';
 import { 
   Play, 
-  Star, 
   CheckCircle2, 
   TrendingUp, 
   Users, 
@@ -32,6 +31,7 @@ interface VentureDetailViewProps {
     tagline?: string;
     pitchVideoUrl?: string;
     thumbnailUrl?: string;
+    founderId?: number;
     pitchDeckUrl?: string;
     highlights?: string[];
     problem: string;
@@ -65,10 +65,12 @@ interface VentureDetailViewProps {
   isPublic?: boolean;
   isOwner?: boolean;
   onAddActivity?: (activity: any) => void;
+  onDeleteActivity?: (activityId: string) => void;
+  onViewFounder?: (founderId: number) => void;
   onEdit?: () => void;
 }
 
-export function VentureDetailView({ venture, isPublic = false, isOwner = false, onAddActivity, onEdit }: VentureDetailViewProps) {
+export function VentureDetailView({ venture, isPublic = false, isOwner = false, onAddActivity, onDeleteActivity, onViewFounder, onEdit }: VentureDetailViewProps) {
   const [isPlaying, setIsPlaying] = useState(false);
 
   const getStatusIcon = (status: string) => {
@@ -134,55 +136,70 @@ export function VentureDetailView({ venture, isPublic = false, isOwner = false, 
           )}
         </div>
 
-        {/* Right: Pitch Video */}
+        {/* Right: Pitch Video (from Pitch Coach) */}
         <Card className="glass-card border-black/5 dark:border-white/10 overflow-hidden">
-          <div className="relative aspect-video bg-gray-900">
-            {venture.thumbnailUrl ? (
-              <img 
-                src={venture.thumbnailUrl} 
-                alt="Pitch thumbnail" 
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-black to-gray-800">
-                <Rocket className="h-16 w-16 text-[#76B947]/50" />
+          {venture.pitchVideoUrl ? (
+            <>
+              <div className="relative aspect-video bg-gray-900">
+                {isPlaying ? (
+                  <video
+                    src={venture.pitchVideoUrl}
+                    className="w-full h-full object-contain"
+                    controls
+                    autoPlay
+                  />
+                ) : (
+                  <>
+                    {venture.thumbnailUrl ? (
+                      <img 
+                        src={venture.thumbnailUrl} 
+                        alt="Pitch thumbnail" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-black to-gray-800">
+                        <Rocket className="h-16 w-16 text-[#76B947]/50" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Button
+                        size="lg"
+                        className="rounded-full bg-white hover:bg-gray-100 text-black shadow-2xl"
+                        onClick={() => setIsPlaying(true)}
+                      >
+                        <Play className="h-6 w-6 fill-current" />
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
-            )}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Button
-                size="lg"
-                className="rounded-full bg-white hover:bg-gray-100 text-black shadow-2xl"
-                onClick={() => setIsPlaying(!isPlaying)}
-              >
-                <Play className="h-6 w-6 fill-current" />
-              </Button>
-            </div>
-          </div>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                  Watch pitch
-                </span>
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star key={star} className="h-4 w-4 text-[#76B947] fill-[#76B947]" />
-                  ))}
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-2">
+                  <Play className="h-4 w-4 text-[#76B947]" />
+                  <span className="font-semibold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                    Pitch Coach Recording
+                  </span>
                 </div>
+                <p className="text-xs text-muted-foreground mt-2" style={{ fontFamily: 'var(--font-body)' }}>
+                  Recorded video pitch from the Uruti Pitch Coach session
+                </p>
+              </CardContent>
+            </>
+          ) : (
+            <div className="aspect-video flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900">
+              <div className="rounded-full bg-gray-200 dark:bg-gray-700 p-6 mb-4">
+                <Play className="h-10 w-10 text-gray-400 dark:text-gray-500" />
               </div>
-              <Button size="sm" className="bg-[#76B947] hover:bg-[#5a8f35] text-white">
-                Connect
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2" style={{ fontFamily: 'var(--font-body)' }}>
-              Thank you for the interest! See, connect and let us see what we can do
-            </p>
-            {isPublic && (
-              <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: 'var(--font-body)' }}>
-                Have some feedback to help change Rwanda? Sign in!
+              <p className="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-1" style={{ fontFamily: 'var(--font-heading)' }}>
+                Video Unavailable
               </p>
-            )}
-          </CardContent>
+              <p className="text-sm text-muted-foreground px-6 text-center" style={{ fontFamily: 'var(--font-body)' }}>
+                {isOwner
+                  ? 'Record your pitch using the Pitch Coach to showcase it here'
+                  : 'The founder hasn\'t recorded a pitch video yet'}
+              </p>
+            </div>
+          )}
         </Card>
       </div>
 
@@ -288,7 +305,9 @@ export function VentureDetailView({ venture, isPublic = false, isOwner = false, 
               Investment readiness at a glance
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto" style={{ fontFamily: 'var(--font-body)' }}>
-              AgriTech Business scores 78 out of 100 in MLP (MLR) analysis, placing them among the top-ranked ventures in the ecosystem for Stage A. Their efficient team of 5 members, strong market feedback, low churn, and fast-growing base reinforce key readiness for Seed-Stage investment.
+              {venture.name} scores {venture.urutiScore} out of 100 in MLP analysis
+              {venture.activeUsers ? `, with ${venture.activeUsers.toLocaleString()}+ active users` : ''}
+              {venture.sector ? ` in the ${venture.sector} sector` : ''}.
             </p>
           </div>
 
@@ -302,20 +321,20 @@ export function VentureDetailView({ venture, isPublic = false, isOwner = false, 
                 {venture.urutiScore}/100
               </div>
               <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                Strong institutional readiness
+                {venture.urutiScore >= 70 ? 'Strong institutional readiness' : venture.urutiScore >= 40 ? 'Developing readiness' : 'Early stage readiness'}
               </p>
             </div>
 
-            {/* Active Users */}
+            {/* Active Users / Customers */}
             <div className="text-center">
               <div className="text-sm text-muted-foreground mb-2" style={{ fontFamily: 'var(--font-body)' }}>
-                Active farmers
+                Active users
               </div>
               <div className="text-5xl font-bold mb-2 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                {venture.activeUsers?.toLocaleString() || '0'}+
+                {venture.activeUsers?.toLocaleString() || '0'}
               </div>
               <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                Growing user base
+                {venture.activeUsers ? 'Growing user base' : 'No users reported yet'}
               </p>
             </div>
 
@@ -328,7 +347,7 @@ export function VentureDetailView({ venture, isPublic = false, isOwner = false, 
                 {venture.monthlyGrowth || 0}%
               </div>
               <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                Reach momentum in trajectory
+                {venture.monthlyGrowth ? 'Growth trajectory' : 'No growth data yet'}
               </p>
             </div>
           </div>
@@ -341,6 +360,7 @@ export function VentureDetailView({ venture, isPublic = false, isOwner = false, 
         activities={venture.activities}
         isOwner={isOwner}
         onAddActivity={onAddActivity}
+        onDeleteActivity={onDeleteActivity}
       />
 
       {/* Pitch Deck Section */}
@@ -409,12 +429,31 @@ export function VentureDetailView({ venture, isPublic = false, isOwner = false, 
             See the pitch or just get in touch to know different details and talk the founder.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <Button size="lg" className="bg-[#76B947] hover:bg-[#5a8f35] text-white">
-              Get in touch
-            </Button>
-            <Button size="lg" variant="outline">
-              View pitch deck
-            </Button>
+            {venture.pitchDeckUrl ? (
+              <Button
+                size="lg"
+                className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
+                onClick={() => window.open(venture.pitchDeckUrl!, '_blank')}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                View Pitch Deck
+              </Button>
+            ) : (
+              <Button size="lg" className="bg-[#76B947] hover:bg-[#5a8f35] text-white" disabled>
+                <FileText className="h-4 w-4 mr-2" />
+                No Pitch Deck Available
+              </Button>
+            )}
+            {venture.founderId && onViewFounder && (
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => onViewFounder(venture.founderId!)}
+              >
+                <Users className="h-4 w-4 mr-2" />
+                View Founder
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

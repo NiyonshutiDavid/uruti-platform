@@ -54,7 +54,8 @@ Widget _avatar(
 //  Main screen
 // ─────────────────────────────────────────────────────────
 class ConnectionsScreen extends StatefulWidget {
-  const ConnectionsScreen({super.key});
+  final int initialTab;
+  const ConnectionsScreen({super.key, this.initialTab = 0});
   @override
   State<ConnectionsScreen> createState() => _ConnectionsScreenState();
 }
@@ -69,7 +70,11 @@ class _ConnectionsScreenState extends State<ConnectionsScreen>
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 3, vsync: this);
+    _tab = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTab,
+    );
     _load();
   }
 
@@ -101,30 +106,27 @@ class _ConnectionsScreenState extends State<ConnectionsScreen>
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: context.colors.appBarBg,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
+          icon: Icon(Icons.menu_rounded, color: Colors.white),
           onPressed: () => MainScaffold.scaffoldKey.currentState?.openDrawer(),
         ),
         title: Text(
           'My Network',
-          style: TextStyle(
-            color: context.colors.textPrimary,
-            fontWeight: FontWeight.w700,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh, color: context.colors.textSecondary),
+            icon: Icon(Icons.refresh, color: Colors.white70),
             onPressed: _load,
           ),
         ],
         bottom: TabBar(
           controller: _tab,
-          indicatorColor: AppColors.primary,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: context.colors.textSecondary,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white60,
           labelStyle: const TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 12,

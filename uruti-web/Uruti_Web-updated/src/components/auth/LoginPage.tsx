@@ -54,8 +54,8 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
       // Login will automatically detect user role and redirect
       await login(formData.email, formData.password);
       
-      console.log('✅ Login successful, redirecting to dashboard');
-      navigate('/dashboard');
+      console.log('✅ Login successful, redirecting to splash');
+      navigate('/splash');
     } catch (err) {
       console.error('❌ Login error:', err);
       console.error('Error details:', {
@@ -94,7 +94,7 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
         if (status.status === 'approved' && status.access_token) {
           stopPolling();
           await loginWithToken(status.access_token);
-          navigate('/dashboard');
+          navigate('/splash');
           return;
         }
 

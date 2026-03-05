@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { useConfirmDialog } from '../ui/confirm-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -39,6 +40,7 @@ interface Founder {
 }
 
 export function AdminFounderTracksModule() {
+  const { confirm } = useConfirmDialog();
   const [founders, setFounders] = useState<Founder[]>([]);
   const [allTracks, setAllTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,9 +130,12 @@ export function AdminFounderTracksModule() {
   const handleRemoveTrack = async (track: Track) => {
     if (!selectedFounder) return;
 
-    const confirmed = window.confirm(
-      `Remove track "${track.title}" from ${selectedFounder.full_name}?`
-    );
+    const confirmed = await confirm({
+      title: 'Remove Track',
+      description: `Remove track "${track.title}" from ${selectedFounder.full_name}? They will lose access to this learning path.`,
+      confirmLabel: 'Remove',
+      variant: 'warning',
+    });
     if (!confirmed) return;
 
     setIsRemoving(true);

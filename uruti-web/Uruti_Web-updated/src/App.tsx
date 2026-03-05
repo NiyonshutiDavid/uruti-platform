@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import { Toaster } from 'sonner';
 import { ThemeProvider } from './lib/theme-context';
 import { AuthProvider, useAuth } from './lib/auth-context';
+import { ConfirmDialogProvider } from './components/ui/confirm-dialog';
 import { SupportProvider } from './lib/support-context';
 import { AdvisoryProvider } from './lib/advisory-context';
 import { CallProvider } from './lib/call-context';
@@ -17,6 +18,7 @@ import { TermsOfService } from './components/landing/TermsOfService';
 import { LoginPage } from './components/auth/LoginPage';
 import { SignupPage } from './components/auth/SignupPage';
 import { AdminLoginPage } from './components/auth/AdminLoginPage';
+import { SplashScreen } from './components/SplashScreen';
 import { ScrollToTop } from './components/ScrollToTop';
 import apiClient from './lib/api-client';
 
@@ -177,15 +179,15 @@ function AppContent() {
   };
 
   const handleLoginSuccess = () => {
-    navigate('/dashboard');
+    navigate('/splash');
   };
 
   const handleSignupSuccess = () => {
-    navigate('/dashboard');
+    navigate('/splash');
   };
 
   const handleAdminLoginSuccess = () => {
-    navigate('/dashboard/admin-dashboard');
+    navigate('/splash');
   };
 
   // Handle pending profile update after signup
@@ -243,6 +245,9 @@ function AppContent() {
         <Route path="/signup" element={<SignupPage onNavigate={handlePublicNavigate} onSignupComplete={handleSignupSuccess} />} />
         <Route path="/admin" element={<AdminLoginPage onLogin={handleAdminLoginSuccess} onNavigateHome={() => navigate('/home')} />} />
 
+        {/* Splash screen - shown after login/signup */}
+        <Route path="/splash" element={isAuthenticated ? <SplashScreen /> : <Navigate to="/login" replace />} />
+
         {/* Protected dashboard routes */}
         <Route 
           path="/dashboard/*" 
@@ -265,13 +270,15 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <SupportProvider>
-        <AdvisoryProvider>
-          <CallProvider>
-            <AppContent />
-          </CallProvider>
-        </AdvisoryProvider>
-      </SupportProvider>
+      <ConfirmDialogProvider>
+        <SupportProvider>
+          <AdvisoryProvider>
+            <CallProvider>
+              <AppContent />
+            </CallProvider>
+          </AdvisoryProvider>
+        </SupportProvider>
+      </ConfirmDialogProvider>
     </AuthProvider>
   );
 }

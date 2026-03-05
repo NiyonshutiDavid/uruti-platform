@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../core/app_colors.dart';
@@ -97,10 +98,25 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
+  // ── Dark-only palette for splash ──
+  static const _bg = Color(0xFF000000);
+  static const _accent = AppColors.primary; // 0xFF76B947
+  static const _darkGreenMid = Color(0xFF1A3A1A);
+  static const _textPrimary = Color(0xFFFFFFFF);
+  static const _textSecondary = Color(0xFFAAAAAA);
+
   @override
   Widget build(BuildContext context) {
+    // Force light status-bar icons (white) regardless of system theme
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.light,
+      ),
+    );
+
     return Scaffold(
-      backgroundColor: context.colors.background,
+      backgroundColor: _bg,
       body: Stack(
         children: [
           // Animated background gradient
@@ -112,10 +128,7 @@ class _SplashScreenState extends State<SplashScreen>
                   gradient: RadialGradient(
                     center: const Alignment(0, -0.1),
                     radius: 0.7 * _logoScale.value,
-                    colors: [
-                      const Color(0xFF0D2410),
-                      context.colors.background,
-                    ],
+                    colors: [const Color(0xFF0D2410), _bg],
                   ),
                 ),
               ),
@@ -139,7 +152,7 @@ class _SplashScreenState extends State<SplashScreen>
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.4),
+                            color: _accent.withValues(alpha: 0.4),
                             width: 2,
                           ),
                         ),
@@ -162,9 +175,9 @@ class _SplashScreenState extends State<SplashScreen>
                         height: 100,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: context.colors.darkGreenMid,
+                          color: _darkGreenMid,
                           border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.5),
+                            color: _accent.withValues(alpha: 0.5),
                             width: 2,
                           ),
                         ),
@@ -197,7 +210,7 @@ class _SplashScreenState extends State<SplashScreen>
                             style: TextStyle(
                               fontSize: 42,
                               fontWeight: FontWeight.w900,
-                              color: context.colors.textPrimary,
+                              color: _textPrimary,
                               letterSpacing: 1.2,
                             ),
                           ),
@@ -206,7 +219,7 @@ class _SplashScreenState extends State<SplashScreen>
                             "Digital Ecosystem for Founders & Investors",
                             style: TextStyle(
                               fontSize: 13,
-                              color: context.colors.textSecondary,
+                              color: _textSecondary,
                               letterSpacing: 0.3,
                             ),
                             textAlign: TextAlign.center,
@@ -215,25 +228,14 @@ class _SplashScreenState extends State<SplashScreen>
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Container(
-                                width: 40,
-                                height: 2,
-                                color: AppColors.primary,
-                              ),
+                              Container(width: 40, height: 2, color: _accent),
                               const SizedBox(width: 8),
                               Text(
                                 'For investors and founders',
-                                style: TextStyle(
-                                  color: AppColors.primary,
-                                  fontSize: 11,
-                                ),
+                                style: TextStyle(color: _accent, fontSize: 11),
                               ),
                               const SizedBox(width: 8),
-                              Container(
-                                width: 40,
-                                height: 2,
-                                color: AppColors.primary,
-                              ),
+                              Container(width: 40, height: 2, color: _accent),
                             ],
                           ),
                         ],
@@ -254,15 +256,13 @@ class _SplashScreenState extends State<SplashScreen>
               animation: _textController,
               builder: (_, __) => Opacity(
                 opacity: _textOpacity.value,
-                child: const Center(
+                child: Center(
                   child: SizedBox(
                     width: 24,
                     height: 24,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        AppColors.primary,
-                      ),
+                      valueColor: const AlwaysStoppedAnimation<Color>(_accent),
                     ),
                   ),
                 ),

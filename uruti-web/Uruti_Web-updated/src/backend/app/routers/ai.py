@@ -12,7 +12,7 @@ from typing import List
 import uuid, os
 
 from ..database import get_db
-from ..models import AiChatMessage, User, Venture
+from ..models import AiChatMessage, User, Venture, Bookmark
 from ..schemas import (
     AiChatRequest, AiChatResponse,
     AiChatMessageResponse, AiChatSessionSummary,
@@ -45,7 +45,7 @@ def _available_models() -> list[dict]:
         {
             "id": ANALYSIS_MODEL_ID,
             "name": analysis_name,
-            "description": "Analyze only your own ventures with required venture context",
+            "description": "Analyze ventures with required venture context (founders: own ventures, investors: bookmarked ventures)",
             "type": "analysis",
             "requires_venture_context": True,
             "fixed_prompt": "analyse my venture",
@@ -239,8 +239,53 @@ async def chat(
     available_ids = {m["id"] for m in _available_models()}
     model = payload.model if payload.model in available_ids else CHATBOT_MODEL_ID
 
+    user_role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
+
+    authorized_venture = None
+    if payload.startup_context and payload.startup_context.venture_id is not None:
+        venture_id = payload.startup_context.venture_id
+        venture = db.query(Venture).filter(Venture.id == venture_id).first()
+        if not venture:
+            raise HTTPException(status_code=404, detail="Venture not found")
+
+        if user_role == "founder":
+            if venture.founder_id != current_user.id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Founders can only attach their own ventures",
+                )
+        elif user_role == "investor":
+            bookmark = db.query(Bookmark).filter(
+                Bookmark.user_id == current_user.id,
+                Bookmark.venture_id == venture.id,
+            ).first()
+            if not bookmark:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Investors can only attach ventures in their bookmarks",
+                )
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail="Startup context attachment is only available for founders and investors",
+            )
+
+        authorized_venture = venture
+
     # Build context string to inject
     ctx = payload.startup_context.model_dump(exclude_none=True) if payload.startup_context else None
+    if authorized_venture:
+        ctx = {
+            "venture_id": authorized_venture.id,
+            "name": authorized_venture.name,
+            "description": authorized_venture.description,
+            "stage": authorized_venture.stage,
+            "industry": authorized_venture.industry,
+            "problem_statement": authorized_venture.problem_statement,
+            "solution": authorized_venture.solution,
+            "target_market": authorized_venture.target_market,
+            "business_model": authorized_venture.business_model,
+        }
     ctx_text = ""
     if ctx:
         ctx_text = (
@@ -287,8 +332,11 @@ async def chat(
     resolved_model = model
 
     if model == ANALYSIS_MODEL_ID:
-        if current_user.role.value != "founder":
-            raise HTTPException(status_code=403, detail="Analysis model is only available for founders")
+        if user_role not in {"founder", "investor"}:
+            raise HTTPException(
+                status_code=403,
+                detail="Analysis model is only available for founders and investors",
+            )
 
         normalized = (payload.message or "").strip().lower()
         if normalized not in {"analyse my venture", "analyze my venture"}:
@@ -298,11 +346,9 @@ async def chat(
         if not venture_id:
             raise HTTPException(status_code=400, detail="Analysis model requires venture context with venture_id")
 
-        venture = db.query(Venture).filter(Venture.id == venture_id).first()
+        venture = authorized_venture or db.query(Venture).filter(Venture.id == venture_id).first()
         if not venture:
             raise HTTPException(status_code=404, detail="Venture not found")
-        if venture.founder_id != current_user.id:
-            raise HTTPException(status_code=403, detail="You can only analyze your own ventures")
 
         analysis = venture_scorer.score_venture(venture)
         score = float(analysis.get("uruti_score") or 0.0)
@@ -353,7 +399,7 @@ async def get_models(
     """Return AI models available in backend so frontend model picker is not hardcoded."""
 
     models = _available_models()
-    if current_user.role.value != "founder":
+    if current_user.role.value not in {"founder", "investor"}:
         models = [m for m in models if m["type"] != "analysis"]
     return models
 

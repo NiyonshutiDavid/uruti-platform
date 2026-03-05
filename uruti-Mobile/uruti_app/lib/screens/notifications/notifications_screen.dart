@@ -7,7 +7,6 @@ import '../../core/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/realtime_service.dart';
-import '../../screens/main_scaffold.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -19,6 +18,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   List _notifs = [];
   bool _loading = true;
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -46,6 +47,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void dispose() {
     _realtimeSub?.cancel();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -124,20 +126,36 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Filter notifications by search query
+    final filtered = _searchQuery.isEmpty
+        ? _notifs
+        : _notifs.where((n) {
+            final m = n as Map;
+            final title = (m['title'] as String? ?? '').toLowerCase();
+            final message = (m['message'] as String? ?? '').toLowerCase();
+            final type = (m['type'] as String? ?? '').toLowerCase();
+            final q = _searchQuery.toLowerCase();
+            return title.contains(q) || message.contains(q) || type.contains(q);
+          }).toList();
+
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: context.colors.appBarBg,
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
-          onPressed: () => MainScaffold.scaffoldKey.currentState?.openDrawer(),
+          icon: Icon(Icons.arrow_back_rounded, color: Colors.white),
+          tooltip: 'Back',
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              context.pop();
+              return;
+            }
+            context.go('/home');
+          },
         ),
         title: Text(
           'Notifications',
-          style: TextStyle(
-            color: context.colors.textPrimary,
-            fontWeight: FontWeight.w700,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
         actions: [
           TextButton(
@@ -156,34 +174,103 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             },
             child: Text(
               'Mark all read',
-              style: TextStyle(color: AppColors.primary, fontSize: 12),
+              style: TextStyle(color: Colors.white, fontSize: 12),
             ),
           ),
         ],
       ),
       body: _loading
-          ? Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : _notifs.isEmpty
           ? Center(
-              child: Text(
-                'No notifications',
-                style: TextStyle(color: context.colors.textSecondary),
-              ),
+              child: CircularProgressIndicator(color: context.colors.accent),
             )
-          : ListView.separated(
-              padding: const EdgeInsets.all(12),
-              itemCount: _notifs.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (_, i) {
-                final data = _notifs[i] as Map<String, dynamic>;
-                return GestureDetector(
-                  onTap: () => _handleNotificationTap(data),
-                  child: _NotifCard(
-                    data: data,
-                    onClose: () => _dismissNotification(i),
+          : Column(
+              children: [
+                // ── Search bar ─────────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                  child: TextField(
+                    controller: _searchCtrl,
+                    style: TextStyle(
+                      color: context.colors.textPrimary,
+                      fontSize: 14,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Search notifications…',
+                      hintStyle: TextStyle(
+                        color: context.colors.textSecondary,
+                        fontSize: 14,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        color: context.colors.textSecondary,
+                      ),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(
+                                Icons.close_rounded,
+                                color: context.colors.textSecondary,
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: context.colors.card,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: context.colors.divider),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: context.colors.divider),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: context.colors.accent),
+                      ),
+                    ),
+                    onChanged: (v) => setState(() => _searchQuery = v.trim()),
                   ),
-                );
-              },
+                ),
+                // ── Notification list ──────────────────────────────
+                Expanded(
+                  child: filtered.isEmpty
+                      ? Center(
+                          child: Text(
+                            _searchQuery.isNotEmpty
+                                ? 'No matching notifications'
+                                : 'No notifications',
+                            style: TextStyle(
+                              color: context.colors.textSecondary,
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 8),
+                          itemBuilder: (_, i) {
+                            final data = filtered[i] as Map<String, dynamic>;
+                            return GestureDetector(
+                              onTap: () => _handleNotificationTap(data),
+                              child: _NotifCard(
+                                data: data,
+                                onClose: () {
+                                  final realIdx = _notifs.indexOf(filtered[i]);
+                                  if (realIdx >= 0)
+                                    _dismissNotification(realIdx);
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
             ),
     );
   }
@@ -220,7 +307,7 @@ class _NotifCard extends StatelessWidget {
         ? ((data['data'] as Map)['kind']?.toString() ?? '')
         : '';
     return kind.startsWith('connection') || type == 'connection'
-        ? AppColors.primary
+        ? context.colors.accent
         : kind == 'venture_updated'
         ? const Color(0xFF0EA5E9)
         : kind == 'bookmark_created' || kind == 'bookmark_removed'
@@ -244,12 +331,12 @@ class _NotifCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isRead
             ? context.colors.card
-            : AppColors.primary.withValues(alpha: 0.04),
+            : context.colors.accent.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isRead
               ? context.colors.divider
-              : AppColors.primary.withValues(alpha: 0.2),
+              : context.colors.accent.withValues(alpha: 0.2),
         ),
       ),
       child: Row(
@@ -300,8 +387,8 @@ class _NotifCard extends StatelessWidget {
             Container(
               width: 8,
               height: 8,
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
+              decoration: BoxDecoration(
+                color: context.colors.accent,
                 shape: BoxShape.circle,
               ),
             ),

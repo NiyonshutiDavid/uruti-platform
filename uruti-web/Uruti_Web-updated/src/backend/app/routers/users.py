@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, desc
 from typing import List
+from datetime import datetime, timedelta
 from ..database import get_db
 from ..models import User, UserRole
 from ..schemas import UserResponse, UserUpdate, UserCreate, CredentialsUpdate, AdminUserUpdate
@@ -63,6 +64,35 @@ def search_users(
         .all()
     )
     return users
+
+
+@router.get("/online-ids", response_model=List[int])
+def get_online_user_ids(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Return IDs of users currently online (admin only).
+
+    A user is considered online if they have an active WebSocket connection
+    (notification or message hub) OR if their last_login was within the last
+    5 minutes (covers active API usage without a WebSocket).
+    """
+    _ensure_admin(current_user)
+
+    from .notifications import notification_hub
+    from .messages import realtime_hub
+
+    ws_ids: set[int] = notification_hub.connected_user_ids | realtime_hub.connected_user_ids
+
+    cutoff = datetime.utcnow() - timedelta(minutes=5)
+    recent_rows = (
+        db.query(User.id)
+        .filter(User.is_active == True, User.last_login >= cutoff)
+        .all()
+    )
+    recent_ids = {row[0] for row in recent_rows}
+
+    return sorted(ws_ids | recent_ids)
 
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)

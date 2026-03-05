@@ -20,6 +20,7 @@
         'figma:asset/b38d5413c55bf04f2a0cb1c3d346a2a056ec152d.png': path.resolve(__dirname, './src/assets/b38d5413c55bf04f2a0cb1c3d346a2a056ec152d.png'),
         'figma:asset/75560f1730e92124453d0b37b270c7a11552a580.png': path.resolve(__dirname, './src/assets/75560f1730e92124453d0b37b270c7a11552a580.png'),
         'figma:asset/5502f2a03310f58145f5272ed6138e223e54afe2.png': path.resolve(__dirname, './src/assets/5502f2a03310f58145f5272ed6138e223e54afe2.png'),
+        '@assets/Uruti-icon-white.png': path.resolve(__dirname, './src/assets/Uruti-icon-white.png'),
         'embla-carousel-react@8.6.0': 'embla-carousel-react',
         'cmdk@1.1.1': 'cmdk',
         'class-variance-authority@0.7.1': 'class-variance-authority',

@@ -5,7 +5,7 @@ import { Badge } from '../ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { EditProfileDialog } from '../EditProfileDialog';
-import { AddExperienceDialog, AddAchievementDialog, AddActivityDialog } from '../AddProfileContentDialogs';
+import { AddAchievementDialog } from '../AddProfileContentDialogs';
 import { StartupDetailsDialog } from '../StartupDetailsDialog';
 import { ShareProfileDialog } from '../ShareProfileDialog';
 import { useAuth } from '../../lib/auth-context';
@@ -19,22 +19,14 @@ import {
   Edit,
   Share2,
   MessageSquare,
-  Star,
-  Briefcase,
-  GraduationCap,
   Award,
-  TrendingUp,
   Users,
-  FileText,
   ExternalLink,
-  Calendar,
   CheckCircle2,
-  Building2,
   Rocket,
   DollarSign,
   Target,
   Globe,
-  Plus
 } from 'lucide-react';
 
 interface ProfileModuleProps {
@@ -82,9 +74,7 @@ export function ProfileModule({
 
   const [activeTab, setActiveTab] = useState('overview');
   const [editProfileOpen, setEditProfileOpen] = useState(false);
-  const [addExperienceOpen, setAddExperienceOpen] = useState(false);
   const [addAchievementOpen, setAddAchievementOpen] = useState(false);
-  const [addActivityOpen, setAddActivityOpen] = useState(false);
   const [shareProfileOpen, setShareProfileOpen] = useState(false);
   const [refreshingProfile, setRefreshingProfile] = useState(false);
   const [startupDetailsOpen, setStartupDetailsOpen] = useState(false);
@@ -94,16 +84,12 @@ export function ProfileModule({
   const [profile, setProfile] = useState({
     ...mapUserToProfile(user),
     connections: 0,
-    followers: 0,
     verified: false,
     skills: mapUserToProfile(user).skills,
-    experience: [],
-    education: [],
-    startups: [],
+    startups: [] as any[],
     achievements: mapUserToProfile(user).achievements,
-    activity: [],
-    investments: [],
-    portfolio: [],
+    investments: [] as any[],
+    portfolio: [] as any[],
     investmentThesis: '',
     ticketSize: '',
     preferredSectors: mapUserToProfile(user).preferredSectors,
@@ -117,12 +103,33 @@ export function ProfileModule({
   const hydrateProfile = async () => {
     if (!user) return;
     try {
-      const latestUser = await apiClient.getCurrentUser();
+      const [latestUser, connections, myVentures] = await Promise.all([
+        apiClient.getCurrentUser(),
+        apiClient.getConnections().catch(() => []),
+        userType === 'founder' ? apiClient.getMyVentures().catch(() => []) : Promise.resolve([]),
+      ]);
       const mapped = mapUserToProfile(latestUser);
+
+      // Use actual connection list length (all returned connections are accepted)
+      const connectionCount = (connections || []).length;
+
+      // Map ventures to the profile startup format
+      const startups = (myVentures || []).map((v: any) => ({
+        name: v.name || '',
+        description: v.tagline || v.description || '',
+        industry: v.industry || v.sector || '',
+        stage: v.stage || '',
+        fundingRaised: v.funding_amount || v.funding_raised || '$0',
+        readinessScore: v.uruti_score || v.readiness_score || 0,
+        logo: v.logo_url || '',
+        id: v.id,
+      }));
 
       setProfile((prev) => ({
         ...prev,
         ...mapped,
+        connections: connectionCount,
+        startups,
       }));
 
       updateUser({
@@ -287,24 +294,10 @@ export function ProfileModule({
     }
   };
 
-  const handleAddExperience = (experience: any) => {
-    setProfile({
-      ...profile,
-      experience: [experience, ...profile.experience]
-    });
-  };
-
   const handleAddAchievement = (achievement: any) => {
     setProfile({
       ...profile,
       achievements: [achievement, ...profile.achievements]
-    });
-  };
-
-  const handleAddActivity = (activity: any) => {
-    setProfile({
-      ...profile,
-      activity: [activity, ...profile.activity]
     });
   };
 
@@ -366,10 +359,6 @@ export function ProfileModule({
                     <Users className="h-4 w-4" />
                     <span>{profile.connections} connections</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Star className="h-4 w-4 text-[#76B947] fill-[#76B947]" />
-                    <span>{profile.followers} followers</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -422,17 +411,9 @@ export function ProfileModule({
             <TabsTrigger value="overview" className="data-[state=active]:border-b-2 data-[state=active]:border-[#76B947] rounded-none">
               Overview
             </TabsTrigger>
-            <TabsTrigger value="experience" className="data-[state=active]:border-b-2 data-[state=active]:border-[#76B947] rounded-none">
-              Experience
-            </TabsTrigger>
             <TabsTrigger value={userType === 'founder' ? 'startups' : 'portfolio'} className="data-[state=active]:border-b-2 data-[state=active]:border-[#76B947] rounded-none">
               {userType === 'founder' ? 'Startups' : 'Portfolio'}
             </TabsTrigger>
-            {userType === 'founder' && (
-              <TabsTrigger value="activity" className="data-[state=active]:border-b-2 data-[state=active]:border-[#76B947] rounded-none">
-                Activity
-              </TabsTrigger>
-            )}
           </TabsList>
         </Card>
 
@@ -472,38 +453,7 @@ export function ProfileModule({
                 </CardContent>
               </Card>
 
-              {/* Experience Preview */}
-              <Card className="glass-card border-black/5 dark:border-white/10">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>Experience</CardTitle>
-                  <Button variant="ghost" size="sm" onClick={() => setActiveTab('experience')}>
-                    View all
-                  </Button>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {profile.experience.slice(0, 2).map((exp, index) => (
-                    <div key={index} className="flex gap-4">
-                      <Avatar className="h-12 w-12 border border-[#76B947]/30">
-                        <AvatarImage src={exp.logo} />
-                        <AvatarFallback className="bg-[#76B947]/10 text-[#76B947]">
-                          {exp.company.substring(0, 2)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <h4 className="font-semibold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                          {exp.title}
-                        </h4>
-                        <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                          {exp.company}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {exp.startDate} - {exp.endDate} • {exp.location}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
+
             </div>
 
             {/* Right Column */}
@@ -679,85 +629,6 @@ export function ProfileModule({
           </div>
         </TabsContent>
 
-        {/* Experience Tab */}
-        <TabsContent value="experience" className="space-y-6">
-          {/* Experience */}
-          <Card className="glass-card border-black/5 dark:border-white/10">
-            <CardHeader>
-              <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>
-                <Briefcase className="h-5 w-5 inline mr-2 text-[#76B947]" />
-                Professional Experience
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {profile.experience.map((exp, index) => (
-                <div key={index} className="flex gap-4 pb-6 border-b last:border-b-0 dark:border-gray-700">
-                  <Avatar className="h-14 w-14 border border-[#76B947]/30">
-                    <AvatarImage src={exp.logo} />
-                    <AvatarFallback className="bg-[#76B947]/10 text-[#76B947]">
-                      {exp.company.substring(0, 2)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h4 className="font-semibold text-lg dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                          {exp.title}
-                        </h4>
-                        <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                          {exp.company}
-                        </p>
-                      </div>
-                      {exp.current && (
-                        <Badge className="bg-[#76B947] text-white">Current</Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      {exp.startDate} - {exp.endDate} • {exp.location}
-                    </p>
-                    <p className="text-sm text-muted-foreground leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>
-                      {exp.description}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* Education */}
-          <Card className="glass-card border-black/5 dark:border-white/10">
-            <CardHeader>
-              <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>
-                <GraduationCap className="h-5 w-5 inline mr-2 text-[#76B947]" />
-                Education
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {profile.education.map((edu, index) => (
-                <div key={index} className="flex gap-4">
-                  <Avatar className="h-14 w-14 border border-[#76B947]/30">
-                    <AvatarImage src={edu.logo} />
-                    <AvatarFallback className="bg-[#76B947]/10 text-[#76B947]">
-                      {edu.institution.substring(0, 2)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <h4 className="font-semibold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                      {edu.institution}
-                    </h4>
-                    <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                      {edu.degree} in {edu.field}
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {edu.startDate} - {edu.endDate}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {/* Startups/Portfolio Tab */}
         <TabsContent value={userType === 'founder' ? 'startups' : 'portfolio'} className="space-y-6">
           <Card className="glass-card border-black/5 dark:border-white/10">
@@ -905,75 +776,6 @@ export function ProfileModule({
           </Card>
         </TabsContent>
 
-        {/* Activity Tab */}
-        {userType === 'founder' && (
-          <TabsContent value="activity" className="space-y-4">
-            <Card className="glass-card border-black/5 dark:border-white/10">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>
-                  <TrendingUp className="h-5 w-5 inline mr-2 text-[#76B947]" />
-                  Recent Activity
-                </CardTitle>
-                {isOwnProfile && (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setAddActivityOpen(true)}
-                    className="hover:bg-[#76B947]/10 hover:text-[#76B947]"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Activity
-                  </Button>
-                )}
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {profile.activity.length === 0 ? (
-                  <div className="text-center py-12">
-                    <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground mb-4" style={{ fontFamily: 'var(--font-body)' }}>
-                      No activity yet. Start tracking your entrepreneurial journey!
-                    </p>
-                    {isOwnProfile && (
-                      <Button 
-                        onClick={() => setAddActivityOpen(true)}
-                        className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Your First Activity
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  profile.activity.map((item, index) => (
-                    <div key={index} className="glass-panel p-4 rounded-lg hover:bg-[#76B947]/5 transition-all">
-                      <div className="flex items-start gap-4">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          item.type === 'pitch' ? 'bg-blue-500/10' :
-                          item.type === 'milestone' ? 'bg-[#76B947]/10' :
-                          item.type === 'funding' ? 'bg-purple-500/10' :
-                          item.type === 'investment' ? 'bg-green-500/10' :
-                          'bg-gray-500/10'
-                        }`}>
-                          {item.type === 'pitch' && <FileText className="h-5 w-5 text-blue-500" />}
-                          {item.type === 'milestone' && <Target className="h-5 w-5 text-[#76B947]" />}
-                          {item.type === 'funding' && <DollarSign className="h-5 w-5 text-purple-500" />}
-                          {item.type === 'investment' && <TrendingUp className="h-5 w-5 text-green-500" />}
-                          {item.type === 'event' && <Calendar className="h-5 w-5 text-orange-500" />}
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm dark:text-white" style={{ fontFamily: 'var(--font-body)' }}>
-                            {item.content}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">{item.date}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
       </Tabs>
 
       {/* Dialogs */}
@@ -983,6 +785,12 @@ export function ProfileModule({
         profile={profile}
         onSave={handleSaveProfile}
         userType={userType}
+      />
+      <ShareProfileDialog
+        open={shareProfileOpen}
+        onOpenChange={setShareProfileOpen}
+        profileName={profile.name}
+        profileUrl={profileUrl}
       />
     </div>
   );

@@ -253,7 +253,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: context.colors.accent,
                 shape: BoxShape.circle,
               ),
               child: ClipOval(
@@ -307,12 +307,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             icon: Icon(
               Icons.help_outline_rounded,
               size: 16,
-              color: AppColors.primary,
+              color: context.colors.accent,
             ),
             label: Text(
               'Help Center',
               style: TextStyle(
-                color: AppColors.primary,
+                color: context.colors.accent,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 letterSpacing: -0.3,
@@ -332,13 +332,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     vertical: 10,
                   ),
                   color: isDark
-                      ? AppColors.primary.withAlpha(30)
-                      : AppColors.primary.withAlpha(20),
+                      ? context.colors.accent.withAlpha(30)
+                      : context.colors.accent.withAlpha(20),
                   child: Row(
                     children: [
                       Icon(
                         Icons.info_outline_rounded,
-                        color: AppColors.primary,
+                        color: context.colors.accent,
                         size: 16,
                       ),
                       const SizedBox(width: 8),
@@ -348,7 +348,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               ? 'Describe your issue below. Our team will review and respond as soon as possible.'
                               : 'Describe your issue below. Our team will reset your password manually after verifying your identity.',
                           style: TextStyle(
-                            color: AppColors.primary,
+                            color: context.colors.accent,
                             fontSize: 12,
                             letterSpacing: -0.3,
                           ),
@@ -389,7 +389,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             width: 30,
                             height: 30,
                             decoration: BoxDecoration(
-                              color: AppColors.primary,
+                              color: context.colors.accent,
                               shape: BoxShape.circle,
                             ),
                             child: ClipOval(
@@ -445,14 +445,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withAlpha(isDark ? 40 : 25),
+                  color: context.colors.accent.withAlpha(isDark ? 40 : 25),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   _isSupportMode
                       ? Icons.support_agent_rounded
                       : Icons.lock_reset_rounded,
-                  color: AppColors.primary,
+                  color: context.colors.accent,
                   size: 36,
                 ),
               ),
@@ -537,7 +537,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               child: ElevatedButton(
                 onPressed: _startingChat ? null : _startChat,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: context.colors.accent,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -599,7 +599,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+        borderSide: BorderSide(color: context.colors.accent, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -624,7 +624,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               height: 30,
               margin: const EdgeInsets.only(right: 8),
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: context.colors.accent,
                 shape: BoxShape.circle,
               ),
               child: ClipOval(
@@ -650,7 +650,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     maxWidth: MediaQuery.of(context).size.width * 0.72,
                   ),
                   decoration: BoxDecoration(
-                    color: isUser ? AppColors.primary : colors.card,
+                    color: isUser ? context.colors.accent : colors.card,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(18),
                       topRight: const Radius.circular(18),
@@ -696,7 +696,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       Icon(
                         Icons.done_all_rounded,
                         size: 13,
-                        color: AppColors.primary,
+                        color: context.colors.accent,
                       ),
                     ],
                   ],
@@ -768,7 +768,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: context.colors.accent,
                 shape: BoxShape.circle,
               ),
               child: const Icon(

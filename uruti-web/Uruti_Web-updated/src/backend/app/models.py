@@ -136,6 +136,7 @@ class User(Base):
     ai_track_progress = relationship("AITrackProgress", back_populates="user", cascade="all, delete-orphan")
     ai_chat_messages = relationship("AiChatMessage", back_populates="user", cascade="all, delete-orphan")
     advisory_material_progress = relationship("AdvisoryMaterialProgress", back_populates="user", cascade="all, delete-orphan")
+    sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
 
 
 class Venture(Base):
@@ -175,7 +176,15 @@ class Venture(Base):
     # Uruti Score
     uruti_score = Column(Float, default=0.0)
     score_breakdown = Column(JSON, nullable=True)  # Detailed score metrics
-    
+
+    # Extended Info (editable by founder, visible to investors)
+    highlights = Column(JSON, nullable=True)  # List of key highlight strings
+    competitive_edge = Column(Text, nullable=True)
+    team_background = Column(Text, nullable=True)
+    funding_plans = Column(Text, nullable=True)
+    milestones = Column(JSON, nullable=True)  # [{title, description, status}]
+    activities = Column(JSON, nullable=True)  # [{id, type, title, description, date}]
+
     # Media
     logo_url = Column(String, nullable=True)
     banner_url = Column(String, nullable=True)
@@ -501,6 +510,24 @@ class AiChatMessage(Base):
 
     # Relationships
     user = relationship("User", back_populates="ai_chat_messages")
+
+
+class UserSession(Base):
+    """Tracks active device sessions for linked-device management."""
+    __tablename__ = "user_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    device_id = Column(String, nullable=True, index=True)
+    device_name = Column(String, nullable=True)
+    platform = Column(String, nullable=True)  # ios, android, web
+    os = Column(String, nullable=True)
+    ip_address = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    last_active = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="sessions")
 
 
 class AdvisoryTrack(Base):

@@ -49,16 +49,16 @@ class _StartupLeaderboardScreenState extends State<StartupLeaderboardScreen> {
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: context.colors.appBarBg,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: context.colors.textPrimary),
+          icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () =>
               context.canPop() ? context.pop() : context.go('/home'),
         ),
         title: Text(
           'Leaderboard',
           style: TextStyle(
-            color: context.colors.textPrimary,
+            color: Colors.white,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -66,14 +66,14 @@ class _StartupLeaderboardScreenState extends State<StartupLeaderboardScreen> {
           IconButton(
             icon: Icon(
               Icons.explore_outlined,
-              color: context.colors.textPrimary,
+              color: Colors.white,
             ),
             onPressed: () => context.go('/discovery'),
           ),
         ],
       ),
       body: _loading
-          ? Center(child: CircularProgressIndicator(color: AppColors.primary))
+          ? Center(child: CircularProgressIndicator(color: context.colors.accent))
           : Column(
               children: [
                 // Header
@@ -152,7 +152,7 @@ class _LeaderboardRow extends StatelessWidget {
         ? 'Medium'
         : 'High';
     final riskColor = score > 80
-        ? AppColors.primary
+        ? context.colors.accent
         : score > 60
         ? const Color(0xFFFFB800)
         : AppColors.error;
@@ -212,7 +212,7 @@ class _LeaderboardRow extends StatelessWidget {
                       child: Text(
                         initials,
                         style: TextStyle(
-                          color: AppColors.primary,
+                          color: context.colors.accent,
                           fontWeight: FontWeight.w800,
                           fontSize: 13,
                         ),
@@ -276,7 +276,7 @@ class _LeaderboardRow extends StatelessWidget {
                 Text(
                   '$score',
                   style: TextStyle(
-                    color: AppColors.primary,
+                    color: context.colors.accent,
                     fontWeight: FontWeight.w900,
                     fontSize: 22,
                   ),
@@ -285,12 +285,12 @@ class _LeaderboardRow extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.arrow_upward,
-                      color: AppColors.primary,
+                      color: context.colors.accent,
                       size: 12,
                     ),
                     Text(
                       'Uruti',
-                      style: TextStyle(color: AppColors.primary, fontSize: 11),
+                      style: TextStyle(color: context.colors.accent, fontSize: 11),
                     ),
                   ],
                 ),

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useConfirmDialog } from '../ui/confirm-dialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -33,6 +34,7 @@ interface Startup {
 }
 
 export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { name: string; description: string }) => void }) {
+  const { confirm } = useConfirmDialog();
   const [startups, setStartups] = useState<Startup[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSector, setFilterSector] = useState('all');
@@ -124,64 +126,44 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
     }
   };
 
-  const handleViewDetails = (startup: Startup) => {
-    // Convert startup to venture format for VentureDetailView
-    const ventureData = {
-      id: startup.id,
-      name: startup.name,
-      sector: startup.sector,
-      tagline: startup.solutionHypothesis,
-      problem: startup.problemStatement,
-      solution: startup.solutionHypothesis,
-      targetMarket: startup.targetMarket,
-      urutiScore: startup.urutiScore || 0,
-      activeUsers: 1250,
-      monthlyGrowth: 15,
-      highlights: [
-        'AI-powered matching algorithm',
-        'Growing user base of 1,250+ farmers',
-        'Partnership with 3 major equipment providers',
-        'Proven 15% monthly growth'
-      ],
-      teamBackground: 'Our team combines agricultural expertise with cutting-edge technology. Led by experienced professionals passionate about transforming farming in Rwanda.',
-      competitiveEdge: 'First-to-market AI solution specifically designed for Rwandan farming communities with proven traction.',
-      fundingPlans: 'Expand to new regions, develop mobile app features, and scale partnerships.',
-      milestones: [
-        {
-          title: 'Platform Launch',
-          description: 'Successfully launched MVP and onboarded first 100 farmers',
-          status: 'completed' as const
-        },
-        {
-          title: 'Market Validation',
-          description: 'Achieved product-market fit with 1,250+ active users',
-          status: 'completed' as const
-        },
-        {
-          title: 'Scale & Growth',
-          description: 'Expand to 3 additional provinces and reach 5,000 farmers',
-          status: 'in-progress' as const
-        }
-      ],
-      activities: [
-        {
-          id: '1',
-          type: 'milestone' as const,
-          title: 'Milestone Achieved',
-          description: 'Reached 1,250 active farmers on our platform! This represents a 200% growth from our initial launch.',
-          date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          id: '2',
-          type: 'funding' as const,
-          title: 'Funding Update',
-          description: 'Completed seed funding round of $250K from local angel investors. Funds will be used for platform development and market expansion.',
-          date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-        }
-      ]
-    };
-    
-    setViewingStartup(ventureData);
+  const handleViewDetails = async (startup: Startup) => {
+    try {
+      // Fetch full venture details from backend
+      const venture = await apiClient.getVentureById(Number(startup.id));
+
+      // Map snake_case API response to camelCase for VentureDetailView
+      const ventureData = {
+        id: String(venture.id),
+        name: venture.name || startup.name,
+        sector: venture.industry || startup.sector,
+        tagline: venture.tagline || '',
+        problem: venture.problem_statement || startup.problemStatement || '',
+        solution: venture.solution || startup.solutionHypothesis || '',
+        targetMarket: venture.target_market || startup.targetMarket || '',
+        urutiScore: venture.uruti_score || 0,
+        activeUsers: venture.customers || 0,
+        monthlyGrowth: venture.mrr ? Math.round((venture.mrr / Math.max(venture.monthly_burn_rate || 1, 1)) * 100) : 0,
+        highlights: venture.highlights || [],
+        teamBackground: venture.team_background || '',
+        competitiveEdge: venture.competitive_edge || '',
+        fundingPlans: venture.funding_plans || '',
+        milestones: venture.milestones || [],
+        activities: venture.activities || [],
+        pitchDeckUrl: venture.pitch_deck_url || '',
+        pitchVideoUrl: venture.demo_video_url || '',
+        thumbnailUrl: venture.banner_url || '',
+        fundingGoal: venture.funding_goal || 0,
+        fundingRaised: venture.funding_raised || 0,
+        teamSize: venture.team_size || 1,
+        stage: venture.stage || '',
+        founderId: venture.founder_id || 0,
+      };
+
+      setViewingStartup(ventureData);
+    } catch (error) {
+      console.error('Failed to load venture details:', error);
+      toast.error('Failed to load venture details');
+    }
   };
 
   const handleEditVenture = (startup: Startup) => {
@@ -235,12 +217,39 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
               handleEditVenture(startupForEdit);
             }
           }}
-          onAddActivity={(activity) => {
-            // Handle adding activity
-            setViewingStartup({
-              ...viewingStartup,
-              activities: [activity, ...(viewingStartup.activities || [])]
-            });
+          onAddActivity={async (activity) => {
+            // Persist activity to backend
+            const updatedActivities = [activity, ...(viewingStartup.activities || [])];
+            try {
+              await apiClient.updateVenture(Number(viewingStartup.id), {
+                activities: updatedActivities,
+              });
+              setViewingStartup({
+                ...viewingStartup,
+                activities: updatedActivities,
+              });
+            } catch (error) {
+              console.error('Failed to save activity:', error);
+              toast.error('Failed to save activity update');
+            }
+          }}
+          onDeleteActivity={async (activityId) => {
+            // Remove activity and persist to backend
+            const updatedActivities = (viewingStartup.activities || []).filter(
+              (a: any) => a.id !== activityId
+            );
+            try {
+              await apiClient.updateVenture(Number(viewingStartup.id), {
+                activities: updatedActivities,
+              });
+              setViewingStartup({
+                ...viewingStartup,
+                activities: updatedActivities,
+              });
+            } catch (error) {
+              console.error('Failed to delete activity:', error);
+              toast.error('Failed to delete activity');
+            }
           }}
         />
       </div>
@@ -546,8 +555,13 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
                           variant="ghost"
                           size="sm"
                           className="hover:bg-destructive/10 text-destructive"
-                          onClick={() => {
-                            const confirmed = window.confirm(`Delete "${startup.name}"?`);
+                          onClick={async () => {
+                            const confirmed = await confirm({
+                              title: 'Delete Startup',
+                              description: `Delete "${startup.name}"? This action cannot be undone.`,
+                              confirmLabel: 'Delete',
+                              variant: 'danger',
+                            });
                             if (!confirmed) return;
                             toast.info('Delete from this list is not wired yet.');
                           }}

@@ -246,144 +246,134 @@ class _MainScaffoldState extends State<MainScaffold>
   Widget _buildBottomNav(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
     final navItems = _navItemsForUser(user);
+    final accent = context.isDarkMode ? AppColors.primary : Colors.black;
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-        child: Container(
-          height: 64,
-          decoration: BoxDecoration(
-            color: context.colors.surface,
-            borderRadius: BorderRadius.circular(5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.18),
-                blurRadius: 24,
-                offset: const Offset(0, -4),
-              ),
-            ],
+    return Container(
+      height: 64 + MediaQuery.of(context).padding.bottom,
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 24,
+            offset: const Offset(0, -4),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(5),
-            child: LayoutBuilder(
-              builder: (ctx, constraints) {
-                final totalW = constraints.maxWidth;
-                final tabW = totalW / navItems.length;
-                return AnimatedBuilder(
-                  animation: _indicatorCtrl,
-                  builder: (_, __) {
-                    final pos = _indicatorPos.value;
-                    final stretch = _indicatorStretch.value;
-                    final pillW = tabW * 0.44 * stretch;
-                    final centerX = (pos + 0.5) * tabW;
-                    return Stack(
-                      children: [
-                        // Liquid pill indicator
-                        Positioned(
-                          bottom: 7,
-                          left: (centerX - pillW / 2).clamp(
-                            0.0,
-                            totalW - pillW,
-                          ),
-                          child: Container(
-                            width: pillW,
-                            height: 3,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
+        ],
+      ),
+      child: ClipRect(
+        child: LayoutBuilder(
+          builder: (ctx, constraints) {
+            final totalW = constraints.maxWidth;
+            final tabW = totalW / navItems.length;
+            return AnimatedBuilder(
+              animation: _indicatorCtrl,
+              builder: (_, __) {
+                final pos = _indicatorPos.value;
+                final stretch = _indicatorStretch.value;
+                final pillW = tabW * 0.44 * stretch;
+                final centerX = (pos + 0.5) * tabW;
+                return Stack(
+                  children: [
+                    // Liquid pill indicator
+                    Positioned(
+                      bottom: 7,
+                      left: (centerX - pillW / 2).clamp(0.0, totalW - pillW),
+                      child: Container(
+                        width: pillW,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: accent,
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                        // Tab items
-                        Row(
-                          children: List.generate(navItems.length, (i) {
-                            final active = i == widget.currentIndex;
-                            final item = navItems[i];
-                            return Expanded(
-                              child: GestureDetector(
-                                onTap: () => _onTabTap(i),
-                                behavior: HitTestBehavior.opaque,
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                      ),
+                    ),
+                    // Tab items
+                    Row(
+                      children: List.generate(navItems.length, (i) {
+                        final active = i == widget.currentIndex;
+                        final item = navItems[i];
+                        return Expanded(
+                          child: GestureDetector(
+                            onTap: () => _onTabTap(i),
+                            behavior: HitTestBehavior.opaque,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Stack(
+                                  clipBehavior: Clip.none,
                                   children: [
-                                    Stack(
-                                      clipBehavior: Clip.none,
-                                      children: [
-                                        AnimatedSwitcher(
-                                          duration: const Duration(
-                                            milliseconds: 200,
-                                          ),
-                                          child: Icon(
-                                            active
-                                                ? item.activeIcon
-                                                : item.icon,
-                                            key: ValueKey(active),
-                                            color: active
-                                                ? AppColors.primary
-                                                : context.colors.navInactive,
-                                            size: 22,
-                                          ),
-                                        ),
-                                        if (i == 3 && _inboxUnreadCount > 0)
-                                          Positioned(
-                                            top: -6,
-                                            right: -10,
-                                            child: Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 5,
-                                                    vertical: 2,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.redAccent,
-                                                borderRadius:
-                                                    BorderRadius.circular(10),
-                                              ),
-                                              constraints: const BoxConstraints(
-                                                minWidth: 16,
-                                                minHeight: 14,
-                                              ),
-                                              child: Text(
-                                                _inboxUnreadCount > 99
-                                                    ? '99+'
-                                                    : '$_inboxUnreadCount',
-                                                textAlign: TextAlign.center,
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      item.label,
-                                      style: TextStyle(
+                                    AnimatedSwitcher(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      child: Icon(
+                                        active ? item.activeIcon : item.icon,
+                                        key: ValueKey(active),
                                         color: active
-                                            ? AppColors.primary
+                                            ? accent
                                             : context.colors.navInactive,
-                                        fontSize: 11,
-                                        fontWeight: active
-                                            ? FontWeight.w600
-                                            : FontWeight.normal,
+                                        size: 22,
                                       ),
                                     ),
+                                    if (i == 3 && _inboxUnreadCount > 0)
+                                      Positioned(
+                                        top: -6,
+                                        right: -10,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 5,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.redAccent,
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
+                                          constraints: const BoxConstraints(
+                                            minWidth: 16,
+                                            minHeight: 14,
+                                          ),
+                                          child: Text(
+                                            _inboxUnreadCount > 99
+                                                ? '99+'
+                                                : '$_inboxUnreadCount',
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                   ],
                                 ),
-                              ),
-                            );
-                          }),
-                        ),
-                      ],
-                    );
-                  },
+                                const SizedBox(height: 3),
+                                Text(
+                                  item.label,
+                                  style: TextStyle(
+                                    color: active
+                                        ? accent
+                                        : context.colors.navInactive,
+                                    fontSize: 11,
+                                    fontWeight: active
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
                 );
               },
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
@@ -392,10 +382,7 @@ class _MainScaffoldState extends State<MainScaffold>
   // ─── Drawer ───────────────────────────────────────────────────────────────
 
   Widget _buildDrawer(BuildContext context, user, AuthProvider auth) {
-    final tabs = _tabsForUser(user);
-    final currentRoute = tabs.length > widget.currentIndex
-        ? tabs[widget.currentIndex]
-        : '/home';
+    final currentRoute = GoRouterState.of(context).uri.path;
     final isFounder = user?.isFounder ?? false;
     final isInvestor = user?.isInvestor ?? false;
 
@@ -417,7 +404,11 @@ class _MainScaffoldState extends State<MainScaffold>
               color: context.colors.background.withValues(alpha: 0.88),
               border: Border(
                 right: BorderSide(
-                  color: AppColors.primary.withValues(alpha: 0.22),
+                  color:
+                      (context.isDarkMode
+                              ? AppColors.primary
+                              : AppColors.purple)
+                          .withValues(alpha: 0.22),
                   width: 1,
                 ),
                 top: BorderSide(
@@ -456,7 +447,11 @@ class _MainScaffoldState extends State<MainScaffold>
                               shape: BoxShape.circle,
                               color: context.colors.darkGreenMid,
                               border: Border.all(
-                                color: AppColors.primary.withValues(alpha: 0.4),
+                                color:
+                                    (context.isDarkMode
+                                            ? AppColors.primary
+                                            : AppColors.purple)
+                                        .withValues(alpha: 0.4),
                                 width: 1.5,
                               ),
                             ),
@@ -539,15 +534,19 @@ class _MainScaffoldState extends State<MainScaffold>
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: AppColors.primary.withValues(
-                                      alpha: 0.15,
-                                    ),
+                                    color:
+                                        (context.isDarkMode
+                                                ? AppColors.primary
+                                                : AppColors.purple)
+                                            .withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
                                     _capitalize(user?.role ?? 'user'),
                                     style: TextStyle(
-                                      color: AppColors.primary,
+                                      color: context.isDarkMode
+                                          ? AppColors.primary
+                                          : AppColors.purple,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -566,6 +565,13 @@ class _MainScaffoldState extends State<MainScaffold>
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         children: [
                           if (isFounder) ...[
+                            _item(
+                              context,
+                              Icons.home_outlined,
+                              'Home',
+                              '/home',
+                              currentRoute,
+                            ),
                             _item(
                               context,
                               Icons.person_outline_rounded,
@@ -789,7 +795,9 @@ class _MainScaffoldState extends State<MainScaffold>
                               trailing: Switch.adaptive(
                                 value: theme.isDark,
                                 onChanged: (_) => theme.toggle(),
-                                activeColor: AppColors.primary,
+                                activeColor: context.isDarkMode
+                                    ? AppColors.primary
+                                    : AppColors.purple,
                               ),
                               onTap: theme.toggle,
                             ),
@@ -902,7 +910,8 @@ class _MainScaffoldState extends State<MainScaffold>
     String currentRoute, {
     int badgeCount = 0,
   }) {
-    final isActive = currentRoute == route;
+    final isActive =
+        currentRoute == route || currentRoute.startsWith('$route/');
     final showBadge = route == '/inbox' && badgeCount > 0;
     return Container(
       margin: const EdgeInsets.only(bottom: 2),

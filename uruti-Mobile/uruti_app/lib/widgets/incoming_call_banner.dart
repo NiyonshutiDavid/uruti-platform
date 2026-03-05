@@ -164,7 +164,7 @@ class _IncomingCallBannerState extends State<IncomingCallBanner> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(11),
                   border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.85),
+                    color: context.colors.accent.withValues(alpha: 0.85),
                     width: 1.6,
                   ),
                 ),

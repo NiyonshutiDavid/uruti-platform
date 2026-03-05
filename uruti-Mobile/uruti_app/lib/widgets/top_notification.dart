@@ -56,7 +56,7 @@ class _TopNotificationBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final icon = isError ? Icons.error_outline_rounded : Icons.notifications;
-    final accent = isError ? Colors.redAccent : AppColors.primary;
+    final accent = isError ? Colors.redAccent : context.colors.accent;
 
     return SafeArea(
       child: Align(

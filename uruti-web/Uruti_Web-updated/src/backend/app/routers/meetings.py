@@ -4,15 +4,46 @@ from sqlalchemy import desc, or_
 from typing import List
 from datetime import datetime, timedelta
 from ..database import get_db
-from ..models import User, Meeting
+from ..models import User, Meeting, NotificationType, MeetingStatus
 from ..schemas import MeetingCreate, MeetingResponse, MeetingUpdate
 from ..auth import get_current_active_user
+from .notifications import create_notification, publish_notification
 
 router = APIRouter(prefix="/meetings", tags=["Meetings"])
 
 
+def _meeting_route_for_user(user_id: int, meeting: Meeting) -> str:
+    if meeting.participant_id == user_id:
+        return "/dashboard/availability"
+    return "/dashboard/calendar"
+
+
+async def _notify_user_about_meeting(
+    *,
+    db: Session,
+    user_id: int,
+    title: str,
+    message: str,
+    meeting: Meeting,
+    action: str,
+):
+    notification = create_notification(
+        db,
+        user_id=user_id,
+        title=title,
+        message=message,
+        notification_type=NotificationType.MEETING,
+        data={
+            "meeting_id": meeting.id,
+            "action": action,
+            "route": _meeting_route_for_user(user_id, meeting),
+        },
+    )
+    await publish_notification(notification, db)
+
+
 @router.post("/", response_model=MeetingResponse, status_code=status.HTTP_201_CREATED)
-def create_meeting(
+async def create_meeting(
     meeting_data: MeetingCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -27,6 +58,25 @@ def create_meeting(
     # Validate time
     if meeting_data.end_time <= meeting_data.start_time:
         raise HTTPException(status_code=400, detail="End time must be after start time")
+
+    # Prevent host from booking themselves
+    if meeting_data.participant_id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot book a meeting with yourself")
+
+    # Prevent overlapping bookings for either participant
+    for user_id in [current_user.id, meeting_data.participant_id]:
+        conflict = db.query(Meeting).filter(
+            or_(Meeting.host_id == user_id, Meeting.participant_id == user_id),
+            Meeting.status != MeetingStatus.CANCELLED,
+            Meeting.start_time < meeting_data.end_time,
+            Meeting.end_time > meeting_data.start_time,
+        ).first()
+
+        if conflict:
+            raise HTTPException(
+                status_code=409,
+                detail="Selected slot is already booked",
+            )
     
     # Create meeting
     db_meeting = Meeting(
@@ -45,8 +95,16 @@ def create_meeting(
     db.add(db_meeting)
     db.commit()
     db.refresh(db_meeting)
-    
-    # TODO: Create notification for participant
+
+    host_name = current_user.full_name or current_user.email
+    await _notify_user_about_meeting(
+        db=db,
+        user_id=participant.id,
+        title="New meeting request",
+        message=f"{host_name} requested a meeting: {db_meeting.title}",
+        meeting=db_meeting,
+        action="review",
+    )
     
     return db_meeting
 
@@ -70,6 +128,13 @@ def get_meetings(
     )
     
     if status_filter:
+        # Validate against the enum to avoid DB errors
+        valid_statuses = [s.value for s in MeetingStatus]
+        if status_filter not in valid_statuses:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status_filter '{status_filter}'. Valid values: {valid_statuses}"
+            )
         query = query.filter(Meeting.status == status_filter)
     
     if upcoming:
@@ -78,6 +143,30 @@ def get_meetings(
     
     meetings = query.order_by(Meeting.start_time).offset(skip).limit(limit).all()
     
+    return meetings
+
+
+@router.get("/calendar/upcoming", response_model=List[MeetingResponse])
+def get_upcoming_meetings(
+    days: int = 7,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get upcoming meetings for next N days"""
+
+    now = datetime.utcnow()
+    future = now + timedelta(days=days)
+
+    meetings = db.query(Meeting).filter(
+        or_(
+            Meeting.host_id == current_user.id,
+            Meeting.participant_id == current_user.id
+        ),
+        Meeting.start_time >= now,
+        Meeting.start_time <= future,
+        Meeting.status == "scheduled"
+    ).order_by(Meeting.start_time).all()
+
     return meetings
 
 
@@ -101,7 +190,7 @@ def get_meeting(
 
 
 @router.put("/{meeting_id}", response_model=MeetingResponse)
-def update_meeting(
+async def update_meeting(
     meeting_id: int,
     meeting_update: MeetingUpdate,
     db: Session = Depends(get_db),
@@ -124,14 +213,24 @@ def update_meeting(
     
     db.commit()
     db.refresh(meeting)
-    
-    # TODO: Create notification for participant
+
+    participant = db.query(User).filter(User.id == meeting.participant_id).first()
+    host_name = current_user.full_name or current_user.email
+    if participant:
+        await _notify_user_about_meeting(
+            db=db,
+            user_id=participant.id,
+            title="Meeting updated",
+            message=f"{host_name} updated meeting details for: {meeting.title}",
+            meeting=meeting,
+            action="updated",
+        )
     
     return meeting
 
 
 @router.delete("/{meeting_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_meeting(
+async def delete_meeting(
     meeting_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -148,14 +247,24 @@ def delete_meeting(
     
     meeting.status = "cancelled"
     db.commit()
-    
-    # TODO: Create notification for participant
+
+    participant = db.query(User).filter(User.id == meeting.participant_id).first()
+    host_name = current_user.full_name or current_user.email
+    if participant:
+        await _notify_user_about_meeting(
+            db=db,
+            user_id=participant.id,
+            title="Meeting cancelled",
+            message=f"{host_name} cancelled meeting: {meeting.title}",
+            meeting=meeting,
+            action="cancelled",
+        )
     
     return None
 
 
 @router.put("/{meeting_id}/accept", response_model=MeetingResponse)
-def accept_meeting(
+async def accept_meeting(
     meeting_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -178,14 +287,22 @@ def accept_meeting(
     meeting.status = "scheduled"
     db.commit()
     db.refresh(meeting)
-    
-    # TODO: Create notification for host
+
+    participant_name = current_user.full_name or current_user.email
+    await _notify_user_about_meeting(
+        db=db,
+        user_id=meeting.host_id,
+        title="Meeting approved",
+        message=f"{participant_name} approved your meeting: {meeting.title}",
+        meeting=meeting,
+        action="approved",
+    )
     
     return meeting
 
 
 @router.put("/{meeting_id}/reject", status_code=status.HTTP_204_NO_CONTENT)
-def reject_meeting(
+async def reject_meeting(
     meeting_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -202,31 +319,16 @@ def reject_meeting(
     
     meeting.status = "cancelled"
     db.commit()
-    
-    # TODO: Create notification for host
+
+    participant_name = current_user.full_name or current_user.email
+    await _notify_user_about_meeting(
+        db=db,
+        user_id=meeting.host_id,
+        title="Meeting declined",
+        message=f"{participant_name} declined your meeting: {meeting.title}",
+        meeting=meeting,
+        action="declined",
+    )
     
     return None
 
-
-@router.get("/calendar/upcoming", response_model=List[MeetingResponse])
-def get_upcoming_meetings(
-    days: int = 7,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-):
-    """Get upcoming meetings for next N days"""
-    
-    now = datetime.utcnow()
-    future = now + timedelta(days=days)
-    
-    meetings = db.query(Meeting).filter(
-        or_(
-            Meeting.host_id == current_user.id,
-            Meeting.participant_id == current_user.id
-        ),
-        Meeting.start_time >= now,
-        Meeting.start_time <= future,
-        Meeting.status == "scheduled"
-    ).order_by(Meeting.start_time).all()
-    
-    return meetings

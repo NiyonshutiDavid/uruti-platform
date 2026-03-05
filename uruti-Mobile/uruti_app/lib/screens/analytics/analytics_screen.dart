@@ -61,15 +61,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: context.colors.appBarBg,
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
+          icon: Icon(Icons.menu_rounded, color: Colors.white),
           onPressed: () => MainScaffold.scaffoldKey.currentState?.openDrawer(),
         ),
         title: Text(
           'Analytics',
           style: TextStyle(
-            color: context.colors.textPrimary,
+            color: Colors.white,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -97,7 +97,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       Text(
                         _loading ? '—' : '$score',
                         style: TextStyle(
-                          color: AppColors.primary,
+                          color: context.colors.accent,
                           fontWeight: FontWeight.w900,
                           fontSize: 28,
                         ),
@@ -109,20 +109,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
+                          color: context.colors.accent.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
                           children: [
                             Icon(
                               Icons.arrow_upward,
-                              color: AppColors.primary,
+                              color: context.colors.accent,
                               size: 12,
                             ),
                             Text(
                               'Current score',
                               style: TextStyle(
-                                color: AppColors.primary,
+                                color: context.colors.accent,
                                 fontSize: 11,
                               ),
                             ),
@@ -151,8 +151,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                       child: Container(
                                         decoration: BoxDecoration(
                                           color: e.key == 7
-                                              ? AppColors.primary
-                                              : AppColors.primary.withValues(
+                                              ? context.colors.accent
+                                              : context.colors.accent.withValues(
                                                   alpha: 0.3,
                                                 ),
                                           borderRadius:
@@ -263,7 +263,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                               child: LinearProgressIndicator(
                                 value: e.$2 / 10,
                                 backgroundColor: context.colors.divider,
-                                color: AppColors.primary,
+                                color: context.colors.accent,
                                 minHeight: 10,
                               ),
                             ),
@@ -317,7 +317,7 @@ class _NumCard extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              color: AppColors.primary,
+              color: context.colors.accent,
               fontWeight: FontWeight.w900,
               fontSize: 22,
             ),

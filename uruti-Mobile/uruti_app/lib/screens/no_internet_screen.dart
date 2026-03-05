@@ -189,7 +189,7 @@ class _NoInternetScreenState extends State<NoInternetScreen>
                         fontFamily: 'InterTight',
                         fontWeight: FontWeight.w800,
                         fontSize: 20,
-                        color: AppColors.primary,
+                        color: context.colors.accent,
                         letterSpacing: -0.4,
                       ),
                     ),
@@ -313,7 +313,7 @@ class _NoInternetScreenState extends State<NoInternetScreen>
                           height: 6,
                           decoration: BoxDecoration(
                             color: _currentPage == i
-                                ? AppColors.primary
+                                ? context.colors.accent
                                 : divider,
                             borderRadius: BorderRadius.circular(3),
                           ),
@@ -343,7 +343,7 @@ class _NoInternetScreenState extends State<NoInternetScreen>
                     children: [
                       Icon(
                         Icons.build_circle_outlined,
-                        color: AppColors.primary,
+                        color: context.colors.accent,
                         size: 20,
                       ),
                       const SizedBox(width: 10),
@@ -424,9 +424,9 @@ class _NoInternetScreenState extends State<NoInternetScreen>
                       _isRetrying ? 'Checking connection…' : 'Try Again',
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: context.colors.accent,
                       foregroundColor: Colors.white,
-                      disabledBackgroundColor: AppColors.primary.withValues(
+                      disabledBackgroundColor: context.colors.accent.withValues(
                         alpha: 0.6,
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -547,16 +547,16 @@ class _BenefitCard extends StatelessWidget {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
+                  color: context.colors.accent.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.3),
+                    color: context.colors.accent.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.language, color: AppColors.primary, size: 16),
+                    Icon(Icons.language, color: context.colors.accent, size: 16),
                     const SizedBox(width: 8),
                     Text(
                       'uruti.rw',
@@ -564,7 +564,7 @@ class _BenefitCard extends StatelessWidget {
                         fontFamily: 'InterTight',
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
+                        color: context.colors.accent,
                         letterSpacing: -0.2,
                       ),
                     ),
@@ -608,7 +608,7 @@ class _TipRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(tip.icon, color: AppColors.primary, size: 16),
+          Icon(tip.icon, color: context.colors.accent, size: 16),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

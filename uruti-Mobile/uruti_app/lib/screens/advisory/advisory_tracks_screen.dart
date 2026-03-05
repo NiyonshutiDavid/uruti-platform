@@ -135,22 +135,19 @@ class _AdvisoryTracksScreenState extends State<AdvisoryTracksScreen> {
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: context.colors.appBarBg,
         elevation: 0,
         leading: context.canPop()
             ? IconButton(
                 icon: Icon(
                   Icons.arrow_back_ios_new_rounded,
-                  color: context.colors.textPrimary,
+                  color: Colors.white,
                   size: 20,
                 ),
                 onPressed: () => context.pop(),
               )
             : IconButton(
-                icon: Icon(
-                  Icons.menu_rounded,
-                  color: context.colors.textPrimary,
-                ),
+                icon: Icon(Icons.menu_rounded, color: Colors.white),
                 onPressed: () =>
                     MainScaffold.scaffoldKey.currentState?.openDrawer(),
               ),
@@ -159,12 +156,12 @@ class _AdvisoryTracksScreenState extends State<AdvisoryTracksScreen> {
             Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.12),
+                color: Colors.white.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.menu_book_outlined,
-                color: AppColors.primary,
+                color: Colors.white,
                 size: 18,
               ),
             ),
@@ -172,7 +169,7 @@ class _AdvisoryTracksScreenState extends State<AdvisoryTracksScreen> {
             Text(
               'AI Advisory Tracks',
               style: TextStyle(
-                color: context.colors.textPrimary,
+                color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
@@ -181,7 +178,7 @@ class _AdvisoryTracksScreenState extends State<AdvisoryTracksScreen> {
         ),
       ),
       body: RefreshIndicator(
-        color: AppColors.primary,
+        color: context.colors.accent,
         onRefresh: _load,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -189,7 +186,7 @@ class _AdvisoryTracksScreenState extends State<AdvisoryTracksScreen> {
           children: [
             TextField(
               controller: _searchCtrl,
-              style: TextStyle(color: context.colors.textPrimary),
+              style: TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Search advisory tracks...',
                 hintStyle: TextStyle(color: context.colors.textMuted),
@@ -205,7 +202,7 @@ class _AdvisoryTracksScreenState extends State<AdvisoryTracksScreen> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppColors.primary),
+                  borderSide: BorderSide(color: context.colors.accent),
                 ),
               ),
             ),
@@ -233,17 +230,17 @@ class _AdvisoryTracksScreenState extends State<AdvisoryTracksScreen> {
                               setState(() => _category = chip.value),
                           labelStyle: TextStyle(
                             color: selected
-                                ? AppColors.primary
+                                ? context.colors.accent
                                 : context.colors.textSecondary,
                             fontWeight: FontWeight.w600,
                           ),
-                          selectedColor: AppColors.primary.withValues(
+                          selectedColor: context.colors.accent.withValues(
                             alpha: 0.16,
                           ),
                           backgroundColor: context.colors.surface,
                           side: BorderSide(
                             color: selected
-                                ? AppColors.primary
+                                ? context.colors.accent
                                 : context.colors.cardBorder,
                           ),
                         );
@@ -252,10 +249,12 @@ class _AdvisoryTracksScreenState extends State<AdvisoryTracksScreen> {
             ),
             const SizedBox(height: 12),
             if (_loading)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 48),
                 child: Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
+                  child: CircularProgressIndicator(
+                    color: context.colors.accent,
+                  ),
                 ),
               )
             else if (_error != null)
@@ -332,13 +331,13 @@ class _TrackCard extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.12),
+                      color: context.colors.accent.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
                       _category(track['category']),
-                      style: const TextStyle(
-                        color: AppColors.primary,
+                      style: TextStyle(
+                        color: context.colors.accent,
                         fontWeight: FontWeight.w700,
                         fontSize: 11,
                       ),
@@ -395,7 +394,7 @@ class _TrackCard extends StatelessWidget {
                   value: (progress.clamp(0, 100)) / 100,
                   minHeight: 7,
                   backgroundColor: context.colors.cardBorder,
-                  valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                  valueColor: AlwaysStoppedAnimation(context.colors.accent),
                 ),
               ),
               const SizedBox(height: 6),
@@ -664,12 +663,12 @@ class _TrackDetailSheetState extends State<_TrackDetailSheet> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.only(top: 5),
                         child: Icon(
                           Icons.circle,
                           size: 6,
-                          color: AppColors.primary,
+                          color: context.colors.accent,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -718,7 +717,7 @@ class _TrackDetailSheetState extends State<_TrackDetailSheet> {
                           ? Icons.check_circle_rounded
                           : Icons.menu_book_outlined,
                       color: done
-                          ? AppColors.primary
+                          ? context.colors.accent
                           : context.colors.textSecondary,
                     ),
                     title: Text(
@@ -750,7 +749,7 @@ class _TrackDetailSheetState extends State<_TrackDetailSheet> {
                               const SizedBox(width: 6),
                               Switch.adaptive(
                                 value: done,
-                                activeColor: AppColors.primary,
+                                activeColor: context.colors.accent,
                                 onChanged: (v) => _toggleDone(trackId, i, v),
                               ),
                             ],

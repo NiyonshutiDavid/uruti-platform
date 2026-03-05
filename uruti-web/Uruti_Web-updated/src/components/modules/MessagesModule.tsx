@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useConfirmDialog } from '../ui/confirm-dialog';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
-import { Search, Send, Paperclip, MoreVertical, Star, Archive, Trash2, Phone, Video, X, Mic, MicOff, VideoOff, PhoneOff, Maximize2, Minimize2, Settings, FileText, Image as ImageIcon, Download, Info, Plus, MessageSquare } from 'lucide-react';
+import { Search, Send, Paperclip, MoreVertical, Star, Archive, Trash2, Phone, Video, X, Mic, MicOff, VideoOff, PhoneOff, Maximize2, Minimize2, Settings, FileText, Image as ImageIcon, Download, Info, Plus, MessageSquare, StopCircle, Play, Pause } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
@@ -16,6 +17,68 @@ import { apiClient } from '../../lib/api-client';
 import { useAuth } from '../../lib/auth-context';
 import { toast } from 'sonner';
 
+/* ─── Inline Audio Player ─── */
+function VoiceNotePlayer({ src, isOwn }: { src: string; isOwn: boolean }) {
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const audio = new Audio(src);
+    audioRef.current = audio;
+    audio.addEventListener('loadedmetadata', () => setDuration(audio.duration));
+    audio.addEventListener('timeupdate', () => {
+      if (audio.duration) setProgress(audio.currentTime / audio.duration);
+    });
+    audio.addEventListener('ended', () => { setPlaying(false); setProgress(0); });
+    return () => { audio.pause(); audio.src = ''; };
+  }, [src]);
+
+  const toggle = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) { audio.pause(); } else { audio.play(); }
+    setPlaying(!playing);
+  };
+
+  const fmt = (s: number) => {
+    if (!s || !isFinite(s)) return '0:00';
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="flex items-center gap-2 min-w-[180px]">
+      <button onClick={toggle} className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center ${isOwn ? 'bg-white/20 hover:bg-white/30' : 'bg-[#76B947]/20 hover:bg-[#76B947]/30'}`}>
+        {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+      </button>
+      <div className="flex-1 flex flex-col gap-0.5">
+        <div className="h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
+          <div className={`h-full rounded-full transition-all ${isOwn ? 'bg-white/70' : 'bg-[#76B947]'}`} style={{ width: `${progress * 100}%` }} />
+        </div>
+        <span className="text-[10px] opacity-70">{fmt(duration)}</span>
+      </div>
+      <Mic className="h-3.5 w-3.5 opacity-50 shrink-0" />
+    </div>
+  );
+}
+
+/* ─── Date-label helper ─── */
+function getDateLabel(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = (today.getTime() - msgDay.getTime()) / 86400000;
+  if (diff < 1) return 'Today';
+  if (diff < 2) return 'Yesterday';
+  if (diff < 7) return d.toLocaleDateString('en-US', { weekday: 'long' });
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
 interface Message {
   id: string;
   senderId: string;
@@ -24,10 +87,11 @@ interface Message {
   read: boolean;
   starred?: boolean;
   attachment?: {
-    type: 'image' | 'file' | 'document' | 'idea';
+    type: 'image' | 'file' | 'document' | 'idea' | 'audio';
     name: string;
     size: number;
     url?: string;
+    duration?: number;
     ideaData?: {
       id: string;
       name: string;
@@ -60,6 +124,7 @@ interface MessagesModuleProps {
 }
 
 export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
+  const { confirm } = useConfirmDialog();
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -69,9 +134,16 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
   const [showChatInfo, setShowChatInfo] = useState(false);
   const [showNewMessageDialog, setShowNewMessageDialog] = useState(false);
   const [showAttachmentDialog, setShowAttachmentDialog] = useState(false);
-  const [selectedAttachment, setSelectedAttachment] = useState<{ type: 'image' | 'file' | 'document' | 'idea'; name: string; size: number } | null>(null);
+  const [selectedAttachment, setSelectedAttachment] = useState<{ type: 'image' | 'file' | 'document' | 'idea' | 'audio'; name: string; size: number; file?: File } | null>(null);
   const [loading, setLoading] = useState(false);
   const { startCall } = useCall();
+
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingTimerRef = useRef<number | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const parseServerTimestamp = (timestamp?: string | null): Date => {
     const value = (timestamp || '').trim();
@@ -115,13 +187,34 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
   }, [user?.id]);
 
   const mapApiMessages = (messages: any[], currentUserId: number): Message[] => {
-    return messages.map((message: any) => ({
-      id: String(message.id),
-      senderId: Number(message.sender_id) === currentUserId ? 'me' : String(message.sender_id),
-      text: message.body || '',
-      timestamp: parseServerTimestamp(message.created_at).toISOString(),
-      read: Boolean(message.is_read),
-    }));
+    return messages.map((message: any) => {
+      // Extract attachment from the message's attachments array if present
+      let attachment: Message['attachment'] | undefined;
+      const rawAttachments = message.attachments;
+      if (Array.isArray(rawAttachments) && rawAttachments.length > 0) {
+        const att = rawAttachments[0]; // Use first attachment
+        const url = typeof att === 'string' ? att : att?.url || att?.file_url || '';
+        const name = (typeof att === 'object' ? att?.name || att?.filename : '') || url.split('/').pop() || 'file';
+        const size = typeof att === 'object' ? att?.size || 0 : 0;
+        const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(url);
+        const isAudio = /\.(webm|ogg|mp3|m4a|wav|aac)(\?|$)/i.test(url) || (typeof att === 'object' && att?.content_type?.startsWith?.('audio'));
+        attachment = {
+          type: isAudio ? 'audio' : isImage ? 'image' : 'document',
+          name,
+          size,
+          url,
+        };
+      }
+
+      return {
+        id: String(message.id),
+        senderId: Number(message.sender_id) === currentUserId ? 'me' : String(message.sender_id),
+        text: message.body || '',
+        timestamp: parseServerTimestamp(message.created_at).toISOString(),
+        read: Boolean(message.is_read),
+        ...(attachment ? { attachment } : {}),
+      };
+    });
   };
 
   const loadConversations = async () => {
@@ -140,6 +233,13 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
             (message: any) => Number(message.receiver_id) === currentUserId && !message.is_read
           ).length;
 
+          const isOnline = (() => {
+            if (!connection.is_active) return false;
+            if (!connection.last_login) return false;
+            const lastLogin = parseServerTimestamp(connection.last_login);
+            return (Date.now() - lastLogin.getTime()) < 10 * 60 * 1000; // 10 minutes
+          })();
+
           return {
             id: String(connection.id),
             userId: Number(connection.id),
@@ -149,7 +249,7 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
             lastMessage: lastMessage?.text || 'Start a conversation...',
             timestamp: lastMessage?.timestamp || new Date().toISOString(),
             unread,
-            online: false,
+            online: isOnline,
             messages: mappedMessages,
             starred: false,
           } as Conversation;
@@ -204,7 +304,16 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
 
       const outgoingText = messageText || (selectedAttachment ? `Attached: ${selectedAttachment.name}` : '');
       try {
-        await apiClient.sendMessage(selectedConversation.userId, outgoingText);
+        let attachUrls: string[] | undefined;
+
+        // Upload file attachment if present
+        if (selectedAttachment?.file) {
+          const uploaded = await apiClient.uploadMessageAttachment(selectedAttachment.file);
+          const url = uploaded.url.startsWith('http') ? uploaded.url : `${(apiClient as any).baseUrl}${uploaded.url}`;
+          attachUrls = [url];
+        }
+
+        await apiClient.sendMessage(selectedConversation.userId, outgoingText, attachUrls);
 
         const newMessage: Message = {
           id: `m-${Date.now()}`,
@@ -212,7 +321,10 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
           text: outgoingText,
           timestamp: new Date().toISOString(),
           read: true,
-          attachment: selectedAttachment || undefined
+          attachment: selectedAttachment ? {
+            ...selectedAttachment,
+            url: attachUrls?.[0],
+          } : undefined
         };
 
         setConversations(prev =>
@@ -248,13 +360,101 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
                       file.type.includes('pdf') || file.type.includes('document') ? 'document' : 'file';
       
       setSelectedAttachment({
-        type: fileType,
+        type: fileType as any,
         name: file.name,
-        size: file.size
+        size: file.size,
+        file,
       });
       
       // Reset the input
       event.target.value = '';
+    }
+  };
+
+  // ── Voice Recording ──
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: 'audio/webm' });
+        const dur = recordingDuration;
+        setRecordingDuration(0);
+
+        if (!selectedConversation) return;
+
+        // Upload and send
+        try {
+          const uploaded = await apiClient.uploadMessageAttachment(file);
+          const attachUrl = uploaded.url.startsWith('http') ? uploaded.url : `${(apiClient as any).baseUrl}${uploaded.url}`;
+          await apiClient.sendMessage(selectedConversation.userId, '🎤 Voice note', [attachUrl]);
+
+          const newMsg: Message = {
+            id: `m-${Date.now()}`,
+            senderId: 'me',
+            text: '🎤 Voice note',
+            timestamp: new Date().toISOString(),
+            read: true,
+            attachment: { type: 'audio', name: file.name, size: file.size, url: attachUrl, duration: dur },
+          };
+
+          setConversations(prev =>
+            prev.map(c =>
+              c.id === selectedConversation.id
+                ? { ...c, messages: [...c.messages, newMsg], lastMessage: '🎤 Voice note', timestamp: newMsg.timestamp }
+                : c
+            )
+          );
+          setSelectedConversation(prev =>
+            prev ? { ...prev, messages: [...prev.messages, newMsg] } : null
+          );
+          toast.success('Voice note sent');
+        } catch {
+          toast.error('Failed to send voice note');
+        }
+      };
+
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimerRef.current = window.setInterval(() => setRecordingDuration(d => d + 1), 1000);
+    } catch {
+      toast.error('Microphone access denied. Please allow microphone in browser settings.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
+      // Remove the onstop handler so we don't send
+      mediaRecorderRef.current.onstop = null;
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    setRecordingDuration(0);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
     }
   };
 
@@ -348,8 +548,13 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
     setShowNewMessageDialog(false);
   };
 
-  const handleDeleteChat = (conversationId: string) => {
-    const confirmed = window.confirm('Delete this chat conversation?');
+  const handleDeleteChat = async (conversationId: string) => {
+    const confirmed = await confirm({
+      title: 'Delete Conversation',
+      description: 'Are you sure you want to delete this chat conversation? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
     if (!confirmed) return;
 
     setConversations(prev => prev.filter(conv => conv.id !== conversationId));
@@ -526,6 +731,7 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
                 contactAvatar={selectedConversation.avatar}
                 contactRole={selectedConversation.role}
                 contactOnline={selectedConversation.online}
+                messages={selectedConversation.messages}
               />
             ) : (
               /* Chat View */
@@ -557,7 +763,10 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
                           <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800" />
                         )}
                       </div>
-                      <div>
+                      <div
+                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => setShowChatInfo(true)}
+                      >
                         <p className="font-semibold text-sm sm:text-base dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
                           {selectedConversation.name}
                         </p>
@@ -623,50 +832,81 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
                 {/* Messages */}
                 <ScrollArea className="flex-1 p-4">
                   <div className="space-y-4">
-                    {selectedConversation.messages.map((message) => {
-                      const isMyMessage = message.senderId === 'me';
-                      return (
-                        <div key={message.id} className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[70%] ${isMyMessage ? 'order-2' : 'order-1'}`}>
-                            {!isMyMessage && (
-                              <div className="flex items-center space-x-2 mb-1">
-                                <Avatar className="h-6 w-6">
-                                  <AvatarImage src={selectedConversation.avatar} />
-                                  <AvatarFallback className="bg-[#76B947]/20 text-[#76B947] text-xs">
-                                    {selectedConversation.name.split(' ').map(n => n[0]).join('')}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                                  {selectedConversation.name}
+                    {(() => {
+                      let lastDateLabel = '';
+                      return selectedConversation.messages.map((message) => {
+                        const isMyMessage = message.senderId === 'me';
+                        const dateLabel = getDateLabel(message.timestamp);
+                        const showDateSeparator = dateLabel !== lastDateLabel;
+                        lastDateLabel = dateLabel;
+
+                        return (
+                          <div key={message.id}>
+                            {/* Date separator */}
+                            {showDateSeparator && dateLabel && (
+                              <div className="flex items-center gap-3 my-4">
+                                <div className="flex-1 h-px bg-black/10 dark:bg-white/10" />
+                                <span className="text-xs font-medium text-muted-foreground px-3 py-1 rounded-full bg-black/5 dark:bg-white/5" style={{ fontFamily: 'var(--font-body)' }}>
+                                  {dateLabel}
                                 </span>
+                                <div className="flex-1 h-px bg-black/10 dark:bg-white/10" />
                               </div>
                             )}
-                            <div
-                              className={`rounded-2xl px-4 py-3 ${
-                                isMyMessage
-                                  ? 'bg-[#76B947] text-white'
-                                  : 'glass-panel border border-black/10 dark:border-white/10 dark:text-white'
-                              }`}
-                            >
-                              <p className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>
-                                {message.text}
-                              </p>
-                              {message.attachment && (
-                                <div className="mt-2">
-                                  <a href={message.attachment.url} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 text-sm text-[#76B947]">
-                                    <FileText className="h-4 w-4" />
-                                    <span>{message.attachment.name} ({formatFileSize(message.attachment.size)})</span>
-                                  </a>
+
+                            <div className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}>
+                              <div className={`max-w-[70%] ${isMyMessage ? 'order-2' : 'order-1'}`}>
+                                {!isMyMessage && (
+                                  <div className="flex items-center space-x-2 mb-1">
+                                    <Avatar className="h-6 w-6">
+                                      <AvatarImage src={selectedConversation.avatar} />
+                                      <AvatarFallback className="bg-[#76B947]/20 text-[#76B947] text-xs">
+                                        {selectedConversation.name.split(' ').map(n => n[0]).join('')}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                                      {selectedConversation.name}
+                                    </span>
+                                  </div>
+                                )}
+                                <div
+                                  className={`rounded-2xl px-4 py-3 ${
+                                    isMyMessage
+                                      ? 'bg-[#76B947] text-white'
+                                      : 'glass-panel border border-black/10 dark:border-white/10 dark:text-white'
+                                  }`}
+                                >
+                                  {/* Voice note player */}
+                                  {message.attachment?.type === 'audio' && message.attachment.url ? (
+                                    <VoiceNotePlayer src={message.attachment.url} isOwn={isMyMessage} />
+                                  ) : (
+                                    <>
+                                      <p className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>
+                                        {message.text}
+                                      </p>
+                                      {message.attachment && message.attachment.type !== 'audio' && (
+                                        <div className="mt-2">
+                                          {message.attachment.type === 'image' && message.attachment.url ? (
+                                            <img src={message.attachment.url} alt={message.attachment.name} className="rounded-lg max-w-full max-h-48 object-cover" />
+                                          ) : (
+                                            <a href={message.attachment.url} target="_blank" rel="noopener noreferrer" className={`flex items-center space-x-2 text-sm ${isMyMessage ? 'text-white/80 hover:text-white' : 'text-[#76B947]'}`}>
+                                              <FileText className="h-4 w-4" />
+                                              <span>{message.attachment.name} ({formatFileSize(message.attachment.size)})</span>
+                                            </a>
+                                          )}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
                                 </div>
-                              )}
+                                <p className={`text-xs text-muted-foreground mt-1 ${isMyMessage ? 'text-right' : 'text-left'}`} style={{ fontFamily: 'var(--font-body)' }}>
+                                  {formatMessageTime(message.timestamp)}
+                                </p>
+                              </div>
                             </div>
-                            <p className={`text-xs text-muted-foreground mt-1 ${isMyMessage ? 'text-right' : 'text-left'}`} style={{ fontFamily: 'var(--font-body)' }}>
-                              {formatMessageTime(message.timestamp)}
-                            </p>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      });
+                    })()}
                   </div>
                 </ScrollArea>
 
@@ -699,37 +939,74 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
                     </div>
                   )}
                   
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="file"
-                      id="file-input"
-                      className="hidden"
-                      onChange={handleFileSelect}
-                      accept="image/*,.pdf,.doc,.docx,.txt"
-                    />
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="hover:bg-[#76B947]/10"
-                      onClick={() => document.getElementById('file-input')?.click()}
-                    >
-                      <Paperclip className="h-5 w-5" />
-                    </Button>
-                    <Input
-                      placeholder="Type your message..."
-                      value={messageText}
-                      onChange={(e) => setMessageText(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                      className="flex-1 dark:bg-gray-800 dark:border-gray-700"
-                    />
-                    <Button 
-                      onClick={handleSendMessage}
-                      className="bg-[#76B947] text-white hover:bg-[#76B947]/90"
-                      disabled={!messageText.trim() && !selectedAttachment}
-                    >
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  {isRecording ? (
+                    /* Recording in progress bar */
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10">
+                        <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                        <span className="text-sm font-medium text-red-600 dark:text-red-400" style={{ fontFamily: 'var(--font-body)' }}>
+                          Recording {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={cancelRecording}
+                        className="text-red-500 hover:bg-red-500/10"
+                        title="Cancel"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </Button>
+                      <Button
+                        onClick={stopRecording}
+                        className="bg-[#76B947] text-white hover:bg-[#76B947]/90"
+                        title="Send voice note"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="file"
+                        id="file-input"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                        accept="image/*,.pdf,.doc,.docx,.txt"
+                      />
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="hover:bg-[#76B947]/10"
+                        onClick={() => document.getElementById('file-input')?.click()}
+                      >
+                        <Paperclip className="h-5 w-5" />
+                      </Button>
+                      <Input
+                        placeholder="Type your message..."
+                        value={messageText}
+                        onChange={(e) => setMessageText(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                        className="flex-1 dark:bg-gray-800 dark:border-gray-700"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="hover:bg-[#76B947]/10"
+                        onClick={startRecording}
+                        title="Record voice note"
+                      >
+                        <Mic className="h-5 w-5" />
+                      </Button>
+                      <Button 
+                        onClick={handleSendMessage}
+                        className="bg-[#76B947] text-white hover:bg-[#76B947]/90"
+                        disabled={!messageText.trim() && !selectedAttachment}
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             )

@@ -34,6 +34,8 @@ class _MessagesHomeState extends State<_MessagesHome> {
   String _search = '';
   final _searchCtrl = TextEditingController();
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
+  final Set<String> _deletedIds = {};
+  Timer? _onlineRefreshTimer;
 
   static const _filters = ['All', 'Unread', 'Starred'];
 
@@ -60,19 +62,90 @@ class _MessagesHomeState extends State<_MessagesHome> {
     _searchCtrl.addListener(() => setState(() => _search = _searchCtrl.text));
 
     _realtimeSub = RealtimeService.instance.events.listen((event) {
-      if (!mounted || event['event'] != 'message_created') return;
-      _load();
+      if (!mounted) return;
+      final eventType = event['event'];
+
+      // Handle new messages
+      if (eventType == 'message_created') {
+        _load();
+        return;
+      }
+
+      // Handle presence events
+      if (eventType == 'user_online' || eventType == 'user_offline') {
+        final data = event['data'];
+        if (data is Map) {
+          final userId = int.tryParse('${data['user_id'] ?? 0}') ?? 0;
+          if (userId > 0) {
+            _updateUserOnlineStatus(userId, eventType == 'user_online');
+          }
+        }
+        return;
+      }
     });
 
     final token = (context.read<AuthProvider>().token ?? '').trim();
     if (token.isNotEmpty) {
       RealtimeService.instance.connect(token);
     }
+
+    // Periodically refresh online status every 30 seconds
+    _onlineRefreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _refreshOnlineStatus(),
+    );
+  }
+
+  /// Update a single user's online status in the conversation list.
+  void _updateUserOnlineStatus(int userId, bool isOnline) {
+    if (!mounted) return;
+    bool changed = false;
+    for (int i = 0; i < _conversations.length; i++) {
+      final other =
+          (_conversations[i]['other_user'] as Map?)?.cast<String, dynamic>() ??
+          {};
+      final uid = int.tryParse('${other['id'] ?? 0}') ?? 0;
+      if (uid == userId && other['is_online'] != isOnline) {
+        _conversations[i] = {
+          ..._conversations[i],
+          'other_user': {...other, 'is_online': isOnline},
+        };
+        changed = true;
+      }
+    }
+    if (changed) setState(() {});
+  }
+
+  /// Fetch online IDs from the backend and update conversation statuses.
+  Future<void> _refreshOnlineStatus() async {
+    if (!mounted || _conversations.isEmpty) return;
+    try {
+      final onlineIds = await ApiService.instance.getOnlineConnectionIds();
+      if (!mounted) return;
+      bool changed = false;
+      for (int i = 0; i < _conversations.length; i++) {
+        final other =
+            (_conversations[i]['other_user'] as Map?)
+                ?.cast<String, dynamic>() ??
+            {};
+        final uid = int.tryParse('${other['id'] ?? 0}') ?? 0;
+        final isOnline = onlineIds.contains(uid);
+        if (other['is_online'] != isOnline) {
+          _conversations[i] = {
+            ..._conversations[i],
+            'other_user': {...other, 'is_online': isOnline},
+          };
+          changed = true;
+        }
+      }
+      if (changed) setState(() {});
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _realtimeSub?.cancel();
+    _onlineRefreshTimer?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -90,6 +163,20 @@ class _MessagesHomeState extends State<_MessagesHome> {
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _showConnectionPicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ConnectionPickerSheet(
+        onSelect: (userId) {
+          Navigator.of(context).pop();
+          context.push('/messages/$userId');
+        },
+      ),
+    );
   }
 
   Future<void> _openThreadAndMarkRead(String uid) async {
@@ -114,7 +201,10 @@ class _MessagesHomeState extends State<_MessagesHome> {
   }
 
   List<Map<String, dynamic>> get _filtered {
-    var list = _conversations;
+    var list = _conversations.where((c) {
+      final other = (c['other_user'] as Map?)?.cast<String, dynamic>() ?? {};
+      return !_deletedIds.contains('${other['id'] ?? ''}');
+    }).toList();
     if (_filter == 'Unread') {
       list = list.where((c) => (c['unread_count'] as int? ?? 0) > 0).toList();
     } else if (_filter == 'Starred') {
@@ -139,25 +229,30 @@ class _MessagesHomeState extends State<_MessagesHome> {
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: context.colors.appBarBg,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
+          icon: Icon(Icons.menu_rounded, color: Colors.white),
           onPressed: () => MainScaffold.scaffoldKey.currentState?.openDrawer(),
         ),
         title: Text(
           'Chats',
           style: TextStyle(
-            color: context.colors.textPrimary,
+            color: Colors.white,
             fontWeight: FontWeight.w800,
             fontSize: 22,
           ),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.edit_square, color: context.colors.textPrimary),
+            icon: Icon(Icons.edit_square, color: Colors.white),
             tooltip: 'New Message',
-            onPressed: () => context.go('/messages'),
+            onPressed: _showConnectionPicker,
+          ),
+          IconButton(
+            icon: Icon(Icons.person_add_alt_1, color: Colors.white),
+            tooltip: 'New Connection',
+            onPressed: () => context.go('/connections?tab=discover'),
           ),
         ],
       ),
@@ -168,7 +263,7 @@ class _MessagesHomeState extends State<_MessagesHome> {
             padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
             child: TextField(
               controller: _searchCtrl,
-              style: TextStyle(color: context.colors.textPrimary, fontSize: 14),
+              style: TextStyle(color: Colors.white, fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'Search by name or message…',
                 hintStyle: TextStyle(
@@ -257,7 +352,9 @@ class _MessagesHomeState extends State<_MessagesHome> {
                 : conversations.isEmpty
                 ? _EmptyState(
                     filter: _filter,
-                    onCompose: () => context.go('/messages'),
+                    onCompose: _showConnectionPicker,
+                    onNewConnection: () =>
+                        context.go('/connections?tab=discover'),
                   )
                 : RefreshIndicator(
                     color: AppColors.primary,
@@ -291,20 +388,89 @@ class _MessagesHomeState extends State<_MessagesHome> {
                             .join()
                             .toUpperCase();
 
-                        return _ConversationTile(
-                          name: name,
-                          role: role,
-                          lastMsg: lastMsg,
-                          time: timeStr,
-                          unread: unread,
-                          isOnline: isOnline,
-                          avatarUrl: avatarUrl,
-                          initials: initials,
-                          onTap: () async {
-                            await _openThreadAndMarkRead(uid);
-                            if (!context.mounted) return;
-                            context.push('/messages/$uid');
+                        return Dismissible(
+                          key: ValueKey('inbox_$uid'),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 24),
+                            color: Colors.redAccent,
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Icon(
+                                  Icons.delete_outline_rounded,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Delete',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          confirmDismiss: (_) async {
+                            return await showDialog<bool>(
+                              context: context,
+                              builder: (dlg) => AlertDialog(
+                                backgroundColor: context.colors.surface,
+                                title: Text(
+                                  'Delete conversation?',
+                                  style: TextStyle(
+                                    color: context.colors.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                content: Text(
+                                  'This will remove this conversation from your list.',
+                                  style: TextStyle(
+                                    color: context.colors.textSecondary,
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(dlg, false),
+                                    child: Text(
+                                      'Cancel',
+                                      style: TextStyle(
+                                        color: context.colors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(dlg, true),
+                                    child: const Text(
+                                      'Delete',
+                                      style: TextStyle(color: Colors.redAccent),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
                           },
+                          onDismissed: (_) {
+                            setState(() => _deletedIds.add(uid));
+                          },
+                          child: _ConversationTile(
+                            name: name,
+                            role: role,
+                            lastMsg: lastMsg,
+                            time: timeStr,
+                            unread: unread,
+                            isOnline: isOnline,
+                            avatarUrl: avatarUrl,
+                            initials: initials,
+                            onTap: () async {
+                              await _openThreadAndMarkRead(uid);
+                              if (!context.mounted) return;
+                              context.push('/messages/$uid');
+                            },
+                          ),
                         );
                       },
                     ),
@@ -376,23 +542,24 @@ class _ConversationTile extends StatelessWidget {
                             )
                           : null,
                     ),
-                    if (isOnline)
-                      Positioned(
-                        bottom: 1,
-                        right: 1,
-                        child: Container(
-                          width: 13,
-                          height: 13,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF25D366),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: context.colors.background,
-                              width: 2,
-                            ),
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: isOnline
+                              ? const Color(0xFF25D366)
+                              : Colors.grey,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: context.colors.background,
+                            width: 2,
                           ),
                         ),
                       ),
+                    ),
                   ],
                 ),
                 const SizedBox(width: 12),
@@ -523,7 +690,12 @@ class _ConversationTile extends StatelessWidget {
 class _EmptyState extends StatelessWidget {
   final String filter;
   final VoidCallback onCompose;
-  const _EmptyState({required this.filter, required this.onCompose});
+  final VoidCallback? onNewConnection;
+  const _EmptyState({
+    required this.filter,
+    required this.onCompose,
+    this.onNewConnection,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -560,7 +732,7 @@ class _EmptyState extends StatelessWidget {
           Text(
             isFilter
                 ? 'Try switching to All'
-                : 'Start a conversation to connect\nwith investors and mentors',
+                : 'Find and connect with investors,\nmentors, and founders',
             textAlign: TextAlign.center,
             style: TextStyle(color: context.colors.textSecondary, fontSize: 13),
           ),
@@ -568,7 +740,7 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: onCompose,
-              icon: const Icon(Icons.edit_rounded, size: 16),
+              icon: const Icon(Icons.edit_square, size: 16),
               label: const Text('New Message'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -582,7 +754,273 @@ class _EmptyState extends StatelessWidget {
                 ),
               ),
             ),
+            if (onNewConnection != null) ...[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: onNewConnection,
+                icon: const Icon(Icons.person_add_alt_1, size: 16),
+                label: const Text('New Connection'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+            ],
           ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Connection Picker Bottom Sheet ───────────────────────────────────────────
+
+class _ConnectionPickerSheet extends StatefulWidget {
+  final void Function(String userId) onSelect;
+  const _ConnectionPickerSheet({required this.onSelect});
+
+  @override
+  State<_ConnectionPickerSheet> createState() => _ConnectionPickerSheetState();
+}
+
+class _ConnectionPickerSheetState extends State<_ConnectionPickerSheet> {
+  List<Map<String, dynamic>> _connections = [];
+  bool _loading = true;
+  String _query = '';
+  final _ctrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchConnections();
+    _ctrl.addListener(() => setState(() => _query = _ctrl.text));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchConnections() async {
+    try {
+      final data = await ApiService.instance.getConnections(null, 'accepted');
+      if (!mounted) return;
+      setState(() {
+        _connections = List<Map<String, dynamic>>.from(
+          data.map((c) => Map<String, dynamic>.from(c as Map)),
+        );
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  List<Map<String, dynamic>> get _filtered {
+    if (_query.trim().isEmpty) return _connections;
+    final q = _query.trim().toLowerCase();
+    return _connections.where((c) {
+      final name = (c['full_name'] ?? '').toString().toLowerCase();
+      final role = (c['role'] ?? '').toString().toLowerCase();
+      return name.contains(q) || role.contains(q);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final results = _filtered;
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: BoxDecoration(
+        color: context.colors.background,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 10, bottom: 6),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: context.colors.textSecondary.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Title
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Text(
+                  'New Message',
+                  style: TextStyle(
+                    color: context.colors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: Icon(Icons.close, color: context.colors.textSecondary),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          // Search field
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: _ctrl,
+              style: TextStyle(color: context.colors.textPrimary, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Search connections…',
+                hintStyle: TextStyle(
+                  color: context.colors.textSecondary,
+                  fontSize: 14,
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: context.colors.textSecondary,
+                  size: 20,
+                ),
+                suffixIcon: _query.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(
+                          Icons.close,
+                          color: context.colors.textSecondary,
+                          size: 18,
+                        ),
+                        onPressed: () {
+                          _ctrl.clear();
+                          setState(() => _query = '');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: context.colors.surface,
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(22),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Divider(height: 1, color: context.colors.divider),
+
+          // Connection list
+          Expanded(
+            child: _loading
+                ? Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  )
+                : results.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _query.isNotEmpty
+                              ? Icons.search_off_rounded
+                              : Icons.people_outline_rounded,
+                          size: 48,
+                          color: context.colors.textSecondary,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _query.isNotEmpty
+                              ? 'No connections found'
+                              : 'No connections yet',
+                          style: TextStyle(
+                            color: context.colors.textSecondary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (_query.isEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Add connections to start messaging',
+                            style: TextStyle(
+                              color: context.colors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: results.length,
+                    itemBuilder: (ctx, i) {
+                      final c = results[i];
+                      final name = c['full_name'] ?? 'User';
+                      final role = (c['role'] ?? '').toString();
+                      final avatarUrl = c['avatar_url']?.toString();
+                      final uid = c['id'].toString();
+                      final initials = name
+                          .toString()
+                          .split(' ')
+                          .where((p) => p.isNotEmpty)
+                          .map((p) => p[0])
+                          .take(2)
+                          .join()
+                          .toUpperCase();
+
+                      return ListTile(
+                        leading: CircleAvatar(
+                          radius: 22,
+                          backgroundColor: AppColors.primary.withValues(
+                            alpha: 0.15,
+                          ),
+                          backgroundImage:
+                              avatarUrl != null && avatarUrl.isNotEmpty
+                              ? NetworkImage(avatarUrl)
+                              : null,
+                          child: avatarUrl == null || avatarUrl.isEmpty
+                              ? Text(
+                                  initials,
+                                  style: TextStyle(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        title: Text(
+                          name,
+                          style: TextStyle(
+                            color: context.colors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        subtitle: role.isNotEmpty
+                            ? Text(
+                                role,
+                                style: TextStyle(
+                                  color: context.colors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              )
+                            : null,
+                        onTap: () => widget.onSelect(uid),
+                      );
+                    },
+                  ),
+          ),
         ],
       ),
     );

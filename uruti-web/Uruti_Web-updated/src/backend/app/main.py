@@ -36,6 +36,28 @@ from .routers import (
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
+# Migrate: add new venture columns if they don't exist
+def _migrate_venture_columns():
+    """Add activities, highlights, competitive_edge, team_background,
+    funding_plans, milestones columns to the ventures table if missing."""
+    from sqlalchemy import text, inspect as sa_inspect
+    inspector = sa_inspect(engine)
+    existing = {c["name"] for c in inspector.get_columns("ventures")}
+    new_cols = {
+        "highlights": "JSON",
+        "competitive_edge": "TEXT",
+        "team_background": "TEXT",
+        "funding_plans": "TEXT",
+        "milestones": "JSON",
+        "activities": "JSON",
+    }
+    with engine.begin() as conn:
+        for col, col_type in new_cols.items():
+            if col not in existing:
+                conn.execute(text(f'ALTER TABLE ventures ADD COLUMN "{col}" {col_type}'))
+
+_migrate_venture_columns()
+
 # Initialize FastAPI app
 app = FastAPI(
     title=settings.APP_NAME,

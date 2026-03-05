@@ -12,15 +12,15 @@ class PitchCoachScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: context.colors.appBarBg,
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
+          icon: Icon(Icons.menu_rounded, color: Colors.white),
           onPressed: () => MainScaffold.scaffoldKey.currentState?.openDrawer(),
         ),
         title: Text(
           'Pitch Coach',
           style: TextStyle(
-            color: context.colors.textPrimary,
+            color: Colors.white,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -52,7 +52,7 @@ class PitchCoachScreen extends StatelessWidget {
                     Text(
                       'AI Pitch Coach',
                       style: TextStyle(
-                        color: context.colors.textPrimary,
+                        color: Colors.white,
                         fontSize: 28,
                         fontWeight: FontWeight.w900,
                       ),
@@ -112,7 +112,7 @@ class PitchCoachScreen extends StatelessWidget {
                       child: Text(
                         'Recent Sessions',
                         style: TextStyle(
-                          color: context.colors.textPrimary,
+                          color: Colors.white,
                           fontWeight: FontWeight.w700,
                           fontSize: 15,
                         ),
@@ -123,12 +123,12 @@ class PitchCoachScreen extends StatelessWidget {
                       future: ApiService.instance.getPitchSessions(),
                       builder: (context, snap) {
                         if (snap.connectionState == ConnectionState.waiting) {
-                          return const Center(
+                          return Center(
                             child: Padding(
                               padding: EdgeInsets.all(16),
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: AppColors.primary,
+                                color: context.colors.accent,
                               ),
                             ),
                           );
@@ -187,7 +187,9 @@ class PitchCoachScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.35),
+                              color: context.colors.accent.withValues(
+                                alpha: 0.35,
+                              ),
                               blurRadius: 20,
                               offset: const Offset(0, 6),
                             ),
@@ -319,10 +321,10 @@ class _SessionTile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: context.colors.accent.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(Icons.mic, color: AppColors.primary, size: 18),
+            child: Icon(Icons.mic, color: context.colors.accent, size: 18),
           ),
           const SizedBox(width: 12),
           Expanded(

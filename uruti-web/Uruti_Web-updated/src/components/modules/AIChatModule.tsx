@@ -145,10 +145,19 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
   const [modelSelectOpen, setModelSelectOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [chatToDelete, setChatToDelete] = useState<string | null>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const quickActions = userType === 'founder' ? founderQuickActions : investorQuickActions;
+
+  const shortenModelDescription = (description: string, maxLength: number = 82) => {
+    const normalized = (description || '').trim().replace(/\s+/g, ' ');
+    if (normalized.length <= maxLength) {
+      return normalized;
+    }
+    return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
+  };
 
   const renderFormattedText = (content: string) => {
     const lines = content.split('\n');
@@ -208,6 +217,22 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
       });
     }
   }, [messages, isTyping]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia('(max-width: 639px)');
+    const syncSidebarForViewport = () => {
+      setSidebarCollapsed(mediaQuery.matches);
+    };
+
+    syncSidebarForViewport();
+    mediaQuery.addEventListener('change', syncSidebarForViewport);
+
+    return () => {
+      mediaQuery.removeEventListener('change', syncSidebarForViewport);
+    };
+  }, []);
 
   // Load ventures from backend
   useEffect(() => {
@@ -357,21 +382,6 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
       ]);
     }
   }, [analysisContext, userType, bookmarkedVentures]);
-
-  useEffect(() => {
-    if (messages.length === 0 && !currentChatId) {
-      const founderGreeting = `Hi! I'm your AI Advisory Assistant powered by Uruti's intelligence engine. I'm here to help you with:\n\n• Refining your startup ideas\n• Market analysis and validation\n• Go-to-market strategies\n• Pitch preparation\n• Investment readiness\n\nWhat would you like to explore today?`;
-
-      const investorGreeting = `Hi! I'm your AI Investment Assistant powered by Uruti's intelligence engine. I'm here to help you with:\n\n• Analyzing startup investment potential\n• Due diligence insights\n• Market opportunity assessment\n• Risk evaluation\n• Portfolio fit analysis\n\nWhich startup would you like to discuss today?`;
-      
-      setMessages([{
-        id: '1',
-        role: 'assistant',
-        content: userType === 'founder' ? founderGreeting : investorGreeting,
-        timestamp: new Date()
-      }]);
-    }
-  }, [currentChatId, userType]);
 
   const handleSend = async (text?: string) => {
     if (!selectedModel) return;
@@ -583,6 +593,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
     }
   };
 
+
   const availableVentures = userType === 'investor' ? bookmarkedVentures : ventures;
   const isAnalysisSelected = selectedModel?.type === 'analysis';
 
@@ -609,10 +620,19 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
         </AlertDialogContent>
       </AlertDialog>
 
+      {!sidebarCollapsed && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 sm:hidden"
+          onClick={() => setSidebarCollapsed(true)}
+        />
+      )}
+
       {/* Chat History Sidebar */}
       <aside 
-        className={`border-r border-purple-200/50 dark:border-purple-500/20 flex flex-col transition-all duration-300 flex-shrink-0 h-full bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm ${
-          sidebarCollapsed ? 'w-0 opacity-0' : 'w-80 opacity-100'
+        className={`border-r border-purple-200/50 dark:border-purple-500/20 flex flex-col transition-all duration-300 h-full overflow-hidden bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm max-sm:fixed sm:relative max-sm:inset-y-0 max-sm:left-0 z-40 sm:z-auto max-sm:w-[86vw] max-sm:max-w-80 sm:max-w-none max-sm:transform sm:transform-none ${
+          sidebarCollapsed
+            ? 'max-sm:-translate-x-full sm:translate-x-0 sm:w-0 sm:opacity-0 sm:pointer-events-none'
+            : 'max-sm:translate-x-0 sm:w-80 sm:opacity-100'
         }`}
       >
         <div className="p-4 border-b border-purple-200/50 dark:border-purple-500/20">
@@ -657,7 +677,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
           </div>
         </div>
 
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 min-h-0">
           {isLoadingChats ? (
             <div className="flex items-center justify-center p-8">
               <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
@@ -671,12 +691,12 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
           ) : (
             <div className="p-2 space-y-2">
               {filteredHistories.map((chat) => (
-                <Card
-                  key={chat.id}
-                  className={`glass-card cursor-pointer transition-all hover:scale-[1.02] hover:bg-[#76B947]/10 dark:hover:bg-[#76B947]/20 border-purple-200/50 dark:border-purple-500/20 ${
-                    currentChatId === chat.id ? 'bg-purple-100/50 dark:bg-purple-900/30 border-purple-400 dark:border-purple-500' : ''
-                  }`}
-                >
+                <div key={chat.id} className="rounded-xl">
+                  <Card
+                    className={`glass-card cursor-pointer transition-all hover:scale-[1.02] hover:bg-[#76B947]/10 dark:hover:bg-[#76B947]/20 border-purple-200/50 dark:border-purple-500/20 ${
+                      currentChatId === chat.id ? 'bg-purple-100/50 dark:bg-purple-900/30 border-purple-400 dark:border-purple-500' : ''
+                    }`}
+                  >
                   <CardContent className="p-3">
                     <div className="flex items-start justify-between mb-1">
                       <div 
@@ -718,7 +738,8 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                       </div>
                     </div>
                   </CardContent>
-                </Card>
+                  </Card>
+                </div>
               ))}
             </div>
           )}
@@ -726,7 +747,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
       </aside>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
+      <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
         {/* Expand Button */}
         {sidebarCollapsed && (
           <Button
@@ -766,8 +787,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
         </div>
 
         {/* Messages Area - Scrollable */}
-        <div className="flex-1 overflow-y-auto" ref={scrollRef}>
-          <div className="min-h-full flex flex-col justify-end">
+        <div className="flex-1 min-h-0 overflow-y-auto" ref={scrollRef}>
             <div className="max-w-4xl mx-auto p-6 w-full">
               {/* Welcome Message when no messages */}
               {messages.length === 0 && (
@@ -896,11 +916,10 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                 </div>
               )}
             </div>
-          </div>
         </div>
 
         {/* Input Area - Fixed at bottom */}
-        <div className="flex-shrink-0 border-t border-purple-200/50 dark:border-purple-500/20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg p-4">
+        <div className="z-20 flex-shrink-0 border-t border-purple-200/50 dark:border-purple-500/20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg p-4">
           <div className="max-w-4xl mx-auto">
             <div className="relative border border-purple-300 dark:border-purple-600 rounded-3xl overflow-hidden bg-white dark:bg-gray-800 shadow-lg">
               <div className="flex items-end p-2 gap-2">
@@ -1017,32 +1036,39 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                         <ChevronRight className="h-4 w-4 ml-1 text-muted-foreground rotate-90" />
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="glass-card border-purple-200 dark:border-purple-500/30">
+                    <DialogContent className="glass-card border-purple-200 dark:border-purple-500/30 w-[calc(100vw-2rem)] sm:w-full max-w-[44rem] max-h-[80vh] overflow-y-auto p-4 sm:p-6">
                       <DialogHeader>
                         <DialogTitle style={{ fontFamily: 'var(--font-heading)' }}>Select AI Model</DialogTitle>
                         <DialogDescription>Choose the best model for your task</DialogDescription>
                       </DialogHeader>
-                      <div className="space-y-3">
+                      <div className="space-y-3 px-1 sm:px-2">
                           {availableModels.map((model) => (
                           <Button
                             key={model.id}
                               variant={selectedModel?.id === model.id ? 'default' : 'outline'}
                             className={
                                 selectedModel?.id === model.id
-                                  ? 'w-full justify-start transition-all bg-gradient-to-r from-purple-600 to-purple-800 text-white h-auto py-4'
-                                : 'w-full justify-start transition-all hover:bg-[#76B947]/10 hover:border-[#76B947] hover:text-[#76B947] dark:hover:bg-[#76B947]/20 h-auto py-4'
+                                  ? 'w-full justify-start items-start transition-all bg-gradient-to-r from-purple-600 to-purple-800 text-white h-auto min-h-[5.75rem] py-4 px-3 sm:px-4 rounded-xl'
+                                : 'w-full justify-start items-start transition-all hover:bg-[#76B947]/10 hover:border-[#76B947] hover:text-[#76B947] dark:hover:bg-[#76B947]/20 h-auto min-h-[5.75rem] py-4 px-3 sm:px-4 rounded-xl'
                             }
                             onClick={() => {
                               setSelectedModel(model);
                               setModelSelectOpen(false);
                             }}
                           >
-                            <div className="flex-1 text-left">
-                              <div className="font-semibold text-base mb-1" style={{ fontFamily: 'var(--font-heading)' }}>
+                            <div className="flex-1 text-left min-w-0">
+                              <div className="font-semibold text-sm sm:text-base mb-1 truncate" style={{ fontFamily: 'var(--font-heading)' }}>
                                 {model.name}
                               </div>
-                              <div className="text-xs opacity-90">
-                                {model.description}
+                              <div
+                                className="text-xs opacity-90 whitespace-normal break-words overflow-hidden"
+                                style={{
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                }}
+                              >
+                                {shortenModelDescription(model.description)}
                               </div>
                             </div>
                             {selectedModel?.id === model.id && (

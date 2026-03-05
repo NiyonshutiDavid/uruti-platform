@@ -7,6 +7,7 @@ import '../models/call_session.dart';
 import '../services/api_service.dart';
 import '../services/call_service.dart';
 import '../services/realtime_service.dart';
+import '../services/webrtc_service.dart';
 
 enum CallPhase { idle, incoming, outgoing, active }
 
@@ -32,6 +33,8 @@ class CallProvider extends ChangeNotifier {
   bool _secondaryShouldEndSystemCall = false;
   String? _secondaryPeerUserId;
   Duration _secondaryActiveDuration = Duration.zero;
+  bool _dismissingSystemCallUI = false;
+  Map<String, dynamic>? _pendingOffer;
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
 
   CallSession? get session => _session;
@@ -125,6 +128,15 @@ class CallProvider extends ChangeNotifier {
           handle: handle,
         );
       } catch (_) {}
+
+      // Start WebRTC — caller side creates the offer
+      unawaited(
+        WebRtcService.instance.startCall(
+          callId: _session!.id,
+          peerId: receiverId,
+          isVideo: isVideo,
+        ),
+      );
     }
   }
 
@@ -135,11 +147,29 @@ class CallProvider extends ChangeNotifier {
     _activeStartedAt = DateTime.now();
     _startTimer();
     if (_shouldEndSystemCall) {
+      _dismissingSystemCallUI = true;
       await CallService.instance.endSystemCall(_session!.id);
     }
 
     if (notifyPeer) {
       await _sendSignalToPeer(action: 'accept');
+    }
+
+    // Start WebRTC media — if we have a pending offer, answer it; otherwise
+    // wait for the caller's offer to arrive via signaling.
+    final peerId = int.tryParse(_peerUserId ?? '');
+    if (peerId != null && peerId > 0 && _session != null) {
+      if (_pendingOffer != null) {
+        unawaited(
+          WebRtcService.instance.answerCall(
+            callId: _session!.id,
+            peerId: peerId,
+            isVideo: _session!.isVideo,
+            offerSdp: _pendingOffer!,
+          ),
+        );
+        _pendingOffer = null;
+      }
     }
     notifyListeners();
   }
@@ -174,6 +204,10 @@ class CallProvider extends ChangeNotifier {
     final callId = current?.id;
     final shouldEndSystemCall = _shouldEndSystemCall;
     final peerToNotify = notifyPeer;
+
+    // Tear down WebRTC media
+    unawaited(WebRtcService.instance.hangUp());
+
     if (_secondarySession != null) {
       _clearPrimaryState(keepSecondary: true);
       _promoteSecondaryToPrimary();
@@ -209,12 +243,14 @@ class CallProvider extends ChangeNotifier {
   void toggleMute() {
     if (!isActive && !isOutgoing) return;
     _muted = !_muted;
+    WebRtcService.instance.setMicEnabled(!_muted);
     notifyListeners();
   }
 
   void toggleSpeaker() {
     if (!isActive && !isOutgoing) return;
     _speakerOn = !_speakerOn;
+    WebRtcService.instance.setSpeakerOn(_speakerOn);
     notifyListeners();
   }
 
@@ -222,6 +258,7 @@ class CallProvider extends ChangeNotifier {
     if (_session == null || !_session!.isVideo) return;
     if (!isActive && !isOutgoing) return;
     _videoEnabled = !_videoEnabled;
+    WebRtcService.instance.setVideoEnabled(_videoEnabled);
     notifyListeners();
   }
 
@@ -243,27 +280,52 @@ class CallProvider extends ChangeNotifier {
     await onIncomingCall(mock, showSystemIncomingUi: true);
   }
 
+  /// Reconstruct a [CallSession] from the native callkit event body.
+  CallSession _sessionFromNativeBody(Map<String, dynamic> body) {
+    final extra = Map<String, dynamic>.from(body['extra'] ?? const {});
+    return CallSession.fromPayload(<String, dynamic>{
+      'call_id': body['id']?.toString(),
+      'caller_id': extra['caller_id']?.toString(),
+      'caller_name':
+          extra['caller_name']?.toString() ?? body['nameCaller']?.toString(),
+      'caller_avatar_url':
+          extra['caller_avatar_url']?.toString() ?? body['avatar']?.toString(),
+      'handle': extra['handle']?.toString() ?? body['handle']?.toString(),
+      'is_video': (body['type'] == 1),
+    });
+  }
+
   void _handleNativeEvent(String event, Map<String, dynamic> body) {
     final normalized = event.toLowerCase();
+
     if (_session == null) {
       if (normalized.contains('incoming')) {
-        final extra = Map<String, dynamic>.from(body['extra'] ?? const {});
-        final payload = <String, dynamic>{
-          'call_id': body['id']?.toString(),
-          'caller_id': extra['caller_id']?.toString(),
-          'caller_name':
-              extra['caller_name']?.toString() ??
-              body['nameCaller']?.toString(),
-          'caller_avatar_url':
-              extra['caller_avatar_url']?.toString() ??
-              body['avatar']?.toString(),
-          'handle': extra['handle']?.toString() ?? body['handle']?.toString(),
-          'is_video': (body['type'] == 1),
-        };
         onIncomingCall(
-          CallSession.fromPayload(payload),
+          _sessionFromNativeBody(body),
           showSystemIncomingUi: false,
         );
+        return;
+      }
+
+      // App was killed/backgrounded — reconstruct the session from the
+      // native body so accept actually works instead of silently dropping.
+      if (normalized.contains('accept')) {
+        final restored = _sessionFromNativeBody(body);
+        _session = restored;
+        _phase = CallPhase.incoming;
+        _shouldEndSystemCall = true;
+        _peerUserId = restored.callerId;
+        _videoEnabled = restored.isVideo;
+        unawaited(acceptCall());
+        return;
+      }
+
+      // Decline/end with no session — just dismiss system UI.
+      if (normalized.contains('decline') || normalized.contains('end')) {
+        final callId = body['id']?.toString();
+        if (callId != null) {
+          CallService.instance.endSystemCall(callId);
+        }
       }
       return;
     }
@@ -278,6 +340,10 @@ class CallProvider extends ChangeNotifier {
     }
     if (normalized.contains('end')) {
       if (_phase == CallPhase.incoming) {
+        return;
+      }
+      if (_dismissingSystemCallUI) {
+        _dismissingSystemCallUI = false;
         return;
       }
       unawaited(endCall());
@@ -331,9 +397,53 @@ class CallProvider extends ChangeNotifier {
 
     if (!isPrimary && !isSecondary) return;
 
+    // ── WebRTC signaling ───────────────────────────────────────────────
+    if (action == 'webrtc_offer') {
+      final webrtcData = payload['webrtc_data'];
+      if (webrtcData is Map) {
+        _pendingOffer = Map<String, dynamic>.from(
+          webrtcData.cast<dynamic, dynamic>(),
+        );
+        // If the call is already active (e.g. callee accepted before the
+        // offer arrived) start media now.
+        if (_phase == CallPhase.active) {
+          final peerId = int.tryParse(_peerUserId ?? '');
+          if (peerId != null && peerId > 0 && _pendingOffer != null) {
+            unawaited(
+              WebRtcService.instance.answerCall(
+                callId: _session!.id,
+                peerId: peerId,
+                isVideo: _session!.isVideo,
+                offerSdp: _pendingOffer!,
+              ),
+            );
+            _pendingOffer = null;
+          }
+        }
+      }
+      return;
+    }
+
+    // webrtc_answer and webrtc_ice are handled directly by WebRtcService
+    // via its own RealtimeService listener – nothing to do here.
+    if (action == 'webrtc_answer' || action == 'webrtc_ice') return;
+
+    // ── accept ────────────────────────────────────────────────────────
     if (action == 'accept') {
       if (!isPrimary) return;
       if (_phase == CallPhase.active) return;
+
+      // Multi-device dismiss: if I am the incoming party and the signal's
+      // caller_id differs from the original caller, another device of mine
+      // already accepted ➜ dismiss the call on *this* device.
+      if (_phase == CallPhase.incoming && callerId != _session!.callerId) {
+        final sysCallId = _session!.id;
+        CallService.instance.endSystemCall(sysCallId);
+        _resetState();
+        notifyListeners();
+        return;
+      }
+
       _phase = CallPhase.active;
       _fullScreen = true;
       _activeStartedAt = DateTime.now();

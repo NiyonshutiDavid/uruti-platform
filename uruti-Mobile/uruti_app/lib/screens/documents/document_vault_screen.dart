@@ -67,21 +67,18 @@ class _DocumentVaultScreenState extends State<DocumentVaultScreen>
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: context.colors.appBarBg,
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
+          icon: Icon(Icons.menu_rounded, color: Colors.white),
           onPressed: () => MainScaffold.scaffoldKey.currentState?.openDrawer(),
         ),
         title: Text(
           'Document Vault',
-          style: TextStyle(
-            color: context.colors.textPrimary,
-            fontWeight: FontWeight.w700,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.upload_file, color: AppColors.primary),
+            icon: Icon(Icons.upload_file, color: Colors.white),
             onPressed: () => ScaffoldMessenger.of(
               context,
             ).showSnackBar(const SnackBar(content: Text('Upload coming soon'))),
@@ -89,9 +86,9 @@ class _DocumentVaultScreenState extends State<DocumentVaultScreen>
         ],
         bottom: TabBar(
           controller: _tab,
-          indicatorColor: AppColors.primary,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: context.colors.textSecondary,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white60,
           tabs: const [
             Tab(text: 'All'),
             Tab(text: 'Pitch'),
@@ -109,7 +106,7 @@ class _DocumentVaultScreenState extends State<DocumentVaultScreen>
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {},
-        backgroundColor: AppColors.primary,
+        backgroundColor: context.colors.accent,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text('Upload', style: TextStyle(color: Colors.white)),
       ),
@@ -150,12 +147,12 @@ class _DocList extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
+                  color: context.colors.accent.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   d['icon'] as IconData,
-                  color: AppColors.primary,
+                  color: context.colors.accent,
                   size: 22,
                 ),
               ),

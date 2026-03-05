@@ -43,4 +43,18 @@ post_install do |installer|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
     end
   end
+
+  # Workaround: Xcode 26 actool rejects DKPhotoGallery & DKImagePickerController
+  # xcassets when the simulator runtime (iOS 18.5) doesn't match the SDK (26.0).
+  # Remove the offending asset catalogs so actool never processes them.
+  pods_root = File.join(__dir__, 'Pods')
+  [
+    File.join(pods_root, 'DKPhotoGallery', 'DKPhotoGallery', 'Resource', 'Resources', 'Images.xcassets'),
+    File.join(pods_root, 'DKImagePickerController', 'Sources', 'DKImagePickerController', 'Resource', 'Resources', 'Images.xcassets'),
+  ].each do |xcassets_path|
+    if File.directory?(xcassets_path)
+      FileUtils.rm_rf(xcassets_path)
+      puts "[Podfile] Removed #{xcassets_path} to work around Xcode 26 actool error"
+    end
+  end
 end

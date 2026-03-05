@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { useNavigate } from 'react-router-dom';
+import { useConfirmDialog } from '../ui/confirm-dialog';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
+import { Progress } from '../ui/progress';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { 
   Search, 
@@ -18,20 +23,24 @@ import {
   ArrowLeft,
   Sparkles,
   Bookmark,
-  Loader2
+  Loader2,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import { VentureDetailView } from '../VentureDetailView';
 import { apiClient } from '../../lib/api-client';
 import { toast } from 'sonner';
 
 export function StartupDiscoveryModule() {
+  const { confirm } = useConfirmDialog();
+  const navigate = useNavigate();
   const [ventures, setVentures] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSector, setFilterSector] = useState('all');
   const [filterStage, setFilterStage] = useState('all');
   const [selectedVenture, setSelectedVenture] = useState<any>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'leaderboard'>('grid');
   const [bookmarkedVentures, setBookmarkedVentures] = useState<Set<number>>(new Set());
 
   // Load ventures from backend
@@ -75,8 +84,44 @@ export function StartupDiscoveryModule() {
     return matchesSearch && matchesSector && matchesStage;
   });
 
-  const handleViewVenture = (venture: any) => {
-    setSelectedVenture(venture);
+  const handleViewVenture = async (venture: any) => {
+    try {
+      // Fetch full venture details from backend
+      const fullVenture = await apiClient.getVentureById(venture.id);
+
+      // Map snake_case API response to camelCase for VentureDetailView
+      const mapped = {
+        id: String(fullVenture.id),
+        name: fullVenture.name || '',
+        sector: fullVenture.industry || '',
+        tagline: fullVenture.tagline || '',
+        problem: fullVenture.problem_statement || '',
+        solution: fullVenture.solution || '',
+        targetMarket: fullVenture.target_market || '',
+        urutiScore: fullVenture.uruti_score || 0,
+        activeUsers: fullVenture.customers || 0,
+        monthlyGrowth: fullVenture.mrr ? Math.round((fullVenture.mrr / Math.max(fullVenture.monthly_burn_rate || 1, 1)) * 100) : 0,
+        highlights: fullVenture.highlights || [],
+        teamBackground: fullVenture.team_background || '',
+        competitiveEdge: fullVenture.competitive_edge || '',
+        fundingPlans: fullVenture.funding_plans || '',
+        milestones: fullVenture.milestones || [],
+        activities: fullVenture.activities || [],
+        pitchDeckUrl: fullVenture.pitch_deck_url || '',
+        pitchVideoUrl: fullVenture.demo_video_url || '',
+        thumbnailUrl: fullVenture.banner_url || '',
+        fundingGoal: fullVenture.funding_goal || 0,
+        fundingRaised: fullVenture.funding_raised || 0,
+        teamSize: fullVenture.team_size || 1,
+        stage: fullVenture.stage || '',
+        founderId: fullVenture.founder_id || 0,
+      };
+
+      setSelectedVenture(mapped);
+    } catch (error) {
+      console.error('Failed to load venture details:', error);
+      toast.error('Failed to load venture details');
+    }
   };
 
   const handleBackToList = () => {
@@ -87,7 +132,12 @@ export function StartupDiscoveryModule() {
     e.stopPropagation(); // Prevent card click
     try {
       if (bookmarkedVentures.has(ventureId)) {
-        const confirmed = window.confirm('Remove this startup from your bookmarks?');
+        const confirmed = await confirm({
+          title: 'Remove Bookmark',
+          description: 'Remove this startup from your bookmarks? You can always bookmark it again later.',
+          confirmLabel: 'Remove',
+          variant: 'danger',
+        });
         if (!confirmed) return;
 
         await apiClient.removeBookmark(ventureId);
@@ -138,7 +188,8 @@ export function StartupDiscoveryModule() {
         </Button>
         <VentureDetailView 
           venture={selectedVenture}
-          onClose={handleBackToList}
+          isOwner={false}
+          onViewFounder={(founderId) => navigate(`/dashboard/profile/${founderId}`)}
         />
       </div>
     );
@@ -165,10 +216,24 @@ export function StartupDiscoveryModule() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge className="bg-[#76B947]/20 text-[#76B947] border-[#76B947]/30">
-            <Sparkles className="mr-1 h-3 w-3" />
-            {filteredVentures.length} Startups Available
-          </Badge>
+          <Button
+            variant={viewMode === 'grid' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('grid')}
+            className={viewMode === 'grid' ? 'bg-[#76B947] text-white hover:bg-[#5a8f35]' : ''}
+          >
+            <LayoutGrid className="h-4 w-4 mr-1" />
+            Grid
+          </Button>
+          <Button
+            variant={viewMode === 'leaderboard' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('leaderboard')}
+            className={viewMode === 'leaderboard' ? 'bg-[#76B947] text-white hover:bg-[#5a8f35]' : ''}
+          >
+            <List className="h-4 w-4 mr-1" />
+            Leaderboard
+          </Button>
         </div>
       </div>
 
@@ -329,6 +394,112 @@ export function StartupDiscoveryModule() {
           </CardContent>
         </Card>
       ) : (
+        /* Content based on view mode */
+        viewMode === 'leaderboard' ? (
+          /* Leaderboard Table View */
+          <Card className="glass-card border-black/5 dark:border-white/10">
+            <CardHeader>
+              <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>Startup Leaderboard</CardTitle>
+              <CardDescription style={{ fontFamily: 'var(--font-body)' }}>
+                AI-ranked startups by Uruti Score • {filteredVentures.length} startups
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead style={{ fontFamily: 'var(--font-heading)' }}>Rank</TableHead>
+                    <TableHead style={{ fontFamily: 'var(--font-heading)' }}>Startup</TableHead>
+                    <TableHead style={{ fontFamily: 'var(--font-heading)' }}>Uruti Score</TableHead>
+                    <TableHead style={{ fontFamily: 'var(--font-heading)' }}>Stage</TableHead>
+                    <TableHead style={{ fontFamily: 'var(--font-heading)' }}>Sector</TableHead>
+                    <TableHead style={{ fontFamily: 'var(--font-heading)' }}>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[...filteredVentures].sort((a, b) => (b.uruti_score || 0) - (a.uruti_score || 0)).map((venture, index) => {
+                    const isBookmarked = bookmarkedVentures.has(venture.id);
+                    return (
+                      <TableRow key={venture.id} className="hover:bg-[#76B947]/5 cursor-pointer" onClick={() => handleViewVenture(venture)}>
+                        <TableCell>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            index === 0 ? 'bg-[#76B947]/20 text-[#76B947]' : index === 1 ? 'bg-blue-100 text-blue-600' : index === 2 ? 'bg-orange-100 text-orange-600' : 'bg-black/5 dark:bg-white/10'
+                          }`}>
+                            <span style={{ fontFamily: 'var(--font-heading)' }}>{index + 1}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage src={venture.logo_url} alt={venture.name} />
+                              <AvatarFallback className="bg-[#76B947]/20 text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>
+                                {(venture.name || '??').substring(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>{venture.name}</p>
+                              <p className="text-xs text-muted-foreground line-clamp-1" style={{ fontFamily: 'var(--font-body)' }}>
+                                {venture.description || venture.tagline || 'No description'}
+                              </p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className={`text-xl font-bold ${
+                              (venture.uruti_score || 0) >= 85 ? 'text-[#76B947]' : (venture.uruti_score || 0) >= 70 ? 'text-blue-600' : 'text-orange-600'
+                            }`} style={{ fontFamily: 'var(--font-heading)' }}>
+                              {venture.uruti_score || 'N/A'}
+                            </div>
+                            <Progress value={venture.uruti_score || 0} className="h-1.5 w-16" />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {venture.stage ? (
+                            <Badge className={`text-xs ${getStageColor(venture.stage)}`}>
+                              {venture.stage}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {venture.industry ? (
+                            <Badge variant="outline" className="text-xs bg-black/5 dark:bg-white/5">
+                              {venture.industry}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="hover:bg-[#76B947]/10"
+                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleViewVenture(venture); }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`hover:bg-[#76B947]/10 ${isBookmarked ? 'text-[#76B947]' : ''}`}
+                              onClick={(e: React.MouseEvent) => toggleBookmark(venture.id, e)}
+                            >
+                              <Bookmark className={`h-4 w-4 ${isBookmarked ? 'fill-[#76B947]' : ''}`} />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        ) : (
         /* Startup Grid */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredVentures.map((venture) => (
@@ -442,6 +613,7 @@ export function StartupDiscoveryModule() {
             </Card>
           ))}
         </div>
+        )
       )}
     </div>
   );

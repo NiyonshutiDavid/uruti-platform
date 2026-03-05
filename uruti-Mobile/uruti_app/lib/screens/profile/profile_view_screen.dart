@@ -1,6 +1,10 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
@@ -18,8 +22,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   bool _loading = true;
   bool _connecting = false;
   String _relation = 'none';
-  int _ventureCount = 0;
   List<Map<String, dynamic>> _founderVentures = [];
+  Color _headerIconColor = Colors.white;
+  String? _lastCoverUrl;
 
   @override
   void initState() {
@@ -71,9 +76,6 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         }
       }
 
-      final ventureCount = ventures
-          .where((v) => (v['founder_id'] as num?)?.toInt() == targetId)
-          .length;
       final founderVentures =
           ventures
               .where((v) => (v['founder_id'] as num?)?.toInt() == targetId)
@@ -89,7 +91,6 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       setState(() {
         _user = data;
         _relation = relation;
-        _ventureCount = ventureCount;
         _founderVentures = founderVentures;
         _loading = false;
       });
@@ -116,6 +117,19 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         final problem = (venture['problem_statement'] as String? ?? '').trim();
         final solution = (venture['solution'] as String? ?? '').trim();
         final market = (venture['target_market'] as String? ?? '').trim();
+        final businessModel = (venture['business_model'] as String? ?? '')
+            .trim();
+        final fundingGoal = (venture['funding_goal'] as num?)?.toDouble();
+        final fundingRaised = (venture['funding_raised'] as num?)?.toDouble();
+        final revenue = (venture['revenue'] as num?)?.toDouble();
+        final burnRate = (venture['monthly_burn_rate'] as num?)?.toDouble();
+        final mrr = (venture['mrr'] as num?)?.toDouble();
+        final teamSize = (venture['team_size'] as num?)?.toInt();
+        final customers = (venture['customers'] as num?)?.toInt();
+        final pitchDeckUrl = (venture['pitch_deck_url'] as String? ?? '')
+            .trim();
+        final demoVideoUrl = (venture['demo_video_url'] as String? ?? '')
+            .trim();
         final score = ((venture['uruti_score'] as num?)?.toDouble() ?? 0)
             .round();
 
@@ -172,15 +186,15 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.12),
+                      color: context.colors.accent.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Column(
                       children: [
                         Text(
                           '$score',
-                          style: const TextStyle(
-                            color: AppColors.primary,
+                          style: TextStyle(
+                            color: context.colors.accent,
                             fontWeight: FontWeight.w800,
                             fontSize: 18,
                           ),
@@ -258,6 +272,64 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                   ),
                 ),
               ],
+              if (businessModel.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                _section(ctx, 'Business Model'),
+                const SizedBox(height: 6),
+                Text(
+                  businessModel,
+                  style: TextStyle(
+                    color: ctx.colors.textSecondary,
+                    fontSize: 14,
+                    height: 1.6,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+              _section(ctx, 'Business Snapshot'),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (fundingGoal != null)
+                    _Tag('Funding Goal: ${_formatCurrency(fundingGoal)}'),
+                  if (fundingRaised != null)
+                    _Tag('Funding Raised: ${_formatCurrency(fundingRaised)}'),
+                  if (revenue != null)
+                    _Tag('Revenue: ${_formatCurrency(revenue)}'),
+                  if (burnRate != null)
+                    _Tag('Burn Rate: ${_formatCurrency(burnRate)} / mo'),
+                  if (mrr != null) _Tag('MRR: ${_formatCurrency(mrr)}'),
+                  if (teamSize != null) _Tag('Team Size: $teamSize'),
+                  if (customers != null) _Tag('Customers: $customers'),
+                ],
+              ),
+              const SizedBox(height: 14),
+              _section(ctx, 'Pitch Deck'),
+              const SizedBox(height: 6),
+              if (pitchDeckUrl.isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: () => _openExternalUrl(pitchDeckUrl),
+                  icon: const Icon(Icons.slideshow_rounded),
+                  label: const Text('View Pitch Deck'),
+                )
+              else
+                Text(
+                  'Pitch deck not available',
+                  style: TextStyle(
+                    color: ctx.colors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              if (demoVideoUrl.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () => _openExternalUrl(demoVideoUrl),
+                  icon: const Icon(Icons.play_circle_outline_rounded),
+                  label: const Text('View Demo Video'),
+                ),
+              ],
               const SizedBox(height: 16),
             ],
           ),
@@ -273,6 +345,84 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         .where((p) => p.trim().isNotEmpty)
         .map((p) => '${p[0].toUpperCase()}${p.substring(1)}')
         .join(' ');
+  }
+
+  String _formatCurrency(double amount) {
+    if (amount >= 1000000) {
+      return '\$${(amount / 1000000).toStringAsFixed(1)}M';
+    }
+    if (amount >= 1000) {
+      return '\$${(amount / 1000).toStringAsFixed(1)}K';
+    }
+    return '\$${amount.toStringAsFixed(0)}';
+  }
+
+  Future<void> _openExternalUrl(String rawUrl) async {
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) return;
+
+    Uri? uri = Uri.tryParse(trimmed);
+    if (uri == null || uri.scheme.isEmpty) {
+      uri = Uri.tryParse('https://$trimmed');
+    }
+    if (uri == null) return;
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open pitch deck link')),
+      );
+    }
+  }
+
+  Future<void> _updateHeaderIconColor(String? imageUrl) async {
+    if (imageUrl == null || imageUrl.trim().isEmpty) {
+      if (mounted) setState(() => _headerIconColor = Colors.white);
+      return;
+    }
+
+    try {
+      final uri = Uri.parse(imageUrl);
+      final data = await NetworkAssetBundle(uri).load(uri.toString());
+      final codec = await ui.instantiateImageCodec(
+        data.buffer.asUint8List(),
+        targetWidth: 16,
+        targetHeight: 16,
+      );
+      final frame = await codec.getNextFrame();
+      final byteData = await frame.image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      );
+      if (byteData == null) return;
+
+      final pixels = byteData.buffer.asUint8List();
+      double luminanceTotal = 0;
+      int count = 0;
+
+      for (int i = 0; i + 3 < pixels.length; i += 4) {
+        final r = pixels[i] / 255;
+        final g = pixels[i + 1] / 255;
+        final b = pixels[i + 2] / 255;
+        luminanceTotal += 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        count++;
+      }
+
+      final averageLuminance = count == 0 ? 0.0 : luminanceTotal / count;
+      final nextColor = averageLuminance > 0.68 ? Colors.black : Colors.white;
+      if (mounted) setState(() => _headerIconColor = nextColor);
+    } catch (_) {
+      if (mounted) setState(() => _headerIconColor = Colors.white);
+    }
+  }
+
+  void _syncHeaderIconColor(String? coverUrl) {
+    if (_lastCoverUrl == coverUrl) return;
+    _lastCoverUrl = coverUrl;
+    _updateHeaderIconColor(coverUrl);
   }
 
   Future<void> _connect() async {
@@ -346,7 +496,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           : const Icon(Icons.person_add_outlined),
       label: const Text('Connect'),
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
+        backgroundColor: context.colors.accent,
         foregroundColor: Colors.white,
         minimumSize: const Size.fromHeight(48),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -360,7 +510,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       return Scaffold(
         backgroundColor: context.colors.background,
         body: Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
+          child: CircularProgressIndicator(color: context.colors.accent),
         ),
       );
     }
@@ -368,7 +518,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       return Scaffold(
         backgroundColor: context.colors.background,
         appBar: AppBar(
-          backgroundColor: context.colors.background,
+          backgroundColor: context.colors.appBarBg,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () =>
@@ -384,25 +534,23 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       );
     }
     final u = _user!;
+    _syncHeaderIconColor(u.resolvedCoverImageUrl);
     return Scaffold(
       backgroundColor: context.colors.background,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             pinned: true,
-            expandedHeight: 200,
+            expandedHeight: 240,
             backgroundColor: context.colors.surface,
             leading: IconButton(
-              icon: Icon(Icons.arrow_back, color: context.colors.textPrimary),
+              icon: Icon(Icons.arrow_back, color: _headerIconColor),
               onPressed: () =>
                   context.canPop() ? context.pop() : context.go('/home'),
             ),
             actions: [
               IconButton(
-                icon: Icon(
-                  Icons.message_outlined,
-                  color: context.colors.textPrimary,
-                ),
+                icon: Icon(Icons.message_outlined, color: _headerIconColor),
                 onPressed: () => context.push('/messages/${u.id}'),
               ),
             ],
@@ -410,37 +558,55 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
+                  if (u.resolvedCoverImageUrl != null)
+                    Image.network(
+                      u.resolvedCoverImageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              const Color(0xFF1A3A0A),
+                              context.colors.card,
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFF1A3A0A),
+                            context.colors.card,
+                          ],
+                        ),
+                      ),
+                    ),
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [const Color(0xFF1A3A0A), context.colors.card],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.15),
+                          Colors.black.withValues(alpha: 0.35),
+                        ],
                       ),
                     ),
                   ),
                   Positioned(
-                    bottom: 20,
+                    bottom: 16,
                     left: 20,
                     right: 20,
                     child: Row(
                       children: [
-                        CircleAvatar(
-                          radius: 36,
-                          backgroundColor: context.colors.darkGreenMid,
-                          backgroundImage: u.resolvedAvatarUrl != null
-                              ? NetworkImage(u.resolvedAvatarUrl!)
-                              : null,
-                          child: u.resolvedAvatarUrl == null
-                              ? Image.asset(
-                                  'assets/images/Uruti-icon-white.png',
-                                  width: 40,
-                                  height: 40,
-                                  fit: BoxFit.contain,
-                                )
-                              : null,
-                        ),
-                        const SizedBox(width: 14),
+                        const SizedBox(width: 84),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -449,8 +615,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                                 u.fullName,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: context.colors.textPrimary,
+                                style: const TextStyle(
+                                  color: Colors.white,
                                   fontWeight: FontWeight.w800,
                                   fontSize: 18,
                                 ),
@@ -462,17 +628,17 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                                   vertical: 3,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(
-                                    alpha: 0.15,
+                                  color: context.colors.accent.withValues(
+                                    alpha: 0.2,
                                   ),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
                                   u.role[0].toUpperCase() + u.role.substring(1),
-                                  style: TextStyle(
-                                    color: AppColors.primary,
+                                  style: const TextStyle(
+                                    color: Colors.white,
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
@@ -483,7 +649,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    color: context.colors.textSecondary,
+                                    color: Colors.white.withValues(alpha: 0.9),
                                     fontSize: 12,
                                   ),
                                 ),
@@ -494,6 +660,34 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                       ],
                     ),
                   ),
+                  Positioned(
+                    left: 20,
+                    bottom: 8,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: context.colors.background,
+                          width: 3,
+                        ),
+                      ),
+                      child: CircleAvatar(
+                        radius: 36,
+                        backgroundColor: context.colors.darkGreenMid,
+                        backgroundImage: u.resolvedAvatarUrl != null
+                            ? NetworkImage(u.resolvedAvatarUrl!)
+                            : null,
+                        child: u.resolvedAvatarUrl == null
+                            ? Image.asset(
+                                'assets/images/Uruti-icon-white.png',
+                                width: 40,
+                                height: 40,
+                                fit: BoxFit.contain,
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -502,16 +696,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             padding: const EdgeInsets.all(16),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                Row(
-                  children: [
-                    _StatBox('Score', u.uritiScore.round().toString()),
-                    _StatBox('Sessions', '—'),
-                    _StatBox('Connects', _relation == 'connected' ? '1' : '0'),
-                    _StatBox('Ventures', _ventureCount.toString()),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
+                const SizedBox(height: 24),
                 _buildPrimaryAction(u),
                 const SizedBox(height: 20),
 
@@ -575,7 +760,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                 if (u.phone != null && u.phone!.isNotEmpty)
                   _InfoRow(Icons.phone_outlined, u.phone!),
                 if (u.linkedinUrl != null && u.linkedinUrl!.isNotEmpty)
-                  _InfoRow(Icons.link, u.linkedinUrl!),
+                  _LinkRow(Icons.link, 'LinkedIn', u.linkedinUrl!),
+                if (u.websiteUrl != null && u.websiteUrl!.isNotEmpty)
+                  _LinkRow(Icons.language_rounded, 'Website', u.websiteUrl!),
                 const SizedBox(height: 80),
               ]),
             ),
@@ -595,41 +782,6 @@ Widget _section(BuildContext context, String t) => Text(
   ),
 );
 
-class _StatBox extends StatelessWidget {
-  final String label;
-  final String value;
-  const _StatBox(this.label, this.value);
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: Container(
-      margin: const EdgeInsets.only(right: 8),
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: context.colors.card,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: context.colors.divider),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w800,
-              fontSize: 18,
-            ),
-          ),
-          Text(
-            label,
-            style: TextStyle(color: context.colors.textSecondary, fontSize: 10),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
 class _Tag extends StatelessWidget {
   final String label;
   const _Tag(this.label);
@@ -637,13 +789,13 @@ class _Tag extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
     decoration: BoxDecoration(
-      color: AppColors.primary.withValues(alpha: 0.1),
+      color: context.colors.accent.withValues(alpha: 0.1),
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+      border: Border.all(color: context.colors.accent.withValues(alpha: 0.3)),
     ),
     child: Text(
       label,
-      style: TextStyle(color: AppColors.primary, fontSize: 12),
+      style: TextStyle(color: context.colors.accent, fontSize: 12),
     ),
   );
 }
@@ -664,9 +816,65 @@ class _InfoRow extends StatelessWidget {
           child: Text(
             text,
             style: TextStyle(color: context.colors.textSecondary, fontSize: 14),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
+    ),
+  );
+}
+
+class _LinkRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String url;
+  const _LinkRow(this.icon, this.label, this.url);
+
+  Future<void> _openUrl(BuildContext context) async {
+    var target = url.trim();
+    if (!target.startsWith('http://') && !target.startsWith('https://')) {
+      target = 'https://$target';
+    }
+    final uri = Uri.tryParse(target);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Could not open link')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: GestureDetector(
+      onTap: () => _openUrl(context),
+      child: Row(
+        children: [
+          Icon(icon, color: context.colors.accent, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              url,
+              style: TextStyle(
+                color: context.colors.accent,
+                fontSize: 14,
+                decoration: TextDecoration.underline,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Icon(
+            Icons.open_in_new_rounded,
+            color: context.colors.accent,
+            size: 14,
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -700,12 +908,12 @@ class _PublicVentureCard extends StatelessWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.12),
+                color: context.colors.accent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.rocket_launch_rounded,
-                color: AppColors.primary,
+                color: context.colors.accent,
                 size: 20,
               ),
             ),
@@ -769,8 +977,8 @@ class _PublicVentureCard extends StatelessWidget {
               children: [
                 Text(
                   '$score',
-                  style: const TextStyle(
-                    color: AppColors.primary,
+                  style: TextStyle(
+                    color: context.colors.accent,
                     fontWeight: FontWeight.w800,
                     fontSize: 20,
                   ),

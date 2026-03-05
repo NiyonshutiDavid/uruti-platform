@@ -37,22 +37,22 @@ class _FounderSnapshotScreenState extends State<FounderSnapshotScreen> {
         return Scaffold(
           backgroundColor: context.colors.background,
           appBar: AppBar(
-            backgroundColor: context.colors.background,
+            backgroundColor: context.colors.appBarBg,
             leading: IconButton(
-              icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
+              icon: Icon(Icons.menu_rounded, color: Colors.white),
               onPressed: () =>
                   MainScaffold.scaffoldKey.currentState?.openDrawer(),
             ),
             title: Text(
               'Founder Snapshot',
               style: TextStyle(
-                color: context.colors.textPrimary,
+                color: Colors.white,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
           body: RefreshIndicator(
-            color: AppColors.primary,
+            color: context.colors.accent,
             onRefresh: () => context.read<FounderCubit>().refreshSnapshot(),
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -217,7 +217,7 @@ class _FounderSnapshotScreenState extends State<FounderSnapshotScreen> {
                     icon: const Icon(Icons.smart_toy_outlined),
                     label: const Text('Get AI Recommendations'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: context.colors.accent,
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(52),
                       shape: RoundedRectangleBorder(
@@ -315,10 +315,14 @@ class _WelcomeCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
+            color: context.colors.accent.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(Icons.auto_awesome, color: AppColors.primary, size: 28),
+          child: Icon(
+            Icons.auto_awesome,
+            color: context.colors.accent,
+            size: 28,
+          ),
         ),
       ],
     ),
@@ -360,7 +364,7 @@ class _StatCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Icon(icon, color: AppColors.primary, size: 14),
+              Icon(icon, color: context.colors.accent, size: 14),
             ],
           ),
           const SizedBox(height: 6),
@@ -400,7 +404,7 @@ class _ScoreCard extends StatelessWidget {
         end: Alignment.bottomRight,
       ),
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+      border: Border.all(color: context.colors.accent.withValues(alpha: 0.3)),
     ),
     child: Row(
       children: [
@@ -417,20 +421,20 @@ class _ScoreCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               loading
-                  ? const SizedBox(
+                  ? SizedBox(
                       height: 48,
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: CircularProgressIndicator(
-                          color: AppColors.primary,
+                          color: context.colors.accent,
                           strokeWidth: 2,
                         ),
                       ),
                     )
                   : Text(
                       '$score',
-                      style: const TextStyle(
-                        color: AppColors.primary,
+                      style: TextStyle(
+                        color: context.colors.accent,
                         fontSize: 48,
                         fontWeight: FontWeight.w900,
                       ),
@@ -452,15 +456,17 @@ class _ScoreCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.15),
+            color: context.colors.accent.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+            border: Border.all(
+              color: context.colors.accent.withValues(alpha: 0.3),
+            ),
           ),
           child: Column(
             children: [
               Icon(
                 Icons.psychology_outlined,
-                color: AppColors.primary,
+                color: context.colors.accent,
                 size: 32,
               ),
               const SizedBox(height: 4),
@@ -497,13 +503,15 @@ class _QuickAction extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.08),
+          color: context.colors.accent.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+          border: Border.all(
+            color: context.colors.accent.withValues(alpha: 0.2),
+          ),
         ),
         child: Column(
           children: [
-            Icon(icon, color: AppColors.primary, size: 26),
+            Icon(icon, color: context.colors.accent, size: 26),
             const SizedBox(height: 8),
             Text(
               label,
@@ -612,7 +620,7 @@ class _InvestmentReadinessPie extends StatelessWidget {
       if (ready > 0)
         PieChartSectionData(
           value: ready.toDouble(),
-          color: AppColors.primary,
+          color: context.colors.accent,
           title: '$ready',
           radius: 38,
           titleStyle: const TextStyle(
@@ -664,7 +672,8 @@ class _InvestmentReadinessPie extends StatelessWidget {
           Wrap(
             spacing: 8,
             children: [
-              if (ready > 0) _Legend(color: AppColors.primary, label: 'Ready'),
+              if (ready > 0)
+                _Legend(color: context.colors.accent, label: 'Ready'),
               if (developing > 0)
                 _Legend(color: const Color(0xFF3B82F6), label: 'Developing'),
               if (early > 0)
@@ -715,7 +724,7 @@ class _ReadinessBarChart extends StatelessWidget {
         barRods: [
           BarChartRodData(
             toY: score,
-            color: AppColors.primary,
+            color: context.colors.accent,
             width: 14,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
           ),
@@ -867,7 +876,7 @@ class _NotificationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final type = n['type'] as String? ?? 'info';
     final dotColor = type == 'success'
-        ? AppColors.primary
+        ? context.colors.accent
         : type == 'warning'
         ? const Color(0xFFFFB800)
         : const Color(0xFF3B82F6);
@@ -960,12 +969,12 @@ class _MilestoneTile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: context.colors.accent.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               Icons.calendar_today_outlined,
-              color: AppColors.primary,
+              color: context.colors.accent,
               size: 14,
             ),
           ),

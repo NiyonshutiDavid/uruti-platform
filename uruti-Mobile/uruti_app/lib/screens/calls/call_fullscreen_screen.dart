@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../../core/app_colors.dart';
 import '../../models/call_session.dart';
+import '../../services/webrtc_service.dart';
 
 class CallFullscreenScreen extends StatefulWidget {
   final CallSession session;
@@ -46,102 +46,52 @@ class CallFullscreenScreen extends StatefulWidget {
 }
 
 class _CallFullscreenScreenState extends State<CallFullscreenScreen> {
-  CameraController? _cameraController;
-  CameraDescription? _selectedCamera;
-  bool _cameraPermissionGranted = false;
-  bool _cameraInitializing = false;
-
-  bool get _needsLocalPreview {
-    if (!widget.session.isVideo) return false;
-    if (!widget.videoEnabled) return false;
-    return widget.outgoing || widget.isActive;
-  }
+  final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
+  final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
+  bool _renderersReady = false;
 
   @override
   void initState() {
     super.initState();
-    _syncCameraState();
+    _initRenderers();
   }
 
-  @override
-  void didUpdateWidget(covariant CallFullscreenScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
+  Future<void> _initRenderers() async {
+    await _localRenderer.initialize();
+    await _remoteRenderer.initialize();
 
-    final previewStateChanged =
-        oldWidget.session.isVideo != widget.session.isVideo ||
-        oldWidget.videoEnabled != widget.videoEnabled ||
-        oldWidget.outgoing != widget.outgoing ||
-        oldWidget.isActive != widget.isActive;
-
-    if (previewStateChanged) {
-      _syncCameraState();
-    }
-  }
-
-  Future<void> _syncCameraState() async {
-    if (!_needsLocalPreview) {
-      await _disposeCamera(notifyUi: true);
-      return;
-    }
-    await _ensureCameraReady();
-  }
-
-  Future<void> _ensureCameraReady() async {
-    if (_cameraController?.value.isInitialized == true || _cameraInitializing) {
-      return;
-    }
-
-    _cameraInitializing = true;
-    try {
-      if (!_cameraPermissionGranted) {
-        final status = await Permission.camera.request();
-        _cameraPermissionGranted = status.isGranted;
-      }
-
-      if (!_cameraPermissionGranted) {
-        return;
-      }
-
-      final cams = await availableCameras();
-      if (cams.isEmpty) return;
-
-      _selectedCamera = cams.firstWhere(
-        (cam) => cam.lensDirection == CameraLensDirection.front,
-        orElse: () => cams.first,
-      );
-
-      final controller = CameraController(
-        _selectedCamera!,
-        ResolutionPreset.medium,
-        enableAudio: false,
-      );
-
-      await controller.initialize();
-      if (!mounted) {
-        await controller.dispose();
-        return;
-      }
-
-      setState(() => _cameraController = controller);
-    } catch (_) {
-      // Keep the call UI functional even if camera preview fails.
-    } finally {
-      _cameraInitializing = false;
-    }
-  }
-
-  Future<void> _disposeCamera({required bool notifyUi}) async {
-    final controller = _cameraController;
-    _cameraController = null;
-    if (notifyUi && mounted) {
+    // Bind WebRTC service streams
+    WebRtcService.instance.onLocalStreamChanged = () {
+      if (!mounted) return;
+      _localRenderer.srcObject =
+          WebRtcService.instance.localRenderer?.srcObject;
       setState(() {});
+    };
+    WebRtcService.instance.onRemoteStreamChanged = () {
+      if (!mounted) return;
+      _remoteRenderer.srcObject =
+          WebRtcService.instance.remoteRenderer?.srcObject;
+      setState(() {});
+    };
+
+    // Attach existing streams (if already connected)
+    final svc = WebRtcService.instance;
+    if (svc.localRenderer != null) {
+      _localRenderer.srcObject = svc.localRenderer!.srcObject;
     }
-    await controller?.dispose();
+    if (svc.remoteRenderer != null) {
+      _remoteRenderer.srcObject = svc.remoteRenderer!.srcObject;
+    }
+
+    if (mounted) setState(() => _renderersReady = true);
   }
 
   @override
   void dispose() {
-    _disposeCamera(notifyUi: false);
+    WebRtcService.instance.onLocalStreamChanged = null;
+    WebRtcService.instance.onRemoteStreamChanged = null;
+    _localRenderer.dispose();
+    _remoteRenderer.dispose();
     super.dispose();
   }
 
@@ -152,9 +102,12 @@ class _CallFullscreenScreenState extends State<CallFullscreenScreen> {
         widget.outgoing &&
         !widget.incoming &&
         widget.videoEnabled;
+    final showRemoteVideo = widget.session.isVideo && widget.isActive;
     final showSmallOwnPreview =
         widget.session.isVideo && widget.isActive && widget.videoEnabled;
-    final camReady = _cameraController?.value.isInitialized == true;
+    final hasLocalStream = _renderersReady && _localRenderer.srcObject != null;
+    final hasRemoteStream =
+        _renderersReady && _remoteRenderer.srcObject != null;
 
     return Material(
       type: MaterialType.transparency,
@@ -163,7 +116,7 @@ class _CallFullscreenScreenState extends State<CallFullscreenScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: showFullOwnPreview
+            colors: (showFullOwnPreview || showRemoteVideo)
                 ? const [Color(0xFF0A1A2A), Color(0xFF081324)]
                 : const [Color(0xFF081120), Color(0xFF040A12)],
           ),
@@ -171,24 +124,23 @@ class _CallFullscreenScreenState extends State<CallFullscreenScreen> {
         child: SafeArea(
           child: Stack(
             children: [
-              if (showFullOwnPreview)
+              // ── Remote peer video (full-screen background) ────────
+              if (showRemoteVideo && hasRemoteStream)
                 Positioned.fill(
-                  child: camReady
-                      ? ClipRect(
-                          child: OverflowBox(
-                            maxWidth: double.infinity,
-                            maxHeight: double.infinity,
-                            child: FittedBox(
-                              fit: BoxFit.cover,
-                              child: SizedBox(
-                                width: 100,
-                                height:
-                                    100 /
-                                    (_cameraController!.value.aspectRatio),
-                                child: CameraPreview(_cameraController!),
-                              ),
-                            ),
-                          ),
+                  child: RTCVideoView(
+                    _remoteRenderer,
+                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                  ),
+                ),
+              // ── Own camera preview (full-screen while ringing) ────
+              if (showFullOwnPreview && !showRemoteVideo)
+                Positioned.fill(
+                  child: hasLocalStream
+                      ? RTCVideoView(
+                          _localRenderer,
+                          mirror: true,
+                          objectFit:
+                              RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                         )
                       : Container(
                           decoration: const BoxDecoration(
@@ -207,7 +159,7 @@ class _CallFullscreenScreenState extends State<CallFullscreenScreen> {
                           ),
                         ),
                 ),
-              if (showFullOwnPreview)
+              if (showFullOwnPreview || (showRemoteVideo && hasRemoteStream))
                 Positioned.fill(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
@@ -269,7 +221,7 @@ class _CallFullscreenScreenState extends State<CallFullscreenScreen> {
                   ),
                 ),
               ),
-              if (!showFullOwnPreview)
+              if (!showFullOwnPreview && !(showRemoteVideo && hasRemoteStream))
                 Align(
                   alignment: widget.incoming
                       ? Alignment.center
@@ -304,7 +256,7 @@ class _CallFullscreenScreenState extends State<CallFullscreenScreen> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.9),
+                        color: context.colors.accent.withValues(alpha: 0.9),
                         width: 2,
                       ),
                       gradient: const LinearGradient(
@@ -315,10 +267,15 @@ class _CallFullscreenScreenState extends State<CallFullscreenScreen> {
                     ),
                     child: Stack(
                       children: [
-                        if (camReady)
+                        if (hasLocalStream)
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: CameraPreview(_cameraController!),
+                            child: RTCVideoView(
+                              _localRenderer,
+                              mirror: true,
+                              objectFit: RTCVideoViewObjectFit
+                                  .RTCVideoViewObjectFitCover,
+                            ),
                           )
                         else
                           Center(
@@ -502,7 +459,7 @@ class _CallControl extends StatelessWidget {
         width: 52,
         height: 52,
         decoration: BoxDecoration(
-          color: active ? AppColors.primary : Colors.white12,
+          color: active ? context.colors.accent : Colors.white12,
           shape: BoxShape.circle,
         ),
         child: Icon(

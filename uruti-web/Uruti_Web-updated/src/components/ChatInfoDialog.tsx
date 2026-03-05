@@ -1,9 +1,28 @@
+import { useMemo } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
-import { FileText, Image as ImageIcon, Download, ExternalLink, Calendar, ArrowLeft } from 'lucide-react';
+import { FileText, Image as ImageIcon, Download, ExternalLink, Calendar, ArrowLeft, FileSpreadsheet, File } from 'lucide-react';
+
+interface SharedAttachment {
+  url: string;
+  name?: string;
+  size?: number;
+  type?: string;
+}
+
+interface ChatMessage {
+  id: string;
+  timestamp: string;
+  attachment?: {
+    type: 'image' | 'file' | 'document' | 'idea' | 'audio';
+    name: string;
+    size: number;
+    url?: string;
+  };
+}
 
 interface ChatInfoDialogProps {
   onClose: () => void;
@@ -11,21 +30,62 @@ interface ChatInfoDialogProps {
   contactAvatar?: string;
   contactRole: string;
   contactOnline: boolean;
+  messages?: ChatMessage[];
 }
 
-const mockSharedDocuments = [
-  { id: '1', name: 'AgriConnect_Pitch_Deck_v3.pdf', type: 'pdf', size: '2.4 MB', date: '2026-02-10' },
-  { id: '2', name: 'Financial_Projections_Q1.xlsx', type: 'excel', size: '1.1 MB', date: '2026-02-08' },
-  { id: '3', name: 'Market_Research_Report.pdf', type: 'pdf', size: '5.2 MB', date: '2026-02-05' },
-];
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
-const mockSharedMedia = [
-  { id: '1', type: 'image', url: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=300&h=200&fit=crop', date: '2026-02-11' },
-  { id: '2', type: 'image', url: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=300&h=200&fit=crop', date: '2026-02-09' },
-  { id: '3', type: 'image', url: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=300&h=200&fit=crop', date: '2026-02-07' },
-];
+function isImageUrl(url: string): boolean {
+  return /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(url);
+}
 
-export function ChatInfoDialog({ onClose, contactName, contactAvatar, contactRole, contactOnline }: ChatInfoDialogProps) {
+function getFileIcon(name: string) {
+  const lower = name.toLowerCase();
+  if (lower.endsWith('.pdf')) return <FileText className="h-5 w-5 text-[#76B947]" />;
+  if (lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.csv'))
+    return <FileSpreadsheet className="h-5 w-5 text-[#76B947]" />;
+  return <File className="h-5 w-5 text-[#76B947]" />;
+}
+
+export function ChatInfoDialog({ onClose, contactName, contactAvatar, contactRole, contactOnline, messages = [] }: ChatInfoDialogProps) {
+  // Extract real shared documents and media from conversation messages
+  const { sharedDocuments, sharedMedia } = useMemo(() => {
+    const docs: { id: string; name: string; size: string; date: string; url: string }[] = [];
+    const media: { id: string; url: string; date: string }[] = [];
+
+    messages.forEach((msg) => {
+      if (!msg.attachment?.url) return;
+      const att = msg.attachment;
+      const dateStr = msg.timestamp;
+
+      if (att.type === 'image' || isImageUrl(att.url || '')) {
+        media.push({
+          id: msg.id,
+          url: att.url!,
+          date: dateStr,
+        });
+      } else {
+        docs.push({
+          id: msg.id,
+          name: att.name || att.url!.split('/').pop() || 'Unknown file',
+          size: att.size ? formatFileSize(att.size) : 'Unknown',
+          date: dateStr,
+          url: att.url!,
+        });
+      }
+    });
+
+    // Sort newest first
+    docs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    media.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    return { sharedDocuments: docs, sharedMedia: media };
+  }, [messages]);
+
   return (
     <div className="h-full flex flex-col">
       {/* Header with Back Button */}
@@ -82,62 +142,82 @@ export function ChatInfoDialog({ onClose, contactName, contactAvatar, contactRol
 
             <TabsContent value="documents" className="mt-4">
               <div className="space-y-2">
-                {mockSharedDocuments.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="glass-panel p-4 rounded-lg hover:bg-[#76B947]/5 transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3 flex-1">
-                        <div className="w-10 h-10 bg-[#76B947]/20 rounded-lg flex items-center justify-center">
-                          <FileText className="h-5 w-5 text-[#76B947]" />
+                {sharedDocuments.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                    <p className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>No shared documents yet</p>
+                  </div>
+                ) : (
+                  sharedDocuments.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="glass-panel p-4 rounded-lg hover:bg-[#76B947]/5 transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3 flex-1">
+                          <div className="w-10 h-10 bg-[#76B947]/20 rounded-lg flex items-center justify-center">
+                            {getFileIcon(doc.name)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                              {doc.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                              {doc.size} • {new Date(doc.date).toLocaleDateString()}
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                            {doc.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                            {doc.size} • {new Date(doc.date).toLocaleDateString()}
-                          </p>
+                        <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <a href={doc.url} download target="_blank" rel="noopener noreferrer">
+                            <Button variant="ghost" size="sm" className="hover:bg-[#76B947]/10">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </a>
+                          <a href={doc.url} target="_blank" rel="noopener noreferrer">
+                            <Button variant="ghost" size="sm" className="hover:bg-[#76B947]/10">
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          </a>
                         </div>
-                      </div>
-                      <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="sm" className="hover:bg-[#76B947]/10">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="hover:bg-[#76B947]/10">
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </TabsContent>
 
             <TabsContent value="media" className="mt-4">
-              <div className="grid grid-cols-3 gap-2">
-                {mockSharedMedia.map((media) => (
-                  <div
-                    key={media.id}
-                    className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity relative group"
-                  >
-                    <img
-                      src={media.url}
-                      alt="Shared media"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Button variant="ghost" size="sm" className="text-white hover:bg-white/10">
-                        <Download className="h-4 w-4" />
-                      </Button>
+              {sharedMedia.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <ImageIcon className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                  <p className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>No shared media yet</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {sharedMedia.map((media) => (
+                    <div
+                      key={media.id}
+                      className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity relative group"
+                    >
+                      <img
+                        src={media.url}
+                        alt="Shared media"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <a href={media.url} download target="_blank" rel="noopener noreferrer">
+                          <Button variant="ghost" size="sm" className="text-white hover:bg-white/10">
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </a>
+                      </div>
+                      <div className="absolute bottom-1 right-1 bg-black/70 backdrop-blur-sm px-2 py-1 rounded text-xs text-white">
+                        {new Date(media.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </div>
                     </div>
-                    <div className="absolute bottom-1 right-1 bg-black/70 backdrop-blur-sm px-2 py-1 rounded text-xs text-white">
-                      {new Date(media.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </TabsContent>
           </Tabs>
 

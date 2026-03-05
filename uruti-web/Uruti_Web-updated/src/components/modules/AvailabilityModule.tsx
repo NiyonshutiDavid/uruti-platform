@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useConfirmDialog } from '../ui/confirm-dialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -49,6 +50,7 @@ interface BookingSettings {
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export function AvailabilityModule() {
+  const { confirm } = useConfirmDialog();
   const { user } = useAuth();
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
@@ -118,7 +120,12 @@ export function AvailabilityModule() {
   };
 
   const handleDeleteSlot = async (id: number) => {
-    const confirmed = window.confirm('Delete this availability slot?');
+    const confirmed = await confirm({
+      title: 'Delete Time Slot',
+      description: 'Delete this availability slot? Anyone who booked this time will be notified.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
     if (!confirmed) return;
 
     try {

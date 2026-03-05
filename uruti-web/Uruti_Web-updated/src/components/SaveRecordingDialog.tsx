@@ -6,14 +6,31 @@ import { Textarea } from './ui/textarea';
 import { Video, Save, RotateCcw, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+
+interface PitchMetrics {
+  pacing: number;
+  clarity: number;
+  confidence: number;
+  engagement: number;
+  structure: number;
+}
+
+interface Venture {
+  id: number | string;
+  name: string;
+}
+
 interface SaveRecordingDialogProps {
   open: boolean;
   onClose: () => void;
-  onSave: (notes: string) => Promise<void>;
+  onSave: (notes: string, selectedVentureId: string | number) => Promise<void>;
   onPracticeAgain: () => void;
   duration: number;
   pitchType: string;
-  ventureName: string;
+  ventures: Venture[];
+  selectedVentureId: string | number;
+  onVentureChange: (id: string | number) => void;
+  pitchMetrics: PitchMetrics;
   videoBlob: Blob | null;
 }
 
@@ -24,7 +41,10 @@ export function SaveRecordingDialog({
   onPracticeAgain,
   duration,
   pitchType,
-  ventureName,
+  ventures,
+  selectedVentureId,
+  onVentureChange,
+  pitchMetrics,
   videoBlob
 }: SaveRecordingDialogProps) {
   const [notes, setNotes] = useState('');
@@ -39,7 +59,7 @@ export function SaveRecordingDialog({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await onSave(notes);
+      await onSave(notes, selectedVentureId);
       toast.success('Recording saved successfully!');
       onClose();
     } catch (error) {
@@ -82,16 +102,39 @@ export function SaveRecordingDialog({
                 {formatTime(duration)}
               </span>
             </div>
-            
-            <div className="grid grid-cols-2 gap-3 text-sm">
+
+            {/* Venture Selection */}
+            <div className="grid grid-cols-2 gap-3 text-sm items-center">
               <div>
                 <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>Venture</p>
-                <p className="font-medium" style={{ fontFamily: 'var(--font-heading)' }}>{ventureName}</p>
+                <select
+                  className="glass-input w-full p-1 rounded border"
+                  value={selectedVentureId}
+                  onChange={e => onVentureChange(e.target.value)}
+                  style={{ fontFamily: 'var(--font-heading)' }}
+                >
+                  {ventures.map(v => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>Pitch Type</p>
                 <p className="font-medium" style={{ fontFamily: 'var(--font-heading)' }}>{pitchType}</p>
               </div>
+            </div>
+
+            {/* AI Feedback Metrics */}
+            <div className="grid grid-cols-2 gap-3 text-sm mt-2">
+              {Object.entries(pitchMetrics).map(([key, value]) => (
+                <div key={key} className="flex items-center gap-2">
+                  <span className="capitalize text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>{key}</span>
+                  <span className="font-medium" style={{ fontFamily: 'var(--font-heading)' }}>{Math.round(value)}</span>
+                  <div className="flex-1 h-2 bg-gray-200 rounded">
+                    <div className="h-2 rounded bg-[#76B947]" style={{ width: `${Math.round(value)}%` }} />
+                  </div>
+                </div>
+              ))}
             </div>
 
             {videoBlob && (

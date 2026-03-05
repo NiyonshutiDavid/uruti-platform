@@ -19,6 +19,7 @@ class _ChatScreenState extends State<ChatScreen> {
   List<Map<String, dynamic>> _conversations = [];
   bool _loading = true;
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
+  final Set<String> _deletedIds = {};
 
   @override
   void initState() {
@@ -57,22 +58,24 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final conversations = _conversations;
+    final conversations = _conversations.where((c) {
+      final otherId = ((c['other_user'] as Map?)?.containsKey('id') ?? false)
+          ? '${(c['other_user'] as Map)['id']}'
+          : '';
+      return !_deletedIds.contains(otherId);
+    }).toList();
 
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: context.colors.appBarBg,
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
+          icon: Icon(Icons.menu_rounded, color: Colors.white),
           onPressed: () => MainScaffold.scaffoldKey.currentState?.openDrawer(),
         ),
         title: Text(
           'Messages',
-          style: TextStyle(
-            color: context.colors.textPrimary,
-            fontWeight: FontWeight.w700,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
         actions: [
           TextButton(
@@ -80,7 +83,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Text(
               '+ New',
               style: TextStyle(
-                color: AppColors.primary,
+                color: Colors.white,
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
               ),
@@ -93,16 +96,100 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: _loading
                 ? Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
+                    child: CircularProgressIndicator(
+                      color: context.colors.accent,
+                    ),
                   )
                 : conversations.isEmpty
                 ? _empty()
-                : ListView.separated(
+                : ListView.builder(
                     itemCount: conversations.length,
-                    separatorBuilder: (_, __) =>
-                        Divider(height: 0, color: context.colors.divider),
-                    itemBuilder: (_, i) =>
-                        _ConversationTile(data: conversations[i]),
+                    itemBuilder: (_, i) {
+                      final conv = conversations[i];
+                      final other =
+                          conv['other_user'] as Map<String, dynamic>? ?? {};
+                      final otherId = '${other['id'] ?? ''}';
+                      return Column(
+                        children: [
+                          Dismissible(
+                            key: ValueKey('conv_$otherId'),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 24),
+                              color: Colors.redAccent,
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Delete',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            confirmDismiss: (_) async {
+                              return await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: context.colors.surface,
+                                  title: Text(
+                                    'Delete conversation?',
+                                    style: TextStyle(
+                                      color: context.colors.textPrimary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  content: Text(
+                                    'This will remove this conversation from your list.',
+                                    style: TextStyle(
+                                      color: context.colors.textSecondary,
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(ctx, false),
+                                      child: Text(
+                                        'Cancel',
+                                        style: TextStyle(
+                                          color: context.colors.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: const Text(
+                                        'Delete',
+                                        style: TextStyle(
+                                          color: Colors.redAccent,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            onDismissed: (_) {
+                              setState(() {
+                                _deletedIds.add(otherId);
+                              });
+                            },
+                            child: _ConversationTile(data: conv),
+                          ),
+                          Divider(height: 0, color: context.colors.divider),
+                        ],
+                      );
+                    },
                   ),
           ),
         ],
@@ -129,7 +216,7 @@ class _ChatScreenState extends State<ChatScreen> {
           onPressed: () => context.go('/discovery'),
           child: Text(
             'Find people to connect with',
-            style: TextStyle(color: AppColors.primary),
+            style: TextStyle(color: context.colors.accent),
           ),
         ),
       ],
@@ -201,35 +288,47 @@ class _ConversationTile extends StatelessWidget {
                   )
                 : null,
           ),
-          if (isOnline)
-            Positioned(
-              bottom: 0,
-              right: 0,
-              child: Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: context.colors.background,
-                    width: 2,
-                  ),
-                ),
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: isOnline ? context.colors.accent : Colors.grey,
+                shape: BoxShape.circle,
+                border: Border.all(color: context.colors.background, width: 2),
               ),
             ),
+          ),
         ],
       ),
       title: Row(
         children: [
           Expanded(
-            child: Text(
-              name,
-              style: TextStyle(
-                color: context.colors.textPrimary,
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
-              ),
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    name,
+                    style: TextStyle(
+                      color: context.colors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  isOnline ? 'Online' : 'Offline',
+                  style: TextStyle(
+                    color: isOnline ? context.colors.accent : Colors.grey,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
           Text(
@@ -244,12 +343,12 @@ class _ConversationTile extends StatelessWidget {
             margin: const EdgeInsets.only(right: 6, top: 2),
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: context.colors.accent.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
               role,
-              style: TextStyle(color: AppColors.primary, fontSize: 10),
+              style: TextStyle(color: context.colors.accent, fontSize: 10),
             ),
           ),
           Expanded(
@@ -267,8 +366,8 @@ class _ConversationTile extends StatelessWidget {
             Container(
               margin: const EdgeInsets.only(left: 6),
               padding: const EdgeInsets.all(5),
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
+              decoration: BoxDecoration(
+                color: context.colors.accent,
                 shape: BoxShape.circle,
               ),
               child: Text(

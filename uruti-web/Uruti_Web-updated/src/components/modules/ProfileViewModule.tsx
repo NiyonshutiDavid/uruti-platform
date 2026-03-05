@@ -76,8 +76,11 @@ export function ProfileViewModule({ userId, onBack, onModuleChange }: ProfileVie
   const fetchProfile = async () => {
     setLoading(true);
     try {
-      const data = await apiClient.getUserById(userId);
-      setProfile(data);
+      const [data, connCount] = await Promise.all([
+        apiClient.getUserById(userId),
+        apiClient.getConnectionCount(userId).catch(() => 0),
+      ]);
+      setProfile({ ...data, connections: connCount });
     } catch (error) {
       console.error('Failed to fetch profile:', error);
       toast.error('Failed to load profile');

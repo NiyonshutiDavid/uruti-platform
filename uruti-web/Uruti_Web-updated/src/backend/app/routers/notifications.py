@@ -30,6 +30,11 @@ class _NotificationRealtimeHub:
         if not sockets:
             self._connections.pop(user_id, None)
 
+    @property
+    def connected_user_ids(self) -> Set[int]:
+        """Return the set of user IDs with at least one active WebSocket."""
+        return {uid for uid, sockets in self._connections.items() if sockets}
+
     async def broadcast_to_user(self, user_id: int, payload: Dict[str, Any]):
         sockets = list(self._connections.get(user_id, set()))
         if not sockets:
@@ -179,7 +184,6 @@ async def notifications_ws(websocket: WebSocket, token: str = Query(...)):
         db.close()
 
 
-@router.get("/", response_model=List[NotificationResponse])
 @router.post("/device-token", status_code=status.HTTP_200_OK)
 def register_device_token(
     payload: PushTokenUpsert,

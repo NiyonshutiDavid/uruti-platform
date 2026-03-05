@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useConfirmDialog } from '../ui/confirm-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -38,6 +39,7 @@ interface User {
 type RequestStatus = 'pending' | 'accepted' | 'rejected';
 
 export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }: BuildConnectionsModuleProps) {
+  const { confirm } = useConfirmDialog();
   const { user } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [connections, setConnections] = useState<User[]>([]);
@@ -202,7 +204,12 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
   };
 
   const handleRemoveConnection = async (userId: number) => {
-    const confirmed = window.confirm('Remove this connection from your network?');
+    const confirmed = await confirm({
+      title: 'Remove Connection',
+      description: 'Remove this connection from your network? You will need to send a new request to reconnect.',
+      confirmLabel: 'Remove',
+      variant: 'danger',
+    });
     if (!confirmed) return;
 
     try {

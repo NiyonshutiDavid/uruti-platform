@@ -1,12 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from typing import List
+from datetime import datetime, date, time, timedelta
 from ..database import get_db
-from ..models import User, MentorAvailability
+from ..models import User, MentorAvailability, Meeting, MeetingStatus
 from ..schemas import MentorAvailabilityCreate, MentorAvailabilityResponse, MentorAvailabilityUpdate
 from ..auth import get_current_active_user
 
 router = APIRouter(prefix="/availability", tags=["Availability"])
+
+
+def _parse_hhmm(value: str) -> time:
+    hour_text, minute_text = value.split(":")
+    return time(hour=int(hour_text), minute=int(minute_text))
+
+
+def _strip_tz(value: datetime) -> datetime:
+    if value.tzinfo is not None:
+        return value.replace(tzinfo=None)
+    return value
 
 
 @router.get("/my-slots", response_model=List[MentorAvailabilityResponse])
@@ -24,6 +37,7 @@ def get_my_availability(
 @router.get("/{user_id}", response_model=List[MentorAvailabilityResponse])
 def get_user_availability(
     user_id: int,
+    week_start: str = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -36,7 +50,40 @@ def get_user_availability(
         MentorAvailability.mentor_id == user_id,
         MentorAvailability.is_available == True
     ).all()
-    return slots
+
+    if not week_start:
+        return slots
+
+    try:
+        week_start_date = date.fromisoformat(week_start)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid week_start format. Use YYYY-MM-DD")
+
+    monday_offset = week_start_date.weekday()
+    week_start_date = week_start_date - timedelta(days=monday_offset)
+    week_start_dt = datetime.combine(week_start_date, time.min)
+    week_end_dt = week_start_dt + timedelta(days=7)
+
+    meetings = db.query(Meeting).filter(
+        or_(Meeting.host_id == user_id, Meeting.participant_id == user_id),
+        Meeting.status != MeetingStatus.CANCELLED,
+        Meeting.start_time < week_end_dt,
+        Meeting.end_time > week_start_dt,
+    ).all()
+
+    meeting_windows = [(_strip_tz(m.start_time), _strip_tz(m.end_time)) for m in meetings]
+    available_slots: List[MentorAvailability] = []
+
+    for slot in slots:
+        slot_date = week_start_date + timedelta(days=slot.day_of_week)
+        slot_start = datetime.combine(slot_date, _parse_hhmm(slot.start_time))
+        slot_end = datetime.combine(slot_date, _parse_hhmm(slot.end_time))
+
+        is_booked = any(slot_start < meeting_end and slot_end > meeting_start for meeting_start, meeting_end in meeting_windows)
+        if not is_booked:
+            available_slots.append(slot)
+
+    return available_slots
 
 
 @router.post("/", response_model=MentorAvailabilityResponse, status_code=status.HTTP_201_CREATED)

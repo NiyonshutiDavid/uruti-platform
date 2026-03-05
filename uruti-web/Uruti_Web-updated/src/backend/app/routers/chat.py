@@ -72,6 +72,7 @@ async def chat_text(
         user_query=payload.user_query,
         founder_profile=founder_profile,
         mode=payload.mode,
+        selected_model=payload.model,
     )
 
 
@@ -80,6 +81,7 @@ async def chat_file(
     user_query: str = Form(...),
     founder_profile: Optional[str] = Form(None),
     mode: str = Form("production"),
+    model: Optional[str] = Form(None),
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ):
@@ -100,6 +102,7 @@ async def chat_file(
         user_query=user_query,
         founder_profile=resolved_profile,
         mode=mode,
+        selected_model=model,
     )
 
 
@@ -108,6 +111,7 @@ async def chat_audio(
     user_query: Optional[str] = Form(""),
     founder_profile: Optional[str] = Form(None),
     mode: str = Form("production"),
+    model: Optional[str] = Form(None),
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ):
@@ -135,4 +139,5 @@ async def chat_audio(
         user_query=effective_query,
         founder_profile=resolved_profile,
         mode=mode,
+        selected_model=model,
     )

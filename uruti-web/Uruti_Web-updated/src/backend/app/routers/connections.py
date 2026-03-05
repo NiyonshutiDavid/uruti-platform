@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from ..database import get_db
 from ..models import User, Connection, ConnectionRequest, NotificationType
 from ..schemas import ConnectionResponse, ConnectionRequestCreate, ConnectionRequestResponse
@@ -325,11 +325,56 @@ def get_connections(
                 "bio": other_user.bio,
                 "company": other_user.company,
                 "location": other_user.location,
+                "is_active": other_user.is_active,
+                "last_login": other_user.last_login.isoformat() if other_user.last_login else None,
                 "connection_id": conn.id,
                 "connected_at": conn.created_at
             })
     
     return result
+
+
+@router.get("/online-ids", response_model=List[int])
+def get_connection_online_ids(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Return IDs of the current user's connections who are currently online.
+
+    A connection is considered online if they have an active WebSocket
+    connection OR their last_login was within the last 5 minutes.
+    """
+    from .notifications import notification_hub
+    from .messages import realtime_hub
+
+    # Get all connection user IDs for current user
+    connection_rows = db.query(Connection).filter(
+        or_(
+            Connection.user1_id == current_user.id,
+            Connection.user2_id == current_user.id,
+        )
+    ).all()
+    connection_user_ids = set()
+    for conn in connection_rows:
+        other_id = conn.user2_id if conn.user1_id == current_user.id else conn.user1_id
+        connection_user_ids.add(other_id)
+
+    if not connection_user_ids:
+        return []
+
+    # Users with active WebSocket connections
+    ws_online = (notification_hub.connected_user_ids | realtime_hub.connected_user_ids) & connection_user_ids
+
+    # Users with recent last_login (covers active API usage without WebSocket)
+    cutoff = datetime.utcnow() - timedelta(minutes=5)
+    recent_rows = (
+        db.query(User.id)
+        .filter(User.id.in_(connection_user_ids), User.is_active == True, User.last_login >= cutoff)
+        .all()
+    )
+    recent_online = {row[0] for row in recent_rows}
+
+    return sorted(ws_online | recent_online)
 
 
 @router.delete("/{connection_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -386,6 +431,27 @@ async def remove_connection(
         await publish_notification(removed_for_self, db)
     
     return None
+
+
+@router.get("/count/{user_id}")
+def get_connection_count(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Return the total number of accepted connections for a given user."""
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    count = db.query(Connection).filter(
+        or_(
+            Connection.user1_id == user_id,
+            Connection.user2_id == user_id,
+        )
+    ).count()
+
+    return {"user_id": user_id, "count": count}
 
 
 @router.get("/status/{user_id}")

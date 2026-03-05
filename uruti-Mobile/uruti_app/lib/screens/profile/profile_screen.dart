@@ -1,6 +1,10 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
@@ -16,7 +20,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<Map<String, dynamic>> _ventures = [];
   bool _loadingVentures = false;
   int _connectionsCount = 0;
-  int _sessionsCount = 0;
+  Color _headerIconColor = Colors.white;
+  String? _lastCoverUrl;
 
   @override
   void initState() {
@@ -34,14 +39,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadStats() async {
     try {
-      final results = await Future.wait([
-        ApiService.instance.getConnections(),
-        ApiService.instance.getPitchSessions(),
-      ]);
+      final connections = await ApiService.instance.getConnections();
       if (!mounted) return;
       setState(() {
-        _connectionsCount = results[0].length;
-        _sessionsCount = results[1].length;
+        _connectionsCount = connections.length;
       });
     } catch (_) {}
   }
@@ -66,17 +67,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (added == true) _loadVentures();
   }
 
+  Future<void> _updateHeaderIconColor(String? imageUrl) async {
+    if (imageUrl == null || imageUrl.trim().isEmpty) {
+      if (mounted) setState(() => _headerIconColor = Colors.white);
+      return;
+    }
+
+    try {
+      final uri = Uri.parse(imageUrl);
+      final data = await NetworkAssetBundle(uri).load(uri.toString());
+      final codec = await ui.instantiateImageCodec(
+        data.buffer.asUint8List(),
+        targetWidth: 16,
+        targetHeight: 16,
+      );
+      final frame = await codec.getNextFrame();
+      final byteData = await frame.image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      );
+      if (byteData == null) return;
+
+      final pixels = byteData.buffer.asUint8List();
+      double luminanceTotal = 0;
+      int count = 0;
+
+      for (int i = 0; i + 3 < pixels.length; i += 4) {
+        final r = pixels[i] / 255;
+        final g = pixels[i + 1] / 255;
+        final b = pixels[i + 2] / 255;
+        luminanceTotal += 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        count++;
+      }
+
+      final averageLuminance = count == 0 ? 0.0 : luminanceTotal / count;
+      final nextColor = averageLuminance > 0.68 ? Colors.black : Colors.white;
+      if (mounted) setState(() => _headerIconColor = nextColor);
+    } catch (_) {
+      if (mounted) setState(() => _headerIconColor = Colors.white);
+    }
+  }
+
+  void _syncHeaderIconColor(String? coverUrl) {
+    if (_lastCoverUrl == coverUrl) return;
+    _lastCoverUrl = coverUrl;
+    _updateHeaderIconColor(coverUrl);
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
     if (user == null) return const SizedBox();
+    _syncHeaderIconColor(user.resolvedCoverImageUrl);
 
     return Scaffold(
       backgroundColor: context.colors.background,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 200,
+            expandedHeight: 240,
             pinned: true,
             backgroundColor: context.colors.surface,
             leading: IconButton(
@@ -84,7 +132,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 context.canPop()
                     ? Icons.arrow_back_ios_new_rounded
                     : Icons.menu_rounded,
-                color: context.colors.textPrimary,
+                color: _headerIconColor,
               ),
               onPressed: () {
                 if (context.canPop()) {
@@ -106,7 +154,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Text(
                   'Edit',
                   style: TextStyle(
-                    color: AppColors.primary,
+                    color: context.colors.accent,
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                   ),
@@ -117,80 +165,137 @@ class _ProfileScreenState extends State<ProfileScreen> {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
+                  if (user.resolvedCoverImageUrl != null)
+                    Image.network(
+                      user.resolvedCoverImageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              const Color(0xFF1A3A0A),
+                              context.colors.card,
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFF1A3A0A),
+                            context.colors.card,
+                          ],
+                        ),
+                      ),
+                    ),
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [const Color(0xFF1A3A0A), context.colors.card],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.15),
+                          Colors.black.withValues(alpha: 0.35),
+                        ],
                       ),
                     ),
                   ),
                   Positioned(
-                    bottom: 20,
+                    bottom: 16,
                     left: 20,
+                    right: 20,
                     child: Row(
                       children: [
-                        CircleAvatar(
-                          radius: 36,
-                          backgroundColor: context.colors.darkGreenMid,
-                          backgroundImage: user.resolvedAvatarUrl != null
-                              ? NetworkImage(user.resolvedAvatarUrl!)
-                              : null,
-                          child: user.resolvedAvatarUrl == null
-                              ? Image.asset(
-                                  'assets/images/Uruti-icon-white.png',
-                                  width: 40,
-                                  height: 40,
-                                  fit: BoxFit.contain,
-                                )
-                              : null,
-                        ),
-                        const SizedBox(width: 14),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              user.fullName,
-                              style: TextStyle(
-                                color: context.colors.textPrimary,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 18,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(
-                                  alpha: 0.15,
-                                ),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                (user.role[0].toUpperCase() +
-                                    user.role.substring(1)),
-                                style: TextStyle(
-                                  color: AppColors.primary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            if (user.title != null) ...[
-                              const SizedBox(height: 2),
+                        const SizedBox(width: 84),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                '${user.title} ${user.company != null ? '@ ${user.company}' : ''}',
+                                user.fullName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: context.colors.textSecondary,
-                                  fontSize: 12,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 18,
                                 ),
                               ),
+                              const SizedBox(height: 2),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: context.colors.accent.withValues(
+                                    alpha: 0.2,
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  (user.role[0].toUpperCase() +
+                                      user.role.substring(1)),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              if (user.title != null) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${user.title} ${user.company != null ? '@ ${user.company}' : ''}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    left: 20,
+                    bottom: 8,
+                    child: Row(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: context.colors.background,
+                              width: 3,
+                            ),
+                          ),
+                          child: CircleAvatar(
+                            radius: 36,
+                            backgroundColor: context.colors.darkGreenMid,
+                            backgroundImage: user.resolvedAvatarUrl != null
+                                ? NetworkImage(user.resolvedAvatarUrl!)
+                                : null,
+                            child: user.resolvedAvatarUrl == null
+                                ? Image.asset(
+                                    'assets/images/Uruti-icon-white.png',
+                                    width: 40,
+                                    height: 40,
+                                    fit: BoxFit.contain,
+                                  )
+                                : null,
+                          ),
                         ),
                       ],
                     ),
@@ -204,13 +309,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: const EdgeInsets.all(16),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                const SizedBox(height: 24),
                 // Stats row
                 Row(
                   children: [
-                    _StatBox('Score', user.uritiScore.round().toString()),
-                    _StatBox('Sessions', _sessionsCount.toString()),
                     _StatBox('Connects', _connectionsCount.toString()),
                     _StatBox('Ventures', _ventures.length.toString()),
+                    _StatBox(
+                      'Role',
+                      user.role[0].toUpperCase() + user.role.substring(1),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -251,7 +359,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       TextButton.icon(
                         onPressed: _goAddVenture,
                         style: TextButton.styleFrom(
-                          foregroundColor: AppColors.primary,
+                          foregroundColor: context.colors.accent,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 6,
@@ -270,13 +378,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 10),
                   if (_loadingVentures)
-                    const Center(
+                    Center(
                       child: SizedBox(
                         height: 32,
                         width: 32,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: AppColors.primary,
+                          color: context.colors.accent,
                         ),
                       ),
                     )
@@ -289,7 +397,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           color: context.colors.card,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.25),
+                            color: context.colors.accent.withValues(
+                              alpha: 0.25,
+                            ),
                             style: BorderStyle.solid,
                           ),
                         ),
@@ -327,8 +437,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _InfoRow(Icons.email_outlined, user.email),
                 if (user.phone != null)
                   _InfoRow(Icons.phone_outlined, user.phone!),
-                if (user.linkedinUrl != null)
-                  _InfoRow(Icons.link, user.linkedinUrl!),
+                if (user.linkedinUrl != null && user.linkedinUrl!.isNotEmpty)
+                  _LinkRow(Icons.link, 'LinkedIn', user.linkedinUrl!),
+                if (user.websiteUrl != null && user.websiteUrl!.isNotEmpty)
+                  _LinkRow(Icons.language_rounded, 'Website', user.websiteUrl!),
 
                 const SizedBox(height: 80),
               ]),
@@ -367,7 +479,7 @@ class _StatBox extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              color: AppColors.primary,
+              color: context.colors.accent,
               fontWeight: FontWeight.w800,
               fontSize: 18,
             ),
@@ -389,13 +501,13 @@ class _Tag extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
     decoration: BoxDecoration(
-      color: AppColors.primary.withValues(alpha: 0.1),
+      color: context.colors.accent.withValues(alpha: 0.1),
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+      border: Border.all(color: context.colors.accent.withValues(alpha: 0.3)),
     ),
     child: Text(
       label,
-      style: TextStyle(color: AppColors.primary, fontSize: 12),
+      style: TextStyle(color: context.colors.accent, fontSize: 12),
     ),
   );
 }
@@ -411,11 +523,69 @@ class _InfoRow extends StatelessWidget {
       children: [
         Icon(icon, color: context.colors.textSecondary, size: 18),
         const SizedBox(width: 10),
-        Text(
-          text,
-          style: TextStyle(color: context.colors.textSecondary, fontSize: 14),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(color: context.colors.textSecondary, fontSize: 14),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
+    ),
+  );
+}
+
+class _LinkRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String url;
+  const _LinkRow(this.icon, this.label, this.url);
+
+  Future<void> _openUrl(BuildContext context) async {
+    var target = url.trim();
+    if (!target.startsWith('http://') && !target.startsWith('https://')) {
+      target = 'https://$target';
+    }
+    final uri = Uri.tryParse(target);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Could not open link')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: GestureDetector(
+      onTap: () => _openUrl(context),
+      child: Row(
+        children: [
+          Icon(icon, color: context.colors.accent, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              url,
+              style: TextStyle(
+                color: context.colors.accent,
+                fontSize: 14,
+                decoration: TextDecoration.underline,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Icon(
+            Icons.open_in_new_rounded,
+            color: context.colors.accent,
+            size: 14,
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -465,12 +635,12 @@ class _VentureCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.12),
+              color: context.colors.accent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.rocket_launch_rounded,
-              color: AppColors.primary,
+              color: context.colors.accent,
               size: 22,
             ),
           ),

@@ -40,13 +40,13 @@ class HelpSupportScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: context.colors.appBarBg,
         leading: IconButton(
           icon: Icon(
             context.canPop()
                 ? Icons.arrow_back_ios_new_rounded
                 : Icons.menu_rounded,
-            color: context.colors.textPrimary,
+            color: Colors.white,
           ),
           onPressed: () {
             if (context.canPop()) {
@@ -59,7 +59,7 @@ class HelpSupportScreen extends StatelessWidget {
         title: Text(
           'Help & Support',
           style: TextStyle(
-            color: context.colors.textPrimary,
+            color: Colors.white,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -78,7 +78,7 @@ class HelpSupportScreen extends StatelessWidget {
               ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.3),
+                color: context.colors.accent.withValues(alpha: 0.3),
               ),
             ),
             child: Column(
@@ -87,7 +87,7 @@ class HelpSupportScreen extends StatelessWidget {
                 Text(
                   'Need help?',
                   style: TextStyle(
-                    color: context.colors.textPrimary,
+                    color: Colors.white,
                     fontWeight: FontWeight.w800,
                     fontSize: 20,
                   ),
@@ -130,8 +130,8 @@ class HelpSupportScreen extends StatelessWidget {
               icon: const Icon(Icons.open_in_new_rounded, size: 16),
               label: const Text('Visit Help Center'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: BorderSide(color: AppColors.primary, width: 1.5),
+                foregroundColor: context.colors.accent,
+                side: BorderSide(color: context.colors.accent, width: 1.5),
                 minimumSize: const Size.fromHeight(48),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -148,7 +148,7 @@ class HelpSupportScreen extends StatelessWidget {
           Text(
             'Frequently Asked Questions',
             style: TextStyle(
-              color: context.colors.textPrimary,
+              color: Colors.white,
               fontWeight: FontWeight.w700,
               fontSize: 16,
             ),
@@ -162,7 +162,7 @@ class HelpSupportScreen extends StatelessWidget {
           Text(
             'Send Feedback',
             style: TextStyle(
-              color: context.colors.textPrimary,
+              color: Colors.white,
               fontWeight: FontWeight.w700,
               fontSize: 16,
             ),
@@ -170,7 +170,7 @@ class HelpSupportScreen extends StatelessWidget {
           const SizedBox(height: 12),
           TextField(
             maxLines: 4,
-            style: TextStyle(color: context.colors.textPrimary),
+            style: TextStyle(color: Colors.white),
             decoration: InputDecoration(
               hintText: 'Tell us how we can improve...',
               hintStyle: TextStyle(
@@ -188,7 +188,7 @@ class HelpSupportScreen extends StatelessWidget {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+                borderSide: BorderSide(color: context.colors.accent, width: 1.5),
               ),
             ),
           ),
@@ -196,7 +196,7 @@ class HelpSupportScreen extends StatelessWidget {
           ElevatedButton(
             onPressed: () {},
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: context.colors.accent,
               foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(48),
               shape: RoundedRectangleBorder(
@@ -224,19 +224,19 @@ class _ContactBtn extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.15),
+          color: context.colors.accent.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+          border: Border.all(color: context.colors.accent.withValues(alpha: 0.3)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: AppColors.primary, size: 16),
+            Icon(icon, color: context.colors.accent, size: 16),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                color: AppColors.primary,
+                color: context.colors.accent,
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
               ),
@@ -265,7 +265,7 @@ class _FaqCardState extends State<_FaqCard> {
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
         color: _expanded
-            ? AppColors.primary.withValues(alpha: 0.3)
+            ? context.colors.accent.withValues(alpha: 0.3)
             : context.colors.divider,
       ),
     ),

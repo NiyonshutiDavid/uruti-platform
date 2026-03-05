@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useConfirmDialog } from '../ui/confirm-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -19,9 +21,12 @@ interface Notification {
   actor_name?: string;
   related_entity_id?: number;
   related_entity_type?: string;
+  data?: Record<string, any>;
 }
 
 export function NotificationsModule() {
+  const { confirm } = useConfirmDialog();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [loading, setLoading] = useState(true);
@@ -132,7 +137,12 @@ export function NotificationsModule() {
   };
 
   const deleteNotification = async (id: number) => {
-    const confirmed = window.confirm('Delete this notification?');
+    const confirmed = await confirm({
+      title: 'Delete Notification',
+      description: 'Are you sure you want to delete this notification? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
     if (!confirmed) return;
 
     try {
@@ -173,6 +183,19 @@ export function NotificationsModule() {
   const filteredNotifications = filter === 'unread' 
     ? notifications.filter(n => !n.is_read)
     : notifications;
+
+  const handleViewDetails = async (notification: Notification) => {
+    if (!notification.is_read) {
+      await markAsRead(notification.id);
+    }
+
+    const route =
+      notification.data?.route ||
+      notification.action_url ||
+      (notification.type === 'meeting' ? '/dashboard/availability' : '/dashboard/notifications');
+
+    navigate(route);
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -316,6 +339,16 @@ export function NotificationsModule() {
                       {notification.action_url && (
                         <Button 
                           size="sm" 
+                          onClick={() => void handleViewDetails(notification)}
+                          className="bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black"
+                        >
+                          View Details
+                        </Button>
+                      )}
+                      {!notification.action_url && notification.type === 'meeting' && (
+                        <Button
+                          size="sm"
+                          onClick={() => void handleViewDetails(notification)}
                           className="bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black"
                         >
                           View Details

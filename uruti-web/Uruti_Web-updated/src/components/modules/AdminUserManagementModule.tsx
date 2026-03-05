@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import { Search, UserPlus, Trash2, Users, Pencil, UserX, UserCheck } from 'lucide-react';
+import { Search, UserPlus, Trash2, Users, Pencil, UserX, UserCheck, Wifi } from 'lucide-react';
 import { apiClient } from '../../lib/api-client';
 import { useAuth } from '../../lib/auth-context';
 import { toast } from 'sonner';
@@ -39,6 +39,7 @@ export function AdminUserManagementModule() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [pendingDeleteUser, setPendingDeleteUser] = useState<any | null>(null);
+  const [onlineIds, setOnlineIds] = useState<Set<number>>(new Set());
   const pageSize = 10;
   const [newUser, setNewUser] = useState({
     full_name: '',
@@ -85,8 +86,24 @@ export function AdminUserManagementModule() {
     }
   };
 
+  const fetchOnlineIds = async () => {
+    try {
+      const ids = await apiClient.getOnlineUserIds();
+      setOnlineIds(new Set(ids));
+    } catch {
+      // silently ignore — non-critical
+    }
+  };
+
   useEffect(() => {
     loadUsers(currentPage);
+    fetchOnlineIds();
+  }, []);
+
+  // Poll online status every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(fetchOnlineIds, 30_000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -281,7 +298,7 @@ export function AdminUserManagementModule() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card className="glass-card border-black/10 dark:border-white/10">
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground">Total</p>
@@ -304,6 +321,15 @@ export function AdminUserManagementModule() {
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground">Admins</p>
             <p className="text-2xl font-bold dark:text-white">{filteredStats.admins}</p>
+          </CardContent>
+        </Card>
+        <Card className="glass-card border-black/10 dark:border-white/10">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-1.5">
+              <Wifi className="h-4 w-4 text-green-500" />
+              <p className="text-sm text-muted-foreground">Online Now</p>
+            </div>
+            <p className="text-2xl font-bold text-green-500">{onlineIds.size}</p>
           </CardContent>
         </Card>
       </div>
@@ -392,12 +418,34 @@ export function AdminUserManagementModule() {
               ) : (
                 users.map((u) => (
                   <div key={u.id} className="p-4 rounded-lg border border-black/10 dark:border-white/10 bg-white/50 dark:bg-black/20 flex items-center justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="font-semibold dark:text-white truncate">{u.full_name}</p>
-                      <p className="text-sm text-muted-foreground truncate">{u.email}</p>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative shrink-0">
+                        <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center text-sm font-semibold dark:text-white">
+                          {(u.full_name || u.email || '?')[0].toUpperCase()}
+                        </div>
+                        <span
+                          className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white dark:border-gray-900 ${
+                            onlineIds.has(u.id) ? 'bg-green-500' : 'bg-gray-400'
+                          }`}
+                          title={onlineIds.has(u.id) ? 'Online' : 'Offline'}
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold dark:text-white truncate">{u.full_name}</p>
+                        <p className="text-sm text-muted-foreground truncate">{u.email}</p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Badge variant="outline" className="bg-[#76B947]/10 text-[#76B947] border-[#76B947]/20">{u.role}</Badge>
+                      <Badge
+                        variant="outline"
+                        className={onlineIds.has(u.id)
+                          ? 'bg-green-500/10 text-green-600 border-green-500/20'
+                          : 'bg-gray-500/10 text-gray-600 border-gray-500/20'
+                        }
+                      >
+                        {onlineIds.has(u.id) ? 'Online' : 'Offline'}
+                      </Badge>
                       <Badge variant="outline" className={u.is_active ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-gray-500/10 text-gray-600 border-gray-500/20'}>
                         {u.is_active ? 'Active' : 'Inactive'}
                       </Badge>

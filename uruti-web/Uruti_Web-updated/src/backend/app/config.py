@@ -32,7 +32,8 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     
-    # CORS
+    # CORS – set CORS_ORIGINS env var to a comma-separated list in production
+    # e.g. CORS_ORIGINS=https://uruti.rw,https://www.uruti.rw
     BACKEND_CORS_ORIGINS: list[str] = Field(
         default=[
         "http://localhost:3000",

@@ -35,6 +35,7 @@ import '../screens/analytics/analytics_screen.dart';
 import '../screens/support/help_support_screen.dart';
 import '../screens/calendar/readiness_calendar_screen.dart';
 import '../screens/auth/forgot_password_screen.dart';
+import '../screens/auth/qr_login_screen.dart';
 import '../screens/calls/call_demo_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -56,14 +57,27 @@ GoRouter createRouter(AuthProvider authProvider) {
       if (location == '/splash') return null;
       if (isInit || isLoading) return '/splash';
 
-      final publicRoutes = ['/login', '/signup', '/forgot-password'];
+      final publicRoutes = [
+        '/login',
+        '/signup',
+        '/forgot-password',
+        '/qr-login',
+      ];
       if (!isAuth && !publicRoutes.contains(location)) return '/login';
       if (isAuth && publicRoutes.contains(location)) return '/home';
 
-      if (isAuth && role == 'admin' && location != unsupportedRoute) {
+      final isDeactivated = authProvider.user?.isActive == false;
+
+      if (isAuth &&
+          (role == 'admin' || isDeactivated) &&
+          location != unsupportedRoute &&
+          location != '/support-chat') {
         return unsupportedRoute;
       }
-      if (isAuth && role != 'admin' && location == unsupportedRoute) {
+      if (isAuth &&
+          role != 'admin' &&
+          !isDeactivated &&
+          location == unsupportedRoute) {
         return '/home';
       }
 
@@ -75,13 +89,21 @@ GoRouter createRouter(AuthProvider authProvider) {
       GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
       GoRoute(
         path: '/mobile-unsupported',
-        builder: (_, __) => const MobileUnsupportedScreen(),
+        builder: (_, __) {
+          final isDeactivated = authProvider.user?.isActive == false;
+          return MobileUnsupportedScreen(
+            reason: isDeactivated
+                ? UnsupportedReason.deactivated
+                : UnsupportedReason.admin,
+          );
+        },
       ),
       GoRoute(
         path: '/forgot-password',
         builder: (_, __) =>
             const ForgotPasswordScreen(mode: ForgotPasswordMode.passwordReset),
       ),
+      GoRoute(path: '/qr-login', builder: (_, __) => const QrLoginScreen()),
       GoRoute(
         path: '/support-chat',
         builder: (_, __) =>
@@ -201,7 +223,15 @@ GoRouter createRouter(AuthProvider authProvider) {
           // Connections & discovery
           GoRoute(
             path: '/connections',
-            builder: (_, __) => const ConnectionsScreen(),
+            builder: (_, state) {
+              final tab = state.uri.queryParameters['tab'];
+              final idx = tab == 'discover'
+                  ? 2
+                  : tab == 'pending'
+                  ? 1
+                  : 0;
+              return ConnectionsScreen(initialTab: idx);
+            },
           ),
           GoRoute(
             path: '/discovery',

@@ -65,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final results = await Future.wait([
       api.getMyVentures().catchError((_) => <dynamic>[]),
       api.getConnections(null, 'accepted').catchError((_) => <dynamic>[]),
-      api.getConnections(null, 'pending').catchError((_) => <dynamic>[]),
+      api.getPendingRequests().catchError((_) => <dynamic>[]),
       api.getNotifications().catchError((_) => <dynamic>[]),
       api.getConversations().catchError((_) => <dynamic>[]),
       api.getPitchSessions().catchError((_) => <dynamic>[]),
@@ -105,8 +105,11 @@ class _HomeScreenState extends State<HomeScreen> {
     return avg.round().clamp(0, 100);
   }
 
-  int _computeBookmarkedUrutiTotal() {
+  /// Returns the average Uruti score across bookmarked startups.
+  int _computeBookmarkedAvgScore() {
+    if (_bookmarks.isEmpty) return 0;
     double total = 0;
+    int count = 0;
     for (final item in _bookmarks) {
       if (item is! Map) continue;
       final map = item.cast<dynamic, dynamic>();
@@ -115,13 +118,24 @@ class _HomeScreenState extends State<HomeScreen> {
           ? venture['uruti_score'] ?? map['uruti_score']
           : map['uruti_score'];
 
+      double score = 0;
       if (rawScore is num) {
-        total += rawScore.toDouble();
+        score = rawScore.toDouble();
       } else if (rawScore is String) {
-        total += double.tryParse(rawScore) ?? 0;
+        score = double.tryParse(rawScore) ?? 0;
       }
+      total += score;
+      count++;
     }
-    return total.round();
+    return count > 0 ? (total / count).round().clamp(0, 100) : 0;
+  }
+
+  /// Returns the number of pending connection requests received (not sent).
+  int _computeReceivedPendingCount() {
+    return _pending.where((r) {
+      if (r is! Map) return false;
+      return r['direction'] == 'received';
+    }).length;
   }
 
   List<Widget> _buildFounderContent({required int score}) => [
@@ -238,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
             subtitle: 'Latest activities',
             emptyIcon: Icons.notifications_none,
             emptyMsg: 'No notifications yet.',
-            items: _notifications,
+            items: _notifications.take(3).toList(),
             itemBuilder: (n) => _FsNotifTile(n: n),
           ),
         ),
@@ -275,13 +289,16 @@ class _HomeScreenState extends State<HomeScreen> {
     required dynamic user,
     required int score,
   }) => [
-    _AiScoreCard(score: score, loading: _loading),
+    _AiScoreCard(
+      score: _bookmarks.isEmpty ? score : _computeBookmarkedAvgScore(),
+      loading: _loading,
+    ),
     const SizedBox(height: 20),
     _InvestorHome(
       loading: _loading,
-      bookmarkedScoreTotal: _computeBookmarkedUrutiTotal(),
+      bookmarkCount: _bookmarks.length,
       connectionCount: _connections.length,
-      pendingRequests: _pending.length,
+      pendingRequests: _computeReceivedPendingCount(),
     ),
     const SizedBox(height: 20),
     _QuickActions(user: user, unreadMessages: _unreadMessages),
@@ -323,18 +340,18 @@ class _HomeScreenState extends State<HomeScreen> {
         child: CustomScrollView(
           slivers: [
             SliverAppBar(
-              backgroundColor: context.colors.background,
-              floating: true,
-              pinned: false,
+              backgroundColor: context.colors.appBarBg,
+              floating: false,
+              pinned: true,
               automaticallyImplyLeading: false,
               title: Row(
                 children: [
                   GestureDetector(
                     onTap: () =>
                         MainScaffold.scaffoldKey.currentState?.openDrawer(),
-                    child: Icon(
+                    child: const Icon(
                       Icons.menu_rounded,
-                      color: context.colors.textPrimary,
+                      color: Colors.white,
                       size: 26,
                     ),
                   ),
@@ -351,9 +368,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.notifications_outlined,
-                        color: context.colors.textPrimary,
+                        color: Colors.white,
                       ),
                       if (_notifications.any((n) => n['is_read'] == false))
                         Positioned(
@@ -437,13 +454,10 @@ class _AiScoreCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF1A3A0A),
-            context.colors.darkGreenMid.withValues(alpha: 0.6),
-          ],
+          colors: [Color(0xFF1A3A0A), Color(0xFF0D2010)],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
@@ -457,7 +471,7 @@ class _AiScoreCard extends StatelessWidget {
                 Text(
                   'AI Readiness Score',
                   style: TextStyle(
-                    color: context.colors.textSecondary,
+                    color: Colors.white.withValues(alpha: 0.7),
                     fontSize: 13,
                   ),
                 ),
@@ -481,7 +495,7 @@ class _AiScoreCard extends StatelessWidget {
                       child: Text(
                         '/100',
                         style: TextStyle(
-                          color: context.colors.textSecondary,
+                          color: Colors.white.withValues(alpha: 0.7),
                           fontSize: 16,
                         ),
                       ),
@@ -506,7 +520,7 @@ class _AiScoreCard extends StatelessWidget {
               children: [
                 CircularProgressIndicator(
                   value: loading ? 0 : score / 100,
-                  backgroundColor: context.colors.divider,
+                  backgroundColor: Colors.white.withValues(alpha: 0.15),
                   color: AppColors.primary,
                   strokeWidth: 6,
                 ),
@@ -538,12 +552,12 @@ class _AiScoreCard extends StatelessWidget {
 // ─── Investor home ────────────────────────────────────────────────────────────
 class _InvestorHome extends StatelessWidget {
   final bool loading;
-  final int bookmarkedScoreTotal;
+  final int bookmarkCount;
   final int connectionCount;
   final int pendingRequests;
   const _InvestorHome({
     required this.loading,
-    required this.bookmarkedScoreTotal,
+    required this.bookmarkCount,
     required this.connectionCount,
     required this.pendingRequests,
   });
@@ -558,10 +572,11 @@ class _InvestorHome extends StatelessWidget {
         Row(
           children: [
             _StatCard(
-              'Bookmarked\nUruti Score',
-              loading ? '—' : '$bookmarkedScoreTotal',
+              'Bookmarked\nStartups',
+              loading ? '—' : '$bookmarkCount',
               Icons.bookmark_outline,
               AppColors.primary,
+              onTap: () => context.go('/discovery'),
             ),
             const SizedBox(width: 12),
             _StatCard(
@@ -569,6 +584,7 @@ class _InvestorHome extends StatelessWidget {
               loading ? '—' : '$connectionCount',
               Icons.people_outline,
               const Color(0xFF3B82F6),
+              onTap: () => context.go('/connections'),
             ),
             const SizedBox(width: 12),
             _StatCard(
@@ -576,6 +592,7 @@ class _InvestorHome extends StatelessWidget {
               loading ? '—' : '$pendingRequests',
               Icons.pending_outlined,
               const Color(0xFFFFB800),
+              onTap: () => context.go('/connections?tab=pending'),
             ),
           ],
         ),
@@ -952,9 +969,7 @@ class _RecentActivity extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      n['message'] as String? ??
-                          n['title'] as String? ??
-                          'Notification',
+                      _privacySummary(n),
                       style: TextStyle(
                         color: context.colors.textPrimary,
                         fontSize: 13,
@@ -1025,36 +1040,45 @@ class _StatCard extends StatelessWidget {
   final String label, value;
   final IconData icon;
   final Color color;
-  const _StatCard(this.label, this.value, this.icon, this.color);
+  final VoidCallback? onTap;
+  const _StatCard(this.label, this.value, this.icon, this.color, {this.onTap});
 
   @override
   Widget build(BuildContext context) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.colors.card,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.colors.divider),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 18),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              color: context.colors.textPrimary,
-              fontWeight: FontWeight.w800,
-              fontSize: 20,
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 110,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: context.colors.card,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: context.colors.divider),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Icon(icon, color: color, size: 18),
+            Text(
+              value,
+              style: TextStyle(
+                color: context.colors.textPrimary,
+                fontWeight: FontWeight.w800,
+                fontSize: 20,
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(color: context.colors.textSecondary, fontSize: 11),
-          ),
-        ],
+            Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: context.colors.textSecondary,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -1696,9 +1720,7 @@ class _FsNotifTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  n['message'] as String? ??
-                      n['title'] as String? ??
-                      'Notification',
+                  _privacySummary(n),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -1794,5 +1816,40 @@ String _fsTimeAgo(String? iso) {
     return '${diff.inDays}d ago';
   } catch (_) {
     return '';
+  }
+}
+
+/// Returns a privacy-friendly summary instead of the raw message content.
+/// Used on the home screen so sensitive text is never exposed.
+String _privacySummary(dynamic n) {
+  final type = (n['type'] as String? ?? '').toLowerCase();
+  final sender =
+      (n['sender_name'] as String? ??
+              n['caller_name'] as String? ??
+              n['from_name'] as String? ??
+              '')
+          .trim();
+  final who = sender.isNotEmpty ? sender : 'Someone';
+
+  switch (type) {
+    case 'message':
+      return '$who messaged you';
+    case 'call':
+    case 'missed_call':
+      return '$who called you';
+    case 'connection_request':
+      return '$who sent you a connection request';
+    case 'connection_accepted':
+      return '$who accepted your connection';
+    case 'pitch':
+      return '$who shared a pitch';
+    case 'investment':
+      return 'New investment update';
+    case 'event':
+      return 'You have an upcoming event';
+    default:
+      // Fall back to the title (non-sensitive) or a generic label.
+      final title = (n['title'] as String? ?? '').trim();
+      return title.isNotEmpty ? title : 'New notification';
   }
 }

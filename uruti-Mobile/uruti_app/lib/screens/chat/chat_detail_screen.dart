@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +11,9 @@ import '../../core/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/call_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/message_notification_handler.dart';
 import '../../services/realtime_service.dart';
+import '../../widgets/book_session_sheet.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final String userId;
@@ -33,6 +36,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   String? _attachedFilePath;
   bool _sending = false;
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
+  Timer? _onlineRefreshTimer;
 
   static final RegExp _callSummaryRegex = RegExp(
     r'^(Voice|Video)\s+call\s+(ended|missed|declined)\s*[·•-]\s*(\d+)m\s*(\d{1,2})s$',
@@ -54,15 +58,28 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _load();
     _realtimeSub = RealtimeService.instance.events.listen(_handleRealtimeEvent);
 
+    // Suppress OS notifications for this conversation while we're viewing it
+    MessageNotificationHandler.instance.activeConversationUserId =
+        widget.userId;
+
     final token = (context.read<AuthProvider>().token ?? '').trim();
     if (token.isNotEmpty) {
       RealtimeService.instance.connect(token);
     }
+
+    // Periodically refresh online status every 20 seconds
+    _onlineRefreshTimer = Timer.periodic(
+      const Duration(seconds: 20),
+      (_) => _refreshOnlineStatus(),
+    );
   }
 
   @override
   void dispose() {
+    // Resume OS notifications for all conversations
+    MessageNotificationHandler.instance.activeConversationUserId = null;
     _realtimeSub?.cancel();
+    _onlineRefreshTimer?.cancel();
     _ctrl.dispose();
     _scroll.dispose();
     super.dispose();
@@ -83,7 +100,29 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   void _handleRealtimeEvent(Map<String, dynamic> event) {
-    if (!mounted || event['event'] != 'message_created') return;
+    if (!mounted) return;
+
+    final eventType = event['event'];
+
+    // Handle presence events
+    if (eventType == 'user_online' || eventType == 'user_offline') {
+      final data = event['data'];
+      if (data is Map) {
+        final userId = int.tryParse('${data['user_id'] ?? 0}') ?? 0;
+        final otherId = int.tryParse(widget.userId) ?? 0;
+        if (userId == otherId && _otherUser != null) {
+          setState(() {
+            _otherUser = {
+              ..._otherUser!,
+              'is_online': eventType == 'user_online',
+            };
+          });
+        }
+      }
+      return;
+    }
+
+    if (eventType != 'message_created') return;
 
     final rawData = event['data'];
     if (rawData is! Map) return;
@@ -171,6 +210,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ? 'Connection'
           : profileDisplayName;
 
+      // Compute online status: use the online-ids endpoint for reliability
+      final parsedId = int.tryParse(widget.userId) ?? 0;
+      Set<int> onlineIds = {};
+      try {
+        onlineIds = await ApiService.instance.getOnlineConnectionIds();
+      } catch (_) {}
+      final isUserOnline = onlineIds.contains(parsedId);
+
       final userMap = {
         'full_name': connectionName ?? profileName,
         'avatar_url':
@@ -178,6 +225,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             _safeAvatarUrl(fromConnection?['avatar']) ??
             _safeAvatarUrl(profile.resolvedAvatarUrl),
         'phone': _asText(profile.phone),
+        'role': _asText(fromConnection?['role']).isNotEmpty
+            ? _asText(fromConnection?['role'])
+            : (profile.role.isNotEmpty ? profile.role : ''),
+        'is_online': isUserOnline,
       };
 
       await ApiService.instance.markThreadAsRead(parsedUserId);
@@ -199,6 +250,23 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
 
     _loadVentures();
+  }
+
+  /// Refresh online status for the other user via the online-ids endpoint.
+  Future<void> _refreshOnlineStatus() async {
+    if (!mounted || _otherUser == null) return;
+    try {
+      final otherId = int.tryParse(widget.userId) ?? 0;
+      if (otherId <= 0) return;
+      final onlineIds = await ApiService.instance.getOnlineConnectionIds();
+      if (!mounted) return;
+      final isOnline = onlineIds.contains(otherId);
+      if (_otherUser?['is_online'] != isOnline) {
+        setState(() {
+          _otherUser = {..._otherUser!, 'is_online': isOnline};
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadVentures() async {
@@ -366,8 +434,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Future<void> _pickFile() async {
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['txt', 'pdf', 'md', 'json', 'csv', 'doc', 'docx'],
+        type: FileType.any,
         withData: true,
       );
       if (result == null || result.files.isEmpty) return;
@@ -404,9 +471,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               ),
               const SizedBox(height: 12),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.attach_file_rounded,
-                  color: AppColors.primary,
+                  color: context.colors.accent,
                 ),
                 title: Text(
                   'Upload file',
@@ -422,9 +489,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.business_center_outlined,
-                  color: AppColors.primary,
+                  color: context.colors.accent,
                 ),
                 title: Text(
                   'Choose startup',
@@ -531,13 +598,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           return ListTile(
                             contentPadding: EdgeInsets.zero,
                             leading: CircleAvatar(
-                              backgroundColor: AppColors.primary.withValues(
+                              backgroundColor: context.colors.accent.withValues(
                                 alpha: 0.12,
                               ),
                               child: Text(
                                 name.isEmpty ? 'V' : name[0].toUpperCase(),
-                                style: const TextStyle(
-                                  color: AppColors.primary,
+                                style: TextStyle(
+                                  color: context.colors.accent,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -559,9 +626,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                               ),
                             ),
                             trailing: active
-                                ? const Icon(
+                                ? Icon(
                                     Icons.check_circle_rounded,
-                                    color: AppColors.primary,
+                                    color: context.colors.accent,
                                   )
                                 : null,
                             onTap: () {
@@ -589,15 +656,102 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       parts.add('📎 File: $_attachedFileName');
     }
     if (_activeContext != null) {
-      final startupName = (_activeContext!['name'] as String? ?? 'Venture')
-          .trim();
-      parts.add('🏷 Startup: $startupName');
+      final ventureJson = jsonEncode({
+        'id': _activeContext!['id'],
+        'name': (_activeContext!['name'] as String? ?? 'Venture').trim(),
+        'tagline': (_activeContext!['tagline'] as String? ?? '').trim(),
+        'logo_url': (_activeContext!['logo_url'] as String? ?? '').trim(),
+        'industry': (_activeContext!['industry'] as String? ?? '').trim(),
+      });
+      parts.add('🏷 Startup: $ventureJson');
     }
     return parts.join('\n');
   }
 
   bool _hasPendingAttachments() {
     return _attachedFileName != null || _activeContext != null;
+  }
+
+  void _showChatInfo() {
+    final name = _asText(_otherUser?['full_name']).isNotEmpty
+        ? _asText(_otherUser?['full_name'])
+        : 'Chat';
+    final avatar = _safeAvatarUrl(_otherUser?['avatar_url']);
+    final initials = name.split(' ').map((p) => p[0]).take(2).join();
+    final isOnline = _otherUser?['is_online'] == true;
+    final rawRole = _asText(_otherUser?['role']);
+    final role = rawRole.isNotEmpty
+        ? '${rawRole[0].toUpperCase()}${rawRole.substring(1)}'
+        : 'User';
+    final phone = _asText(_otherUser?['phone']);
+
+    // Gather shared files and media from messages
+    final sharedFiles = <Map<String, dynamic>>[];
+    final sharedMedia = <Map<String, dynamic>>[];
+    for (final msg in _messages) {
+      final attachments = msg['attachments'];
+      if (attachments is List) {
+        for (final att in attachments) {
+          final url = att.toString().trim();
+          if (url.isEmpty) continue;
+          final lower = url.toLowerCase();
+          final isImage =
+              lower.endsWith('.png') ||
+              lower.endsWith('.jpg') ||
+              lower.endsWith('.jpeg') ||
+              lower.endsWith('.gif') ||
+              lower.endsWith('.webp');
+          if (isImage) {
+            sharedMedia.add({
+              'url': url.startsWith('http')
+                  ? url
+                  : '${AppConstants.apiBaseUrl}$url',
+              'date': msg['created_at'] ?? '',
+            });
+          } else {
+            final fileName =
+                Uri.tryParse(url)?.pathSegments.lastOrNull ?? 'File';
+            sharedFiles.add({
+              'name': fileName,
+              'url': url.startsWith('http')
+                  ? url
+                  : '${AppConstants.apiBaseUrl}$url',
+              'date': msg['created_at'] ?? '',
+            });
+          }
+        }
+      }
+      // Also pick up tagged file names
+      final body = (msg['body'] as String?) ?? '';
+      final fileMatch = _fileTagRegex.firstMatch(body);
+      if (fileMatch != null) {
+        final fName = fileMatch.group(1)?.trim() ?? 'File';
+        if (!sharedFiles.any((f) => f['name'] == fName)) {
+          sharedFiles.add({
+            'name': fName,
+            'url': '',
+            'date': msg['created_at'] ?? '',
+          });
+        }
+      }
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ChatInfoSheet(
+        name: name,
+        avatarUrl: avatar,
+        initials: initials,
+        isOnline: isOnline,
+        role: role,
+        phone: phone,
+        sharedFiles: sharedFiles,
+        sharedMedia: sharedMedia,
+        userId: widget.userId,
+      ),
+    );
   }
 
   Future<void> _send() async {
@@ -682,6 +836,19 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Widget build(BuildContext context) {
     final me = context.read<AuthProvider>().user!;
     final calls = context.watch<CallProvider>();
+
+    // Sync: if the call ended externally (overlay/banner), clear local state.
+    if (_activeCallType != null && !calls.hasCall) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _activeCallType != null) {
+          setState(() {
+            _activeCallType = null;
+            _callStartedAt = null;
+          });
+        }
+      });
+    }
+
     final name = _asText(_otherUser?['full_name']).isNotEmpty
         ? _asText(_otherUser?['full_name'])
         : 'Chat';
@@ -691,9 +858,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.surface,
+        backgroundColor: context.colors.appBarBg,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: context.colors.textPrimary),
+          icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () =>
               context.canPop() ? context.pop() : context.go('/inbox'),
         ),
@@ -702,13 +869,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundColor: context.colors.darkGreenMid,
+              backgroundColor: Colors.white.withValues(alpha: 0.2),
               backgroundImage: avatar != null ? NetworkImage(avatar) : null,
               child: avatar == null
                   ? Text(
                       initials,
                       style: TextStyle(
-                        color: AppColors.primary,
+                        color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -716,42 +883,74 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   : null,
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: TextStyle(
-                    color: context.colors.textPrimary,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
+            Expanded(
+              child: GestureDetector(
+                onTap: _showChatInfo,
+                behavior: HitTestBehavior.opaque,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Row(
+                      children: [
+                        if (_activeCallType == null) ...[
+                          Container(
+                            width: 8,
+                            height: 8,
+                            margin: const EdgeInsets.only(right: 4),
+                            decoration: BoxDecoration(
+                              color: (_otherUser?['is_online'] == true)
+                                  ? Colors.green
+                                  : Colors.grey,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          Text(
+                            (_otherUser?['is_online'] == true)
+                                ? 'Online'
+                                : 'Offline',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ] else
+                          Text(
+                            calls.isOutgoing
+                                ? '${_activeCallType == 'video' ? 'Video' : 'Voice'} call • Waiting...'
+                                : '${_activeCallType == 'video' ? 'Video' : 'Voice'} call • ${_formatDuration(calls.activeDuration)}',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
-                Text(
-                  _activeCallType == null
-                      ? 'Online'
-                      : calls.isOutgoing
-                      ? '${_activeCallType == 'video' ? 'Video' : 'Voice'} call • Waiting...'
-                      : '${_activeCallType == 'video' ? 'Video' : 'Voice'} call • ${_formatDuration(calls.activeDuration)}',
-                  style: TextStyle(color: AppColors.primary, fontSize: 11),
-                ),
-              ],
+              ),
             ),
           ],
         ),
         actions: [
-          IconButton(
-            icon: Icon(Icons.phone_outlined, color: context.colors.textPrimary),
-            onPressed: _startVoiceCall,
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.videocam_outlined,
-              color: context.colors.textPrimary,
+          if (_activeCallType == null) ...[
+            IconButton(
+              icon: Icon(Icons.phone_outlined, color: Colors.white),
+              onPressed: _startVoiceCall,
             ),
-            onPressed: _startVideoCall,
-          ),
-          if (_activeCallType != null)
+            IconButton(
+              icon: Icon(Icons.videocam_outlined, color: Colors.white),
+              onPressed: _startVideoCall,
+            ),
+          ] else
             IconButton(
               icon: const Icon(Icons.call_end_rounded, color: Colors.red),
               onPressed: _promptEndCall,
@@ -774,11 +973,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         'Startup: ${_activeContext!['name'] ?? 'Venture'}',
                       ),
                       labelStyle: const TextStyle(fontSize: 12),
-                      backgroundColor: AppColors.primary.withValues(
+                      backgroundColor: context.colors.accent.withValues(
                         alpha: 0.12,
                       ),
                       side: BorderSide(
-                        color: AppColors.primary.withValues(alpha: 0.35),
+                        color: context.colors.accent.withValues(alpha: 0.35),
                       ),
                       deleteIcon: const Icon(Icons.close_rounded, size: 16),
                       onDeleted: () => setState(() => _activeContext = null),
@@ -801,7 +1000,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           Expanded(
             child: _loading
                 ? Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
+                    child: CircularProgressIndicator(
+                      color: context.colors.accent,
+                    ),
                   )
                 : ListView.builder(
                     controller: _scroll,
@@ -856,7 +1057,7 @@ class _CallSummaryBubble extends StatelessWidget {
       color = Colors.redAccent;
     } else {
       icon = type == 'video' ? Icons.videocam_outlined : Icons.phone_outlined;
-      color = AppColors.primary;
+      color = context.colors.accent;
     }
 
     return Align(
@@ -910,7 +1111,23 @@ class _MessageBubble extends StatelessWidget {
     );
 
     final fileName = fileMatch?.group(1)?.trim();
-    final startup = startupMatch?.group(1)?.trim();
+    String? startupName;
+    Map<String, dynamic>? ventureData;
+
+    if (startupMatch != null) {
+      final captured = startupMatch.group(1)?.trim() ?? '';
+      // Try JSON first (new rich format), fallback to plain name
+      if (captured.startsWith('{')) {
+        try {
+          ventureData = jsonDecode(captured) as Map<String, dynamic>;
+          startupName = (ventureData['name'] as String?)?.trim();
+        } catch (_) {
+          startupName = captured;
+        }
+      } else {
+        startupName = captured;
+      }
+    }
 
     final cleaned = raw
         .replaceAll(_ChatDetailScreenState._fileTagRegex, '')
@@ -918,7 +1135,12 @@ class _MessageBubble extends StatelessWidget {
         .replaceAll(RegExp(r'\n{3,}'), '\n\n')
         .trim();
 
-    return _ParsedBody(text: cleaned, fileName: fileName, startupName: startup);
+    return _ParsedBody(
+      text: cleaned,
+      fileName: fileName,
+      startupName: startupName,
+      ventureData: ventureData,
+    );
   }
 
   List<String> _attachmentUrls() {
@@ -967,7 +1189,7 @@ class _MessageBubble extends StatelessWidget {
           maxWidth: MediaQuery.of(context).size.width * 0.72,
         ),
         decoration: BoxDecoration(
-          color: isMe ? AppColors.primary : context.colors.card,
+          color: isMe ? context.colors.accent : context.colors.card,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
@@ -1057,39 +1279,10 @@ class _MessageBubble extends StatelessWidget {
                 ),
               ),
             if (parsed.startupName != null)
-              Container(
-                margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isMe
-                      ? Colors.white.withValues(alpha: 0.15)
-                      : context.colors.surface,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.business_center_outlined,
-                      size: 14,
-                      color: isMe ? Colors.white : context.colors.textSecondary,
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        parsed.startupName!,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: isMe
-                              ? Colors.white
-                              : context.colors.textPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              _VentureCard(
+                name: parsed.startupName!,
+                ventureData: parsed.ventureData,
+                isMe: isMe,
               ),
             if (parsed.text.isNotEmpty)
               Text(
@@ -1141,12 +1334,959 @@ class _ParsedBody {
   final String text;
   final String? fileName;
   final String? startupName;
+  final Map<String, dynamic>? ventureData;
 
   const _ParsedBody({
     required this.text,
     required this.fileName,
     required this.startupName,
+    this.ventureData,
   });
+}
+
+// ─── Venture sharing card inside message bubbles ─────────────────
+class _VentureCard extends StatelessWidget {
+  final String name;
+  final Map<String, dynamic>? ventureData;
+  final bool isMe;
+
+  const _VentureCard({
+    required this.name,
+    required this.ventureData,
+    required this.isMe,
+  });
+
+  String? _resolveLogoUrl(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    final url = raw.trim();
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return '${AppConstants.apiBaseUrl}$url';
+  }
+
+  void _openVentureDetails(BuildContext context) async {
+    final id = ventureData?['id'];
+    if (id == null) return;
+
+    Map<String, dynamic>? fullVenture;
+    try {
+      fullVenture = await ApiService.instance.getVentureById(
+        int.tryParse('$id') ?? 0,
+      );
+    } catch (_) {
+      fullVenture = ventureData;
+    }
+
+    if (fullVenture == null || !context.mounted) return;
+
+    _showVentureDetailSheet(context, fullVenture);
+  }
+
+  static void _showVentureDetailSheet(
+    BuildContext context,
+    Map<String, dynamic> venture,
+  ) {
+    final name = (venture['name'] as String? ?? 'Venture').trim();
+    final tagline = (venture['tagline'] as String? ?? '').trim();
+    final stage = (venture['stage'] as String? ?? '').trim();
+    final industry = (venture['industry'] as String? ?? '').trim();
+    final description = (venture['description'] as String? ?? '').trim();
+    final problem = (venture['problem_statement'] as String? ?? '').trim();
+    final solution = (venture['solution'] as String? ?? '').trim();
+    final market = (venture['target_market'] as String? ?? '').trim();
+    final logoUrl = (venture['logo_url'] as String? ?? '').trim();
+    final resolvedLogo = logoUrl.isNotEmpty
+        ? (logoUrl.startsWith('http')
+              ? logoUrl
+              : '${AppConstants.apiBaseUrl}$logoUrl')
+        : null;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.65,
+        maxChildSize: 0.92,
+        builder: (ctx, scrollCtrl) => ListView(
+          controller: scrollCtrl,
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.colors.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Logo + name
+            Row(
+              children: [
+                if (resolvedLogo != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      resolvedLogo,
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          _letterAvatar(context, name),
+                    ),
+                  )
+                else
+                  _letterAvatar(context, name),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(
+                          color: context.colors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 18,
+                        ),
+                      ),
+                      if (tagline.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          tagline,
+                          style: TextStyle(
+                            color: context.colors.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Stage & Industry chips
+            if (stage.isNotEmpty || industry.isNotEmpty)
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  if (stage.isNotEmpty) _infoChip(context, stage),
+                  if (industry.isNotEmpty) _infoChip(context, industry),
+                ],
+              ),
+            if (description.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _sectionTitle(context, 'About'),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: TextStyle(
+                  color: context.colors.textPrimary,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+            ],
+            if (problem.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _sectionTitle(context, 'Problem'),
+              const SizedBox(height: 4),
+              Text(
+                problem,
+                style: TextStyle(
+                  color: context.colors.textPrimary,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+            if (solution.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _sectionTitle(context, 'Solution'),
+              const SizedBox(height: 4),
+              Text(
+                solution,
+                style: TextStyle(
+                  color: context.colors.textPrimary,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+            if (market.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _sectionTitle(context, 'Target Market'),
+              const SizedBox(height: 4),
+              Text(
+                market,
+                style: TextStyle(
+                  color: context.colors.textPrimary,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _letterAvatar(BuildContext context, String name) {
+    return CircleAvatar(
+      radius: 24,
+      backgroundColor: context.colors.accent.withValues(alpha: 0.12),
+      child: Text(
+        name.isEmpty ? 'V' : name[0].toUpperCase(),
+        style: TextStyle(
+          color: context.colors.accent,
+          fontWeight: FontWeight.w700,
+          fontSize: 18,
+        ),
+      ),
+    );
+  }
+
+  static Widget _infoChip(BuildContext context, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: context.colors.accent.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: context.colors.accent,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  static Widget _sectionTitle(BuildContext context, String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        color: context.colors.textSecondary,
+        fontWeight: FontWeight.w700,
+        fontSize: 12,
+        letterSpacing: 0.5,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tagline = (ventureData?['tagline'] as String? ?? '').trim();
+    final logoRaw = ventureData?['logo_url'] as String?;
+    final logoUrl = _resolveLogoUrl(logoRaw);
+    final hasId = ventureData?['id'] != null;
+
+    return GestureDetector(
+      onTap: hasId ? () => _openVentureDetails(context) : null,
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: isMe
+              ? Colors.white.withValues(alpha: 0.15)
+              : context.colors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isMe
+                ? Colors.white.withValues(alpha: 0.2)
+                : context.colors.cardBorder,
+          ),
+        ),
+        child: Row(
+          children: [
+            // Logo / letter avatar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: logoUrl != null
+                  ? Image.network(
+                      logoUrl,
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _smallLetterAvatar(context),
+                    )
+                  : _smallLetterAvatar(context),
+            ),
+            const SizedBox(width: 10),
+            // Name + tagline
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isMe ? Colors.white : context.colors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                  if (tagline.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      tagline,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isMe
+                            ? Colors.white.withValues(alpha: 0.75)
+                            : context.colors.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            // Arrow icon — tap to view details
+            if (hasId) ...[
+              const SizedBox(width: 6),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: isMe
+                    ? Colors.white.withValues(alpha: 0.7)
+                    : context.colors.textSecondary,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _smallLetterAvatar(BuildContext context) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: context.colors.accent.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        name.isEmpty ? 'V' : name[0].toUpperCase(),
+        style: TextStyle(
+          color: context.colors.accent,
+          fontWeight: FontWeight.w700,
+          fontSize: 16,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Chat Info & Settings Bottom Sheet ───────────────────────────
+class _ChatInfoSheet extends StatefulWidget {
+  final String name;
+  final String? avatarUrl;
+  final String initials;
+  final bool isOnline;
+  final String role;
+  final String phone;
+  final List<Map<String, dynamic>> sharedFiles;
+  final List<Map<String, dynamic>> sharedMedia;
+  final String userId;
+
+  const _ChatInfoSheet({
+    required this.name,
+    required this.avatarUrl,
+    required this.initials,
+    required this.isOnline,
+    required this.role,
+    required this.phone,
+    required this.sharedFiles,
+    required this.sharedMedia,
+    required this.userId,
+  });
+
+  @override
+  State<_ChatInfoSheet> createState() => _ChatInfoSheetState();
+}
+
+class _ChatInfoSheetState extends State<_ChatInfoSheet>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabCtrl = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    super.dispose();
+  }
+
+  String _formatDate(String? raw) {
+    if (raw == null || raw.isEmpty) return '';
+    final dt = DateTime.tryParse(raw);
+    if (dt == null) return '';
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[dt.month - 1]} ${dt.day}';
+  }
+
+  Future<void> _openUrl(String url) async {
+    if (url.isEmpty) return;
+    final uri = Uri.tryParse(url);
+    if (uri != null) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.45,
+      maxChildSize: 0.95,
+      builder: (ctx, scrollCtrl) => Container(
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            // Drag handle
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 8),
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.colors.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            // Header – Back to Chat
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.arrow_back_ios_rounded,
+                          size: 18,
+                          color: context.colors.accent,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Back to Chat',
+                          style: TextStyle(
+                            color: context.colors.accent,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView(
+                controller: scrollCtrl,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                children: [
+                  const SizedBox(height: 12),
+                  // ── Contact Card ──
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: context.colors.card,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: context.colors.cardBorder),
+                    ),
+                    child: Column(
+                      children: [
+                        // Avatar with online dot
+                        Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 42,
+                              backgroundColor: context.colors.accent.withValues(
+                                alpha: 0.15,
+                              ),
+                              backgroundImage: widget.avatarUrl != null
+                                  ? NetworkImage(widget.avatarUrl!)
+                                  : null,
+                              child: widget.avatarUrl == null
+                                  ? Text(
+                                      widget.initials,
+                                      style: TextStyle(
+                                        color: context.colors.accent,
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            if (widget.isOnline)
+                              Positioned(
+                                bottom: 2,
+                                right: 2,
+                                child: Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                    color: Colors.green,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: context.colors.surface,
+                                      width: 3,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Name
+                        Text(
+                          widget.name,
+                          style: TextStyle(
+                            color: context.colors.textPrimary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        // Role
+                        Text(
+                          widget.role,
+                          style: TextStyle(
+                            color: context.colors.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Online badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: widget.isOnline
+                                ? Colors.green.withValues(alpha: 0.15)
+                                : Colors.grey.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            widget.isOnline ? 'Online' : 'Offline',
+                            style: TextStyle(
+                              color: widget.isOnline
+                                  ? Colors.green
+                                  : Colors.grey,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if (widget.phone.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.phone_outlined,
+                                size: 14,
+                                color: context.colors.textSecondary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                widget.phone,
+                                style: TextStyle(
+                                  color: context.colors.textSecondary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Shared Media & Documents Tabs ──
+                  Container(
+                    decoration: BoxDecoration(
+                      color: context.colors.card,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: context.colors.cardBorder),
+                    ),
+                    child: Column(
+                      children: [
+                        TabBar(
+                          controller: _tabCtrl,
+                          indicatorColor: context.colors.accent,
+                          labelColor: context.colors.accent,
+                          unselectedLabelColor: context.colors.textSecondary,
+                          indicatorSize: TabBarIndicatorSize.tab,
+                          tabs: [
+                            Tab(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.description_outlined, size: 16),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Documents',
+                                    style: TextStyle(fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Tab(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.image_outlined, size: 16),
+                                  const SizedBox(width: 6),
+                                  Text('Media', style: TextStyle(fontSize: 13)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(
+                          height: _tabContentHeight(),
+                          child: TabBarView(
+                            controller: _tabCtrl,
+                            children: [
+                              // Documents tab
+                              _buildDocumentsTab(),
+                              // Media tab
+                              _buildMediaTab(),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Action Buttons ──
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            // Navigate to user profile
+                            context.push('/profile/${widget.userId}');
+                          },
+                          icon: Icon(
+                            Icons.person_outline,
+                            size: 18,
+                            color: context.colors.accent,
+                          ),
+                          label: Text(
+                            'View Profile',
+                            style: TextStyle(
+                              color: context.colors.accent,
+                              fontSize: 13,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: context.colors.accent.withValues(
+                                alpha: 0.4,
+                              ),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            final uid = int.tryParse(widget.userId) ?? 0;
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (_) => BookSessionSheet(
+                                userId: uid,
+                                userName: widget.name,
+                              ),
+                            );
+                          },
+                          icon: Icon(
+                            Icons.calendar_today_outlined,
+                            size: 18,
+                            color: context.colors.accent,
+                          ),
+                          label: Text(
+                            'Schedule',
+                            style: TextStyle(
+                              color: context.colors.accent,
+                              fontSize: 13,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: context.colors.accent.withValues(
+                                alpha: 0.4,
+                              ),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  double _tabContentHeight() {
+    final docCount = widget.sharedFiles.length;
+    final mediaCount = widget.sharedMedia.length;
+    final maxItems = docCount > mediaCount ? docCount : mediaCount;
+    if (maxItems == 0) return 100;
+    // Documents: ~64px per item. Media grid: ~rows of 3, ~120px per row.
+    final docH = docCount * 64.0 + 16;
+    final mediaRows = ((mediaCount + 2) / 3).ceil();
+    final mediaH = mediaRows * 120.0 + 16;
+    final max = docH > mediaH ? docH : mediaH;
+    return max.clamp(100.0, 320.0);
+  }
+
+  Widget _buildDocumentsTab() {
+    if (widget.sharedFiles.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.folder_open_outlined,
+                size: 22,
+                color: context.colors.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'No shared documents yet',
+                style: TextStyle(
+                  color: context.colors.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(12),
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: widget.sharedFiles.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 6),
+      itemBuilder: (_, i) {
+        final doc = widget.sharedFiles[i];
+        return GestureDetector(
+          onTap: () => _openUrl(doc['url'] ?? ''),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: context.colors.surface,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: context.colors.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.description_outlined,
+                    size: 18,
+                    color: context.colors.accent,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        doc['name'] ?? 'File',
+                        style: TextStyle(
+                          color: context.colors.textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (_formatDate(doc['date']).isNotEmpty)
+                        Text(
+                          _formatDate(doc['date']),
+                          style: TextStyle(
+                            color: context.colors.textSecondary,
+                            fontSize: 11,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if ((doc['url'] ?? '').toString().isNotEmpty)
+                  Icon(
+                    Icons.download_outlined,
+                    size: 18,
+                    color: context.colors.textSecondary,
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMediaTab() {
+    if (widget.sharedMedia.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.image_outlined,
+                size: 22,
+                color: context.colors.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'No shared media yet',
+                style: TextStyle(
+                  color: context.colors.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          mainAxisSpacing: 4,
+          crossAxisSpacing: 4,
+        ),
+        itemCount: widget.sharedMedia.length,
+        itemBuilder: (_, i) {
+          final media = widget.sharedMedia[i];
+          return GestureDetector(
+            onTap: () => _openUrl(media['url'] ?? ''),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    media['url'],
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: context.colors.surface,
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        color: context.colors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 2,
+                    right: 2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        _formatDate(media['date']),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
 class _InputBar extends StatelessWidget {
@@ -1166,8 +2306,13 @@ class _InputBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-      color: Colors.transparent,
+      padding: const EdgeInsets.fromLTRB(0, 6, 0, 0),
+      decoration: BoxDecoration(
+        color: context.colors.card,
+        border: Border(
+          top: BorderSide(color: context.colors.cardBorder, width: 0.5),
+        ),
+      ),
       child: SafeArea(
         top: false,
         child: ValueListenableBuilder<TextEditingValue>(
@@ -1176,16 +2321,11 @@ class _InputBar extends StatelessWidget {
             final hasText = value.text.trim().isNotEmpty;
             final canSend = hasText || hasAttachment;
 
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: context.colors.card,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: context.colors.cardBorder),
-              ),
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(6, 0, 6, 6),
               child: Row(
                 children: [
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 4),
                   Expanded(
                     child: TextField(
                       controller: ctrl,
@@ -1203,6 +2343,10 @@ class _InputBar extends StatelessWidget {
                           ),
                         ),
                         border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                       ),
                     ),
                   ),
@@ -1213,15 +2357,15 @@ class _InputBar extends StatelessWidget {
                     ),
                     onPressed: onAttach,
                     tooltip: 'Attach',
+                    visualDensity: VisualDensity.compact,
                   ),
                   GestureDetector(
                     onTap: canSend && !sending ? onSend : null,
                     child: Container(
-                      margin: const EdgeInsets.only(right: 4),
-                      width: 46,
-                      height: 46,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: context.colors.accent,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -1231,6 +2375,7 @@ class _InputBar extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 2),
                 ],
               ),
             );

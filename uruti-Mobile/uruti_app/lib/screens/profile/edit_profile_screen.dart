@@ -271,19 +271,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: context.colors.appBarBg,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.close, color: context.colors.textPrimary),
+          icon: Icon(Icons.close, color: Colors.white),
           onPressed: () =>
               context.canPop() ? context.pop() : context.go('/profile'),
         ),
         title: Text(
           'Edit Profile',
-          style: TextStyle(
-            color: context.colors.textPrimary,
-            fontWeight: FontWeight.w700,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
         actions: [
           TextButton(
@@ -294,13 +291,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: AppColors.primary,
+                      color: Colors.white,
                     ),
                   )
                 : Text(
                     'Save',
                     style: TextStyle(
-                      color: AppColors.primary,
+                      color: Colors.white,
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
                     ),
@@ -345,7 +342,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         width: 32,
                         height: 32,
                         decoration: BoxDecoration(
-                          color: AppColors.primary,
+                          color: context.colors.accent,
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: context.colors.background,
@@ -441,7 +438,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           : const Icon(Icons.upload_rounded, size: 16),
                       label: const Text('Upload'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: context.colors.accent,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -583,7 +580,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       child: Text(
         label,
         style: TextStyle(
-          color: AppColors.primary,
+          color: context.colors.accent,
           fontSize: 13,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.5,
@@ -631,7 +628,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+                borderSide: BorderSide(
+                  color: context.colors.accent,
+                  width: 1.5,
+                ),
               ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
@@ -701,7 +701,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+                borderSide: BorderSide(
+                  color: context.colors.accent,
+                  width: 1.5,
+                ),
               ),
               errorBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),

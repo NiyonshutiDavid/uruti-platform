@@ -179,7 +179,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: selected
-                                  ? AppColors.primary
+                                  ? context.colors.accent
                                   : ctx.colors.background,
                               borderRadius: BorderRadius.circular(20),
                             ),
@@ -228,7 +228,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                       width: double.infinity,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: context.colors.accent,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -290,28 +290,25 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: context.colors.appBarBg,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
+          icon: Icon(Icons.menu_rounded, color: Colors.white),
           onPressed: () => MainScaffold.scaffoldKey.currentState?.openDrawer(),
         ),
         title: Text(
           'My Availability',
-          style: TextStyle(
-            color: context.colors.textPrimary,
-            fontWeight: FontWeight.w700,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh, color: context.colors.textSecondary),
+            icon: Icon(Icons.refresh, color: Colors.white70),
             onPressed: _load,
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
+        backgroundColor: context.colors.accent,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text(
           'Add Slot',
@@ -340,7 +337,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                   ElevatedButton(
                     onPressed: _load,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: context.colors.accent,
                     ),
                     child: const Text(
                       'Retry',
@@ -364,7 +361,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                   Text(
                     'No availability set',
                     style: TextStyle(
-                      color: context.colors.textPrimary,
+                      color: Colors.white,
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
@@ -383,7 +380,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
             )
           : RefreshIndicator(
               onRefresh: _load,
-              color: AppColors.primary,
+              color: context.colors.accent,
               child: ListView.builder(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                 itemCount: _byDay.length,
@@ -471,14 +468,14 @@ class _DaySection extends StatelessWidget {
                 height: 36,
                 decoration: BoxDecoration(
                   color: isActive
-                      ? AppColors.primary.withOpacity(0.12)
+                      ? context.colors.accent.withOpacity(0.12)
                       : context.colors.background,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   Icons.access_time_rounded,
                   color: isActive
-                      ? AppColors.primary
+                      ? context.colors.accent
                       : context.colors.textSecondary,
                   size: 18,
                 ),

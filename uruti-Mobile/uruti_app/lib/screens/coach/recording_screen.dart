@@ -27,6 +27,10 @@ class _RecordingScreenState extends State<RecordingScreen>
   bool _micPermitted = false;
   bool _uploading = false;
   bool _cameraReady = false;
+  bool _fullscreen = false;
+  bool _sessionComplete = false;
+  String? _recordedFilePath;
+  int _recordedDurationSeconds = 0;
   late AnimationController _pulseCtrl;
   late Animation<double> _pulse;
   int _seconds = 0;
@@ -232,8 +236,12 @@ class _RecordingScreenState extends State<RecordingScreen>
       final file = await _cameraController!.stopVideoRecording();
       _stopTimer();
       if (!mounted) return;
-      setState(() => _recording = false);
-      await _uploadRecording(file.path);
+      setState(() {
+        _recording = false;
+        _sessionComplete = true;
+        _recordedFilePath = file.path;
+        _recordedDurationSeconds = _seconds;
+      });
     } catch (e) {
       _stopTimer();
       if (!mounted) return;
@@ -252,23 +260,32 @@ class _RecordingScreenState extends State<RecordingScreen>
         _selectedVentureId!,
         filePath,
         pitchType: _pitchType,
-        durationSeconds: _seconds,
+        durationSeconds: _recordedDurationSeconds,
         targetDurationSeconds: _targetMinutes * 60,
       );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pitch session uploaded successfully.')),
+        const SnackBar(content: Text('Pitch session saved successfully!')),
       );
       context.go('/pitch-performance');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to upload pitch video: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to save pitch video: $e')));
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
+  }
+
+  void _retryRecording() {
+    setState(() {
+      _sessionComplete = false;
+      _recordedFilePath = null;
+      _recordedDurationSeconds = 0;
+      _seconds = 0;
+    });
   }
 
   String get _time {
@@ -288,282 +305,297 @@ class _RecordingScreenState extends State<RecordingScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_sessionComplete) return _buildSessionResults(context);
+
     return Scaffold(
       backgroundColor: context.colors.background,
       body: SafeArea(
         child: Column(
           children: [
             // Header with recording indicator
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.close, color: context.colors.textPrimary),
-                    onPressed: () =>
-                        context.canPop() ? context.pop() : context.go('/coach'),
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: AnimatedBuilder(
-                        animation: _pulse,
-                        builder: (_, __) => Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Transform.scale(
-                              scale: _pulse.value,
-                              child: Container(
-                                width: 10,
-                                height: 10,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFFF3B3B),
-                                  shape: BoxShape.circle,
+            if (!_fullscreen)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.close,
+                        color: context.colors.textPrimary,
+                      ),
+                      onPressed: () => context.canPop()
+                          ? context.pop()
+                          : context.go('/coach'),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: AnimatedBuilder(
+                          animation: _pulse,
+                          builder: (_, __) => Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Transform.scale(
+                                scale: _pulse.value,
+                                child: Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFFF3B3B),
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                _uploading
-                                    ? 'Uploading...'
-                                    : 'Listening...  $_time',
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: context.colors.textPrimary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  _uploading
+                                      ? 'Uploading...'
+                                      : 'Listening...  $_time',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: context.colors.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 48),
-                ],
+                    const SizedBox(width: 48),
+                  ],
+                ),
               ),
-            ),
 
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // Analysis bars
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _fullscreen
+                  ? _buildFullscreenBody(context)
+                  : SingleChildScrollView(
                       child: Column(
                         children: [
-                          _AnalysisBar(
-                            'Pacing',
-                            0.78,
-                            'Optimal',
-                            AppColors.primary,
-                          ),
-                          const SizedBox(height: 12),
-                          _AnalysisBar(
-                            'Slide Sync',
-                            0.65,
-                            'On Track',
-                            AppColors.primary,
-                          ),
-                          const SizedBox(height: 12),
-                          _AnalysisBar(
-                            'Confidence',
-                            0.55,
-                            'Good',
-                            const Color(0xFFFFB800),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Real-time tip
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(
-                                  alpha: 0.15,
+                          // Analysis bars
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Column(
+                              children: [
+                                _AnalysisBar(
+                                  'Pacing',
+                                  0.78,
+                                  'Optimal',
+                                  context.colors.accent,
                                 ),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.lightbulb_outline,
-                                color: AppColors.primary,
-                                size: 18,
-                              ),
+                                const SizedBox(height: 12),
+                                _AnalysisBar(
+                                  'Slide Sync',
+                                  0.65,
+                                  'On Track',
+                                  context.colors.accent,
+                                ),
+                                const SizedBox(height: 12),
+                                _AnalysisBar(
+                                  'Confidence',
+                                  0.55,
+                                  'Good',
+                                  const Color(0xFFFFB800),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // Real-time tip
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: context.colors.accent.withValues(
+                                  alpha: 0.08,
+                                ),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: context.colors.accent.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                ),
+                              ),
+                              child: Row(
                                 children: [
-                                  Text(
-                                    'Real-time Tip',
-                                    style: TextStyle(
-                                      color: AppColors.primary,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: context.colors.accent.withValues(
+                                        alpha: 0.15,
+                                      ),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.lightbulb_outline,
+                                      color: context.colors.accent,
+                                      size: 18,
                                     ),
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    "Great pacing! Try to slow down slightly when describing your revenue model.",
-                                    style: TextStyle(
-                                      color: context.colors.textPrimary,
-                                      fontSize: 13,
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Real-time Tip',
+                                          style: TextStyle(
+                                            color: context.colors.accent,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          "Great pacing! Try to slow down slightly when describing your revenue model.",
+                                          style: TextStyle(
+                                            color: context.colors.textPrimary,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
+                          ),
 
-                    const SizedBox(height: 14),
+                          const SizedBox(height: 14),
 
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: context.colors.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: context.colors.divider),
-                        ),
-                        child: Column(
-                          children: [
-                            DropdownButtonFormField<int>(
-                              value: _selectedVentureId,
-                              items: _ventures
-                                  .map(
-                                    (v) => DropdownMenuItem<int>(
-                                      value: int.tryParse('${v['id']}'),
-                                      child: Text(
-                                        (v['name'] as String?) ?? 'Venture',
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: _recording
-                                  ? null
-                                  : (value) => setState(
-                                      () => _selectedVentureId = value,
-                                    ),
-                              decoration: const InputDecoration(
-                                labelText: 'Current Venture',
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: DropdownButtonFormField<String>(
-                                    value: _pitchType,
-                                    items: const [
-                                      DropdownMenuItem(
-                                        value: 'Elevator Pitch',
-                                        child: Text('Elevator Pitch'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'Investor Pitch',
-                                        child: Text('Investor Pitch'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'Demo Day Pitch',
-                                        child: Text('Demo Day Pitch'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'Customer Pitch',
-                                        child: Text('Customer Pitch'),
-                                      ),
-                                    ],
-                                    onChanged: _recording
-                                        ? null
-                                        : (value) {
-                                            if (value != null) {
-                                              setState(
-                                                () => _pitchType = value,
-                                              );
-                                            }
-                                          },
-                                    decoration: const InputDecoration(
-                                      labelText: 'Pitch Type',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: context.colors.surface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: context.colors.divider,
                                 ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: DropdownButtonFormField<int>(
-                                    value: _targetMinutes,
-                                    items: const [1, 2, 3, 5, 7, 10]
+                              ),
+                              child: Column(
+                                children: [
+                                  DropdownButtonFormField<int>(
+                                    value: _selectedVentureId,
+                                    items: _ventures
                                         .map(
-                                          (m) => DropdownMenuItem(
-                                            value: m,
-                                            child: Text('$m min'),
+                                          (v) => DropdownMenuItem<int>(
+                                            value: int.tryParse('${v['id']}'),
+                                            child: Text(
+                                              (v['name'] as String?) ??
+                                                  'Venture',
+                                            ),
                                           ),
                                         )
                                         .toList(),
                                     onChanged: _recording
                                         ? null
-                                        : (value) {
-                                            if (value != null) {
-                                              setState(
-                                                () => _targetMinutes = value,
-                                              );
-                                            }
-                                          },
+                                        : (value) => setState(
+                                            () => _selectedVentureId = value,
+                                          ),
                                     decoration: const InputDecoration(
-                                      labelText: 'Target',
+                                      labelText: 'Current Venture',
                                       border: OutlineInputBorder(),
                                     ),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: DropdownButtonFormField<String>(
+                                          value: _pitchType,
+                                          items: const [
+                                            DropdownMenuItem(
+                                              value: 'Elevator Pitch',
+                                              child: Text('Elevator Pitch'),
+                                            ),
+                                            DropdownMenuItem(
+                                              value: 'Investor Pitch',
+                                              child: Text('Investor Pitch'),
+                                            ),
+                                            DropdownMenuItem(
+                                              value: 'Demo Day Pitch',
+                                              child: Text('Demo Day Pitch'),
+                                            ),
+                                            DropdownMenuItem(
+                                              value: 'Customer Pitch',
+                                              child: Text('Customer Pitch'),
+                                            ),
+                                          ],
+                                          onChanged: _recording
+                                              ? null
+                                              : (value) {
+                                                  if (value != null) {
+                                                    setState(
+                                                      () => _pitchType = value,
+                                                    );
+                                                  }
+                                                },
+                                          decoration: const InputDecoration(
+                                            labelText: 'Pitch Type',
+                                            border: OutlineInputBorder(),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: DropdownButtonFormField<int>(
+                                          value: _targetMinutes,
+                                          items: const [1, 2, 3, 5, 7, 10]
+                                              .map(
+                                                (m) => DropdownMenuItem(
+                                                  value: m,
+                                                  child: Text('$m min'),
+                                                ),
+                                              )
+                                              .toList(),
+                                          onChanged: _recording
+                                              ? null
+                                              : (value) {
+                                                  if (value != null) {
+                                                    setState(
+                                                      () => _targetMinutes =
+                                                          value,
+                                                    );
+                                                  }
+                                                },
+                                          decoration: const InputDecoration(
+                                            labelText: 'Target',
+                                            border: OutlineInputBorder(),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: _presentationStarted && _deckFilePath != null
+                                ? _buildDeckPresentationView(context)
+                                : _buildCameraView(context),
+                          ),
+
+                          const SizedBox(height: 20),
+                        ],
                       ),
                     ),
-
-                    const SizedBox(height: 14),
-
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _presentationStarted && _deckFilePath != null
-                          ? _buildDeckPresentationView(context)
-                          : _buildCameraView(context),
-                    ),
-
-                    // Waveform
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: _Waveform(),
-                    ),
-
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
             ),
 
             // Controls
@@ -616,7 +648,7 @@ class _RecordingScreenState extends State<RecordingScreen>
                             decoration: BoxDecoration(
                               color: _recording
                                   ? const Color(0xFFFF3B3B)
-                                  : AppColors.primary,
+                                  : context.colors.accent,
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
@@ -633,7 +665,7 @@ class _RecordingScreenState extends State<RecordingScreen>
                             style: TextStyle(
                               color: _recording
                                   ? const Color(0xFFFF3B3B)
-                                  : AppColors.primary,
+                                  : context.colors.accent,
                               fontSize: 12,
                             ),
                           ),
@@ -648,6 +680,14 @@ class _RecordingScreenState extends State<RecordingScreen>
                       active: _presentationStarted || _deckFilePath != null,
                       onTap: _toggleDeckPresentation,
                     ),
+                    _ctrl(
+                      icon: _fullscreen
+                          ? Icons.fullscreen_exit_rounded
+                          : Icons.fullscreen_rounded,
+                      label: _fullscreen ? 'Exit Full' : 'Fullscreen',
+                      active: _fullscreen,
+                      onTap: () => setState(() => _fullscreen = !_fullscreen),
+                    ),
                   ],
                 ),
               ),
@@ -657,6 +697,333 @@ class _RecordingScreenState extends State<RecordingScreen>
       ),
     );
   }
+
+  Widget _buildSessionResults(BuildContext context) {
+    final duration =
+        '${(_recordedDurationSeconds ~/ 60).toString().padLeft(2, '0')}:${(_recordedDurationSeconds % 60).toString().padLeft(2, '0')}';
+    final ventureName =
+        _ventures
+            .where((v) => int.tryParse('${v['id']}') == _selectedVentureId)
+            .map((v) => v['name'] as String?)
+            .firstOrNull ??
+        'Venture';
+
+    return Scaffold(
+      backgroundColor: context.colors.background,
+      appBar: AppBar(
+        backgroundColor: context.colors.appBarBg,
+        title: const Text(
+          'Session Results',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/coach'),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            // Session summary card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: context.colors.card,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: context.colors.divider),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: context.colors.accent.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.videocam,
+                          color: context.colors.accent,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Session Complete',
+                              style: TextStyle(
+                                color: context.colors.textPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$ventureName • $_pitchType',
+                              style: TextStyle(
+                                color: context.colors.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      _ResultChip(
+                        Icons.timer_outlined,
+                        'Duration',
+                        duration,
+                        context,
+                      ),
+                      const SizedBox(width: 10),
+                      _ResultChip(
+                        Icons.track_changes,
+                        'Target',
+                        '$_targetMinutes min',
+                        context,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Overall Score
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1A3A0A), Color(0xFF0D2010)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: context.colors.accent.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'Overall Score',
+                    style: TextStyle(
+                      color: context.colors.textSecondary,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '82',
+                    style: TextStyle(
+                      color: context.colors.accent,
+                      fontSize: 64,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    'out of 100',
+                    style: TextStyle(
+                      color: context.colors.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _ScoreChip('Duration', duration),
+                      const _ScoreChip('Words/min', '142'),
+                      const _ScoreChip('Clarity', '91%'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            _sectionTitle(context, 'Category Breakdown'),
+            const SizedBox(height: 12),
+
+            ...[
+              ('Pacing', 0.78, context.colors.accent),
+              ('Confidence', 0.72, const Color(0xFFFFB800)),
+              ('Clarity', 0.91, const Color(0xFF3B82F6)),
+              ('Content', 0.80, const Color(0xFFFF6B6B)),
+              ('Engagement', 0.68, const Color(0xFF8B5CF6)),
+            ].map(
+              (e) => Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          e.$1,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${(e.$2 * 100).toInt()}%',
+                          style: TextStyle(
+                            color: e.$3,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: e.$2,
+                        backgroundColor: context.colors.divider,
+                        color: e.$3,
+                        minHeight: 8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 8),
+            _sectionTitle(context, 'AI Feedback'),
+            const SizedBox(height: 12),
+
+            ...[
+              (
+                Icons.check_circle,
+                context.colors.accent,
+                'Strong opening hook captured attention effectively.',
+              ),
+              (
+                Icons.check_circle,
+                context.colors.accent,
+                'Market size data was compelling and well-sourced.',
+              ),
+              (
+                Icons.warning_amber_rounded,
+                const Color(0xFFFFB800),
+                'Revenue projections could use more detail.',
+              ),
+              (
+                Icons.warning_amber_rounded,
+                const Color(0xFFFFB800),
+                'Consider slowing down in the technical section.',
+              ),
+            ].map(
+              (e) => Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: context.colors.card,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.colors.divider),
+                ),
+                child: Row(
+                  children: [
+                    Icon(e.$1, color: e.$2, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        e.$3,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Retry and Save Video buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _uploading ? null : _retryRecording,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: context.colors.accent,
+                      side: BorderSide(color: context.colors.accent),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _uploading || _recordedFilePath == null
+                        ? null
+                        : () => _uploadRecording(_recordedFilePath!),
+                    icon: _uploading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.save),
+                    label: Text(_uploading ? 'Saving...' : 'Save Video'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: context.colors.accent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 30),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Align _sectionTitle(BuildContext context, String t) => Align(
+    alignment: Alignment.centerLeft,
+    child: Text(
+      t,
+      style: TextStyle(
+        color: context.colors.textPrimary,
+        fontWeight: FontWeight.w700,
+        fontSize: 16,
+      ),
+    ),
+  );
 
   Widget _ctrl({
     required IconData icon,
@@ -673,18 +1040,20 @@ class _RecordingScreenState extends State<RecordingScreen>
             height: 46,
             decoration: BoxDecoration(
               color: active
-                  ? AppColors.primary.withValues(alpha: 0.15)
+                  ? context.colors.accent.withValues(alpha: 0.15)
                   : context.colors.card,
               shape: BoxShape.circle,
               border: Border.all(
                 color: active
-                    ? AppColors.primary.withValues(alpha: 0.4)
+                    ? context.colors.accent.withValues(alpha: 0.4)
                     : context.colors.divider,
               ),
             ),
             child: Icon(
               icon,
-              color: active ? AppColors.primary : context.colors.textSecondary,
+              color: active
+                  ? context.colors.accent
+                  : context.colors.textSecondary,
               size: 20,
             ),
           ),
@@ -698,20 +1067,91 @@ class _RecordingScreenState extends State<RecordingScreen>
     );
   }
 
+  Widget _buildFullscreenBody(BuildContext context) {
+    return Column(
+      children: [
+        // Fullscreen top bar — timer + exit
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            children: [
+              IconButton(
+                icon: Icon(Icons.close, color: context.colors.textPrimary),
+                onPressed: () =>
+                    context.canPop() ? context.pop() : context.go('/coach'),
+              ),
+              const Spacer(),
+              AnimatedBuilder(
+                animation: _pulse,
+                builder: (_, __) => Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Transform.scale(
+                      scale: _pulse.value,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFF3B3B),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _time,
+                      style: TextStyle(
+                        color: context.colors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: Icon(
+                  Icons.fullscreen_exit_rounded,
+                  color: context.colors.textPrimary,
+                ),
+                onPressed: () => setState(() => _fullscreen = false),
+              ),
+            ],
+          ),
+        ),
+        // Main content fills remaining space
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: _presentationStarted && _deckFilePath != null
+                ? _buildDeckPresentationView(context)
+                : _buildCameraView(context),
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
   Widget _buildCameraView(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: 220,
+      height: _fullscreen ? null : 220,
+      constraints: _fullscreen ? const BoxConstraints(minHeight: 200) : null,
       decoration: BoxDecoration(
         color: Colors.black,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: context.colors.divider),
       ),
       child: (!_cameraOn || !_cameraReady || _cameraController == null)
-          ? Center(
-              child: Text(
-                'Camera Off',
-                style: TextStyle(color: context.colors.textSecondary),
+          ? SizedBox(
+              height: _fullscreen ? 300 : 220,
+              child: Center(
+                child: Text(
+                  'Camera Off',
+                  style: TextStyle(color: context.colors.textSecondary),
+                ),
               ),
             )
           : ClipRRect(
@@ -724,7 +1164,8 @@ class _RecordingScreenState extends State<RecordingScreen>
   Widget _buildDeckPresentationView(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: 330,
+      height: _fullscreen ? null : 330,
+      constraints: _fullscreen ? const BoxConstraints(minHeight: 300) : null,
       decoration: BoxDecoration(
         color: Colors.black,
         borderRadius: BorderRadius.circular(12),
@@ -911,69 +1352,68 @@ class _AnalysisBar extends StatelessWidget {
   }
 }
 
-class _Waveform extends StatelessWidget {
+class _ScoreChip extends StatelessWidget {
+  final String label, value;
+  const _ScoreChip(this.label, this.value);
   @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width - 40;
-    return SizedBox(
-      height: 60,
-      width: width,
-      child: CustomPaint(painter: _WavePainter()),
-    );
-  }
+  Widget build(BuildContext context) => Column(
+    children: [
+      Text(
+        value,
+        style: TextStyle(
+          color: context.colors.textPrimary,
+          fontWeight: FontWeight.w800,
+          fontSize: 16,
+        ),
+      ),
+      Text(
+        label,
+        style: TextStyle(color: context.colors.textSecondary, fontSize: 11),
+      ),
+    ],
+  );
 }
 
-class _WavePainter extends CustomPainter {
+class _ResultChip extends StatelessWidget {
+  final IconData icon;
+  final String label, value;
+  final BuildContext ctx;
+  const _ResultChip(this.icon, this.label, this.value, this.ctx);
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.primary.withValues(alpha: 0.7)
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round;
-    final heights = [
-      0.3,
-      0.7,
-      0.5,
-      0.9,
-      0.4,
-      0.8,
-      0.6,
-      0.4,
-      1.0,
-      0.5,
-      0.7,
-      0.3,
-      0.8,
-      0.6,
-      0.9,
-      0.4,
-      0.7,
-      0.5,
-      0.3,
-      0.8,
-      0.6,
-      0.4,
-      0.9,
-      0.5,
-      0.7,
-      0.3,
-      0.8,
-      0.6,
-      0.4,
-      0.7,
-    ];
-    final spacing = size.width / heights.length;
-    for (int i = 0; i < heights.length; i++) {
-      final x = i * spacing + spacing / 2;
-      final h = heights[i] * size.height;
-      canvas.drawLine(
-        Offset(x, (size.height - h) / 2),
-        Offset(x, (size.height + h) / 2),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
+  Widget build(BuildContext context) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: context.colors.divider),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: context.colors.accent),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: context.colors.textSecondary,
+                  fontSize: 11,
+                ),
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  color: context.colors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -15,6 +16,38 @@ Future<void> firebaseBackgroundMessageHandler(RemoteMessage message) async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
   }
+
+  // Show a local notification so the user sees it at OS level even when
+  // the app is killed or in the background.
+  final title =
+      message.notification?.title ?? message.data['title']?.toString();
+  final body = message.notification?.body ?? message.data['body']?.toString();
+
+  if (title == null || title.trim().isEmpty) return;
+
+  final localNotifications = FlutterLocalNotificationsPlugin();
+  await localNotifications.initialize(
+    const InitializationSettings(
+      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      iOS: DarwinInitializationSettings(),
+    ),
+  );
+
+  await localNotifications.show(
+    DateTime.now().millisecondsSinceEpoch ~/ 1000,
+    title,
+    body ?? '',
+    const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'uruti-important',
+        'Important Notifications',
+        channelDescription: 'Message and platform updates',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+      iOS: DarwinNotificationDetails(),
+    ),
+  );
 }
 
 class NotificationService {
@@ -92,10 +125,27 @@ class NotificationService {
 
     final token = await _getFcmTokenSafely();
     if (token == null || token.trim().isEmpty) return;
+
+    final deviceId = await _getDeviceId();
     await ApiService.instance.registerDeviceToken(
       token,
       platform: _platformName(),
+      deviceId: deviceId,
     );
+  }
+
+  Future<String?> _getDeviceId() async {
+    try {
+      final info = DeviceInfoPlugin();
+      if (Platform.isAndroid) {
+        final a = await info.androidInfo;
+        return a.id;
+      } else if (Platform.isIOS) {
+        final i = await info.iosInfo;
+        return i.identifierForVendor;
+      }
+    } catch (_) {}
+    return null;
   }
 
   Future<void> unregisterCurrentToken() async {
@@ -126,6 +176,14 @@ class NotificationService {
       await Future<void>.delayed(const Duration(milliseconds: 500));
     }
     return null;
+  }
+
+  /// Public API to display an OS-level local notification from app code.
+  Future<void> showLocalNotification({
+    required String title,
+    required String body,
+  }) async {
+    await _showLocal(title, body);
   }
 
   Future<void> _showLocal(String title, String body) async {

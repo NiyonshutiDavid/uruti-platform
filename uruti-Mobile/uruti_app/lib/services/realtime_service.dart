@@ -14,6 +14,7 @@ class RealtimeService {
   StreamSubscription? _socketSub;
   StreamSubscription? _notificationsSub;
   Timer? _reconnectTimer;
+  Timer? _heartbeatTimer;
   String? _token;
   bool _connecting = false;
 
@@ -72,6 +73,14 @@ class RealtimeService {
 
       channel.sink.add(jsonEncode({'event': 'ping'}));
       notificationsChannel.sink.add(jsonEncode({'event': 'ping'}));
+
+      // Start periodic heartbeat to keep presence alive (updates last_login on server)
+      _heartbeatTimer?.cancel();
+      _heartbeatTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+        try {
+          _channel?.sink.add(jsonEncode({'event': 'ping'}));
+        } catch (_) {}
+      });
     } catch (_) {
       _scheduleReconnect();
     } finally {
@@ -83,6 +92,8 @@ class RealtimeService {
     _token = null;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
     await _disposeSocket();
   }
 

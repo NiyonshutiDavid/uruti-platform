@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useConfirmDialog } from '../ui/confirm-dialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -8,13 +10,15 @@ import { Input } from '../ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
-import { TrendingUp, Search, Filter, Star, Bookmark, MessageCircle, Eye, Download, DollarSign, Target, Users, Sparkles, Play, FileText, Calendar, ArrowRight, Award, Bell, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { TrendingUp, Search, Filter, Star, Bookmark, MessageCircle, Eye, Download, DollarSign, Target, Users, Sparkles, Play, FileText, Calendar, ArrowRight, ArrowLeft, Award, Bell, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { VentureDetailView } from '../VentureDetailView';
 import { apiClient } from '../../lib/api-client';
 import { toast } from 'sonner';
 import { useAuth } from '../../lib/auth-context';
 
 export function InvestorDashboardModule() {
+  const { confirm } = useConfirmDialog();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [ventures, setVentures] = useState<any[]>([]);
   const [bookmarkedVentures, setBookmarkedVentures] = useState<any[]>([]);
@@ -25,6 +29,7 @@ export function InvestorDashboardModule() {
   const [filterBand, setFilterBand] = useState('all');
   const [selectedVenture, setSelectedVenture] = useState<any | null>(null);
   const [viewType, setViewType] = useState<'leaderboard' | 'grid'>('leaderboard');
+  const [loadingVenture, setLoadingVenture] = useState(false);
 
   // Load all data from backend
   useEffect(() => {
@@ -63,7 +68,12 @@ export function InvestorDashboardModule() {
       const isBookmarked = bookmarkedVentures.some(v => v.id === ventureId);
       
       if (isBookmarked) {
-        const confirmed = window.confirm('Remove this startup from your bookmarks?');
+        const confirmed = await confirm({
+          title: 'Remove Bookmark',
+          description: 'Remove this startup from your bookmarks? You can always bookmark it again later.',
+          confirmLabel: 'Remove',
+          variant: 'danger',
+        });
         if (!confirmed) return;
 
         await apiClient.removeBookmark(ventureId);
@@ -80,20 +90,59 @@ export function InvestorDashboardModule() {
     }
   };
 
+  const handleViewVenture = async (venture: any) => {
+    setLoadingVenture(true);
+    try {
+      const fullVenture = await apiClient.getVentureById(venture.id);
+      const mapped = {
+        id: String(fullVenture.id),
+        name: fullVenture.name || '',
+        sector: fullVenture.industry || '',
+        tagline: fullVenture.tagline || '',
+        problem: fullVenture.problem_statement || '',
+        solution: fullVenture.solution || '',
+        targetMarket: fullVenture.target_market || '',
+        urutiScore: fullVenture.uruti_score || 0,
+        activeUsers: fullVenture.customers || 0,
+        monthlyGrowth: fullVenture.mrr ? Math.round((fullVenture.mrr / Math.max(fullVenture.monthly_burn_rate || 1, 1)) * 100) : 0,
+        highlights: fullVenture.highlights || [],
+        teamBackground: fullVenture.team_background || '',
+        competitiveEdge: fullVenture.competitive_edge || '',
+        fundingPlans: fullVenture.funding_plans || '',
+        milestones: fullVenture.milestones || [],
+        activities: fullVenture.activities || [],
+        pitchDeckUrl: fullVenture.pitch_deck_url || '',
+        pitchVideoUrl: fullVenture.demo_video_url || '',
+        thumbnailUrl: fullVenture.banner_url || '',
+        fundingGoal: fullVenture.funding_goal || 0,
+        fundingRaised: fullVenture.funding_raised || 0,
+        teamSize: fullVenture.team_size || 1,
+        stage: fullVenture.stage || '',
+        founderId: fullVenture.founder_id || 0,
+      };
+      setSelectedVenture(mapped);
+    } catch (error) {
+      console.error('Failed to load venture details:', error);
+      toast.error('Failed to load venture details');
+    } finally {
+      setLoadingVenture(false);
+    }
+  };
+
   const getReadinessBand = (score: number) => {
     if (score >= 85) {
       return <Badge className="bg-[#76B947]/20 text-[#76B947]">Growth Ready</Badge>;
     } else if (score >= 70) {
       return <Badge className="bg-blue-100 text-blue-700">High Potential</Badge>;
     } else {
-      return <Badge className="bg-purple-100 text-purple-700">Niche Specialist</Badge>;
+      return <Badge className="bg-orange-100 text-orange-700">Emerging</Badge>;
     }
   };
 
   const getScoreColor = (score: number) => {
     if (score >= 85) return 'text-[#76B947]';
     if (score >= 70) return 'text-blue-600';
-    return 'text-purple-600';
+    return 'text-orange-600';
   };
 
   // Calculate sector distribution from real data
@@ -112,21 +161,20 @@ export function InvestorDashboardModule() {
     return acc;
   }, []);
 
+  // Extract unique sectors and stages from real data
+  const uniqueSectors = Array.from(new Set(ventures.map(v => v.industry || v.sector).filter(Boolean)));
+  const uniqueStages = Array.from(new Set(ventures.map(v => v.stage).filter(Boolean)));
+
   // Filter ventures
   const filteredVentures = ventures.filter(venture => {
     const matchesSearch = (venture.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (venture.description || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSector = filterSector === 'all' || venture.industry === filterSector || venture.sector === filterSector;
     
-    // Filter by readiness band based on score
-    let matchesBand = true;
-    if (filterBand === 'growth-ready') {
-      matchesBand = (venture.uruti_score || 0) >= 85;
-    } else if (filterBand === 'high-potential') {
-      matchesBand = (venture.uruti_score || 0) >= 70 && (venture.uruti_score || 0) < 85;
-    }
+    // Filter by stage
+    const matchesStage = filterBand === 'all' || venture.stage === filterBand;
     
-    return matchesSearch && matchesSector && matchesBand;
+    return matchesSearch && matchesSector && matchesStage;
   }).sort((a, b) => (b.uruti_score || 0) - (a.uruti_score || 0));
 
   const avgScore = ventures.length > 0 
@@ -135,7 +183,7 @@ export function InvestorDashboardModule() {
 
   const growthReadyCount = ventures.filter(v => (v.uruti_score || 0) >= 85).length;
   const highPotentialCount = ventures.filter(v => (v.uruti_score || 0) >= 70 && (v.uruti_score || 0) < 85).length;
-  const nicheSpecialistCount = ventures.filter(v => (v.uruti_score || 0) < 70).length;
+  const emergingCount = ventures.filter(v => (v.uruti_score || 0) < 70).length;
 
   // Get user's first name for welcome message
   const displayName = user?.full_name?.split(' ')[0] || 'Investor';
@@ -147,6 +195,27 @@ export function InvestorDashboardModule() {
           <Loader2 className="h-12 w-12 animate-spin text-[#76B947] mx-auto mb-4" />
           <p className="text-muted-foreground">Loading dashboard...</p>
         </div>
+      </div>
+    );
+  }
+
+  // If a venture is selected, show the full detail view
+  if (selectedVenture) {
+    return (
+      <div className="space-y-6">
+        <Button
+          onClick={() => setSelectedVenture(null)}
+          variant="outline"
+          className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Dashboard
+        </Button>
+        <VentureDetailView
+          venture={selectedVenture}
+          isPublic={false}
+          onViewFounder={(founderId) => navigate(`/dashboard/profile/${founderId}`)}
+        />
       </div>
     );
   }
@@ -261,8 +330,12 @@ export function InvestorDashboardModule() {
                     key={venture.id}
                     className="flex items-start gap-4 p-4 rounded-xl glass-button hover:bg-[#76B947]/10 transition-all cursor-pointer border border-black/5"
                   >
-                    <div className="w-16 h-16 rounded-lg bg-[#76B947]/10 flex items-center justify-center flex-shrink-0">
-                      <Award className="h-8 w-8 text-[#76B947]" />
+                    <div className="w-16 h-16 rounded-lg bg-[#76B947]/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {venture.logo_url ? (
+                        <img src={venture.logo_url} alt={venture.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Award className="h-8 w-8 text-[#76B947]" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 mb-2">
@@ -301,7 +374,7 @@ export function InvestorDashboardModule() {
                           size="sm"
                           variant="outline"
                           className="text-xs border-[#76B947] text-[#76B947] hover:bg-[#76B947]/10"
-                          onClick={() => setSelectedVenture(venture)}
+                          onClick={() => handleViewVenture(venture)}
                         >
                           <Eye className="h-3 w-3 mr-1" />
                           View Details
@@ -452,12 +525,12 @@ export function InvestorDashboardModule() {
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm" style={{ fontFamily: 'var(--font-heading)' }}>Niche Specialist</span>
-                    <span className="text-sm text-purple-600" style={{ fontFamily: 'var(--font-heading)' }}>
-                      {nicheSpecialistCount}
+                    <span className="text-sm" style={{ fontFamily: 'var(--font-heading)' }}>Emerging</span>
+                    <span className="text-sm text-orange-600" style={{ fontFamily: 'var(--font-heading)' }}>
+                      {emergingCount}
                     </span>
                   </div>
-                  <Progress value={ventures.length > 0 ? (nicheSpecialistCount / ventures.length) * 100 : 0} className="h-2" />
+                  <Progress value={ventures.length > 0 ? (emergingCount / ventures.length) * 100 : 0} className="h-2" />
                 </div>
               </div>
             </CardContent>
@@ -483,16 +556,17 @@ export function InvestorDashboardModule() {
             <Tabs value={filterSector} onValueChange={setFilterSector}>
               <TabsList>
                 <TabsTrigger value="all">All Sectors</TabsTrigger>
-                {sectorDistribution.slice(0, 4).map(sector => (
-                  <TabsTrigger key={sector.name} value={sector.name}>{sector.name}</TabsTrigger>
+                {uniqueSectors.slice(0, 4).map(sector => (
+                  <TabsTrigger key={sector} value={sector}>{sector}</TabsTrigger>
                 ))}
               </TabsList>
             </Tabs>
             <Tabs value={filterBand} onValueChange={setFilterBand}>
               <TabsList>
-                <TabsTrigger value="all">All Bands</TabsTrigger>
-                <TabsTrigger value="growth-ready">Growth Ready</TabsTrigger>
-                <TabsTrigger value="high-potential">High Potential</TabsTrigger>
+                <TabsTrigger value="all">All Stages</TabsTrigger>
+                {uniqueStages.slice(0, 4).map(stage => (
+                  <TabsTrigger key={stage} value={stage}>{stage}</TabsTrigger>
+                ))}
               </TabsList>
             </Tabs>
             <Tabs value={viewType} onValueChange={(v) => setViewType(v as 'leaderboard' | 'grid')}>
@@ -553,6 +627,7 @@ export function InvestorDashboardModule() {
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-10 w-10">
+                            <AvatarImage src={venture.logo_url} alt={venture.name} />
                             <AvatarFallback className="bg-[#76B947]/20 text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>
                               {(venture.name || '??').substring(0, 2).toUpperCase()}
                             </AvatarFallback>
@@ -590,7 +665,7 @@ export function InvestorDashboardModule() {
                             variant="ghost"
                             size="sm"
                             className="hover:bg-[#76B947]/10"
-                            onClick={() => setSelectedVenture(venture)}
+                            onClick={() => handleViewVenture(venture)}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -659,10 +734,10 @@ export function InvestorDashboardModule() {
                       <Button 
                         size="sm" 
                         className="flex-1 bg-[#76B947] text-white hover:bg-[#5a8f35]" 
-                        onClick={() => setSelectedVenture(venture)}
+                        onClick={() => handleViewVenture(venture)}
                       >
                         <Eye className="mr-2 h-4 w-4" />
-                        View Details
+                        {loadingVenture ? 'Loading...' : 'View Details'}
                       </Button>
                     </div>
                   </div>
@@ -673,63 +748,6 @@ export function InvestorDashboardModule() {
         </div>
       )}
 
-      {/* Venture Detail Dialog */}
-      <Dialog open={selectedVenture !== null} onOpenChange={(open) => !open && setSelectedVenture(null)}>
-        <DialogContent className="max-w-4xl glass-card max-h-[90vh] overflow-y-auto">
-          {selectedVenture && (
-            <>
-              <DialogHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-4">
-                    <Avatar className="h-16 w-16">
-                      <AvatarFallback className="bg-[#76B947]/20 text-[#76B947] text-xl" style={{ fontFamily: 'var(--font-heading)' }}>
-                        {(selectedVenture.name || '??').substring(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <DialogTitle style={{ fontFamily: 'var(--font-heading)' }}>{selectedVenture.name}</DialogTitle>
-                      <DialogDescription style={{ fontFamily: 'var(--font-body)' }}>
-                        {selectedVenture.description || selectedVenture.tagline || 'No description available'}
-                      </DialogDescription>
-                      <div className="flex items-center space-x-2 mt-2">
-                        {selectedVenture.industry && (
-                          <Badge variant="outline" className="bg-black/5">{selectedVenture.industry}</Badge>
-                        )}
-                        {selectedVenture.stage && (
-                          <Badge variant="outline" className="bg-black/5">{selectedVenture.stage}</Badge>
-                        )}
-                        {getReadinessBand(selectedVenture.uruti_score || 0)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className={`text-4xl ${getScoreColor(selectedVenture.uruti_score || 0)}`} style={{ fontFamily: 'var(--font-heading)' }}>
-                    {selectedVenture.uruti_score || 'N/A'}
-                  </div>
-                </div>
-              </DialogHeader>
-
-              <div className="mt-6">
-                <p className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>
-                  {selectedVenture.description || 'No detailed information available'}
-                </p>
-              </div>
-
-              <div className="flex items-center space-x-2 mt-6 pt-6 border-t border-black/10">
-                <Button 
-                  className="flex-1 bg-[#76B947] text-white hover:bg-[#5a8f35]"
-                  onClick={() => {
-                    const isBookmarked = bookmarkedVentures.some(b => b.id === selectedVenture.id);
-                    toggleBookmark(selectedVenture.id);
-                  }}
-                >
-                  <Bookmark className={`mr-2 h-4 w-4 ${bookmarkedVentures.some(b => b.id === selectedVenture.id) ? 'fill-white' : ''}`} />
-                  {bookmarkedVentures.some(b => b.id === selectedVenture.id) ? 'Bookmarked' : 'Bookmark'}
-                </Button>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

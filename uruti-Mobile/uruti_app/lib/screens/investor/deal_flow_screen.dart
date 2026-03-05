@@ -173,15 +173,15 @@ class _DealFlowScreenState extends State<DealFlowScreen> {
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: context.colors.appBarBg,
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
+          icon: Icon(Icons.menu_rounded, color: Colors.white),
           onPressed: () => MainScaffold.scaffoldKey.currentState?.openDrawer(),
         ),
         title: Text(
           'Deal Flow',
           style: TextStyle(
-            color: context.colors.textPrimary,
+            color: Colors.white,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -189,14 +189,14 @@ class _DealFlowScreenState extends State<DealFlowScreen> {
           IconButton(
             icon: Icon(
               Icons.explore_outlined,
-              color: context.colors.textPrimary,
+              color: Colors.white,
             ),
             onPressed: () => context.go('/discovery'),
           ),
         ],
       ),
       body: RefreshIndicator(
-        color: AppColors.primary,
+        color: context.colors.accent,
         onRefresh: _load,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -206,7 +206,7 @@ class _DealFlowScreenState extends State<DealFlowScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: _searchCtrl,
-              style: TextStyle(color: context.colors.textPrimary),
+              style: TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Search bookmarked startups...',
                 hintStyle: TextStyle(color: context.colors.textMuted),
@@ -224,9 +224,9 @@ class _DealFlowScreenState extends State<DealFlowScreen> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: context.colors.cardBorder),
                 ),
-                focusedBorder: const OutlineInputBorder(
+                focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.all(Radius.circular(12)),
-                  borderSide: BorderSide(color: AppColors.primary),
+                  borderSide: BorderSide(color: context.colors.accent),
                 ),
               ),
             ),
@@ -242,16 +242,18 @@ class _DealFlowScreenState extends State<DealFlowScreen> {
                       label: Text(s),
                       selected: selected,
                       onSelected: (_) => setState(() => _stage = s),
-                      selectedColor: AppColors.primary.withValues(alpha: 0.16),
+                      selectedColor: context.colors.accent.withValues(
+                        alpha: 0.16,
+                      ),
                       backgroundColor: context.colors.surface,
                       side: BorderSide(
                         color: selected
-                            ? AppColors.primary
+                            ? context.colors.accent
                             : context.colors.cardBorder,
                       ),
                       labelStyle: TextStyle(
                         color: selected
-                            ? AppColors.primary
+                            ? context.colors.accent
                             : context.colors.textSecondary,
                         fontWeight: FontWeight.w600,
                       ),
@@ -262,10 +264,12 @@ class _DealFlowScreenState extends State<DealFlowScreen> {
             ),
             const SizedBox(height: 12),
             if (_loading)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(32),
                 child: Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
+                  child: CircularProgressIndicator(
+                    color: context.colors.accent,
+                  ),
                 ),
               )
             else if (_error != null)
@@ -312,7 +316,7 @@ class _DealFlowScreenState extends State<DealFlowScreen> {
         Text(
           value,
           style: TextStyle(
-            color: AppColors.primary,
+            color: context.colors.accent,
             fontWeight: FontWeight.w900,
             fontSize: 22,
           ),
@@ -354,8 +358,8 @@ class _DealFlowScreenState extends State<DealFlowScreen> {
               ),
               Text(
                 score,
-                style: const TextStyle(
-                  color: AppColors.primary,
+                style: TextStyle(
+                  color: context.colors.accent,
                   fontWeight: FontWeight.w900,
                   fontSize: 18,
                 ),
@@ -382,7 +386,7 @@ class _DealFlowScreenState extends State<DealFlowScreen> {
               _chip(industry, const Color(0xFF3B82F6)),
               _chip(stage, const Color(0xFFFFB800)),
               if (ask > 0)
-                _chip('Goal: ${ask.toStringAsFixed(0)}', AppColors.primary),
+                _chip('Goal: ${ask.toStringAsFixed(0)}', context.colors.accent),
             ],
           ),
           const SizedBox(height: 10),

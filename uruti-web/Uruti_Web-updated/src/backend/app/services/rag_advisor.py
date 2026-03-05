@@ -78,7 +78,8 @@ class RwandaRagAdvisor:
 
         self._tokenizer = None
         self._model = None
-        self._model_id = os.getenv("URUTI_BEST_MODEL_ID", "microsoft/Phi-3.5-mini-instruct")
+        self._default_model_id = os.getenv("URUTI_BEST_MODEL_ID", "microsoft/Phi-3.5-mini-instruct")
+        self._model_id = self._default_model_id
 
         self._load_base_knowledge_once()
 
@@ -472,14 +473,28 @@ class RwandaRagAdvisor:
         text = self._tokenizer.decode(generated, skip_special_tokens=True)
         return model_name, int(generated.shape[-1]), float(torch.cuda.memory_allocated() / (1024 * 1024)) if (torch and torch.cuda.is_available()) else 0.0
 
-    def advise(self, user_query: str, founder_profile: str, mode: str = "production") -> Dict[str, Any]:
+    def _resolve_model_id(self, selected_model: Optional[str]) -> str:
+        model_candidate = self.normalize_whitespace(selected_model or "")
+        if not model_candidate or model_candidate in {"uruti-ai", "default"}:
+            model_candidate = self._default_model_id
+
+        if model_candidate != self._model_id:
+            self._model_id = model_candidate
+            self._tokenizer = None
+            self._model = None
+            self.clear_gpu()
+
+        return self._model_id
+
+    def advise(self, user_query: str, founder_profile: str, mode: str = "production", selected_model: Optional[str] = None) -> Dict[str, Any]:
         clean_query = self.truncate_to_max_tokens(self.normalize_whitespace(user_query), max_tokens=512)
         clean_profile = self.normalize_whitespace(founder_profile or "")
 
         retrieved = self.retrieve(clean_query, top_k=3)
         prompt = self._build_prompt(clean_profile, retrieved, clean_query)
 
-        model_name = "rule-based-fallback"
+        active_model = self._resolve_model_id(selected_model)
+        model_name = active_model if mode == "production" else f"{active_model}-research"
         tokens_generated = 0
         memory_mb = 0.0
 

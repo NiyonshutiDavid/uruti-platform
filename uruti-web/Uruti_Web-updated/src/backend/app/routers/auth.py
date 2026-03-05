@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from datetime import timedelta, datetime, timezone
-from typing import Dict
+from typing import Dict, Optional
 from secrets import token_urlsafe
 from threading import Lock
+from pydantic import BaseModel
 from ..database import get_db
-from ..models import User
+from ..models import User, UserSession
 from ..schemas import (
     UserCreate,
     UserResponse,
@@ -17,11 +18,48 @@ from ..auth import (
     get_password_hash,
     authenticate_user,
     create_access_token,
+    get_current_user,
     get_current_active_user
 )
 from ..config import settings
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+class LoginRequestExt(BaseModel):
+    """Extended login request with optional device info for session tracking."""
+    email: str
+    password: str
+    device_id: Optional[str] = None
+    device_name: Optional[str] = None
+    platform: Optional[str] = None
+    os: Optional[str] = None
+
+
+def _create_session(
+    db: Session,
+    user_id: int,
+    *,
+    device_id: Optional[str] = None,
+    device_name: Optional[str] = None,
+    platform: Optional[str] = None,
+    os_name: Optional[str] = None,
+    ip_address: Optional[str] = None,
+) -> UserSession:
+    """Create a new user session record."""
+    session = UserSession(
+        user_id=user_id,
+        device_id=device_id,
+        device_name=device_name,
+        platform=platform,
+        os=os_name,
+        ip_address=ip_address,
+        is_active=True,
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return session
 
 
 class _QrLoginChallenge:
@@ -77,7 +115,7 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(login_data: LoginRequest, db: Session = Depends(get_db)):
+def login(login_data: LoginRequestExt, request: Request, db: Session = Depends(get_db)):
     """Login and get access token"""
     
     print(f"🔍 LOGIN ATTEMPT - Email: {login_data.email}, Password length: {len(login_data.password)}")
@@ -94,6 +132,19 @@ def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         )
     
     print(f"✅ LOGIN SUCCESS for {login_data.email}")
+
+    # Track login session
+    ip = request.client.host if request.client else None
+    _create_session(
+        db,
+        user.id,
+        device_id=login_data.device_id,
+        device_name=login_data.device_name,
+        platform=login_data.platform,
+        os_name=login_data.os,
+        ip_address=ip,
+    )
+
     # Create access token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
@@ -203,12 +254,126 @@ def qr_login_status(request_id: str, code: str, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserResponse)
-def get_current_user_info(current_user: User = Depends(get_current_active_user)):
-    """Get current authenticated user information"""
+def get_current_user_info(current_user: User = Depends(get_current_user)):
+    """Get current authenticated user information.
+
+    Uses get_current_user (not get_current_active_user) so that
+    deactivated accounts can still retrieve their profile and be
+    shown the dedicated deactivated-account screen.
+    """
     return current_user
 
 
 @router.post("/logout")
-def logout(current_user: User = Depends(get_current_active_user)):
+def logout(current_user: User = Depends(get_current_user)):
     """Logout current user (client should delete token)"""
     return {"message": "Successfully logged out"}
+
+
+# ──────────────────── SESSION MANAGEMENT ────────────────────
+
+@router.get("/sessions")
+def get_active_sessions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """List all active sessions (linked devices) for the current user."""
+    sessions = (
+        db.query(UserSession)
+        .filter(
+            UserSession.user_id == current_user.id,
+            UserSession.is_active == True,
+        )
+        .order_by(UserSession.last_active.desc())
+        .all()
+    )
+
+    return {
+        "sessions": [
+            {
+                "id": s.id,
+                "device_id": s.device_id,
+                "device_name": s.device_name,
+                "platform": s.platform,
+                "os": s.os,
+                "ip_address": s.ip_address,
+                "last_active": s.last_active.isoformat() if s.last_active else None,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+                "is_current": False,  # Client determines this via device_id match
+            }
+            for s in sessions
+        ]
+    }
+
+
+@router.delete("/sessions/{session_id}")
+def revoke_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Revoke (log out) a specific device session."""
+    session = db.query(UserSession).filter(UserSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    session.is_active = False
+    db.commit()
+    return {"message": "Session revoked"}
+
+
+class RegisterSessionPayload(BaseModel):
+    device_id: Optional[str] = None
+    device_name: Optional[str] = None
+    platform: Optional[str] = None
+    os: Optional[str] = None
+
+
+@router.post("/sessions/register")
+def register_session(
+    payload: RegisterSessionPayload,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Register/refresh a session for the current device.
+
+    Called after login or on app startup so sessions stay up-to-date even
+    for users who logged in before session tracking was added.
+    """
+    ip = request.client.host if request.client else None
+
+    # If a device_id is provided, update an existing active session rather
+    # than creating a duplicate.
+    if payload.device_id:
+        existing = (
+            db.query(UserSession)
+            .filter(
+                UserSession.user_id == current_user.id,
+                UserSession.device_id == payload.device_id,
+                UserSession.is_active == True,
+            )
+            .first()
+        )
+        if existing:
+            existing.device_name = payload.device_name or existing.device_name
+            existing.platform = payload.platform or existing.platform
+            existing.os = payload.os or existing.os
+            existing.ip_address = ip or existing.ip_address
+            existing.last_active = datetime.now(timezone.utc)
+            db.commit()
+            db.refresh(existing)
+            return {"status": "updated", "session_id": existing.id}
+
+    session = _create_session(
+        db,
+        current_user.id,
+        device_id=payload.device_id,
+        device_name=payload.device_name,
+        platform=payload.platform,
+        os_name=payload.os,
+        ip_address=ip,
+    )
+    return {"status": "created", "session_id": session.id}

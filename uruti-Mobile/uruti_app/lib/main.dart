@@ -1,10 +1,10 @@
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, NetworkInterface, InternetAddressType;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'core/app_constants.dart';
 import 'core/app_theme.dart';
 import 'core/app_router.dart';
@@ -13,6 +13,7 @@ import 'providers/auth_provider.dart';
 import 'providers/call_provider.dart';
 import 'providers/connectivity_provider.dart';
 import 'providers/theme_provider.dart';
+import 'services/message_notification_handler.dart';
 import 'services/notification_service.dart';
 import 'screens/no_internet_screen.dart';
 import 'widgets/call_overlay_host.dart';
@@ -25,7 +26,28 @@ const String? kBackendUrlOverride =
     null; // e.g. 'http://192.168.1.100:8000' or 'https://api.uruti.rw'
 // ─────────────────────────────────────────────────────────────────────────────
 
-String _resolveBackendUrl() {
+/// Gets the host machine's local network IP by querying network interfaces.
+/// Returns null if we can't determine it.
+Future<String?> _getHostMachineIp() async {
+  try {
+    final interfaces = await NetworkInterface.list(
+      type: InternetAddressType.IPv4,
+      includeLoopback: false,
+    );
+    for (final iface in interfaces) {
+      for (final addr in iface.addresses) {
+        final ip = addr.address;
+        // Skip loopback and link-local
+        if (!ip.startsWith('127.') && !ip.startsWith('169.254.')) {
+          return ip;
+        }
+      }
+    }
+  } catch (_) {}
+  return null;
+}
+
+Future<String> _resolveBackendUrl() async {
   if (kBackendUrlOverride != null && kBackendUrlOverride!.trim().isNotEmpty) {
     return kBackendUrlOverride!.trim();
   }
@@ -35,15 +57,44 @@ String _resolveBackendUrl() {
   }
 
   if (Platform.isAndroid) {
-    return 'http://10.0.2.2:8000';
+    // For physical devices we need the computer's actual LAN IP.
+    // For emulators, 10.0.2.2 is the host machine alias.
+    // We detect physical device by checking if we can find a LAN IP
+    // on the device — physical devices have Wi-Fi IPs, emulators have
+    // 10.0.2.x IPs.
+    final deviceIp = await _getHostMachineIp();
+    final isEmulator =
+        deviceIp != null &&
+        (deviceIp.startsWith('10.0.2.') || deviceIp.startsWith('10.0.3.'));
+
+    if (isEmulator) {
+      return 'http://10.0.2.2:8000';
+    }
+
+    // Physical device — need the Mac's IP on the same network.
+    // Try common development machine discovery, or fall back to
+    // the hardcoded IP detected at build time.
+    // You can always override with kBackendUrlOverride above.
+    if (kDebugMode) {
+      debugPrint('📱 Physical Android device detected (IP: $deviceIp)');
+      debugPrint('📡 Trying to reach backend on local network...');
+    }
+    // Use the device's gateway subnet to guess the host machine.
+    // Most reliable: specify kBackendUrlOverride in main.dart.
+    // Fallback: use the current Mac IP detected during development.
+    return 'http://10.110.13.242:8000';
   }
 
+  // iOS simulator
   return 'http://127.0.0.1:8000';
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  AppConstants.configure(_resolveBackendUrl()); // ← single source of truth
+  AppConstants.configure(await _resolveBackendUrl());
+  if (kDebugMode) {
+    debugPrint('🌐 Backend URL: ${AppConstants.apiBaseUrl}');
+  }
   await NotificationService.instance.initialize();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(
@@ -54,6 +105,7 @@ void main() async {
   await authProvider.init();
   if (authProvider.isAuthenticated) {
     await NotificationService.instance.syncTokenWithBackend();
+    MessageNotificationHandler.instance.start(authProvider);
   }
 
   runApp(UrutiApp(authProvider: authProvider));

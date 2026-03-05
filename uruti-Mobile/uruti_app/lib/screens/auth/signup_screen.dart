@@ -268,7 +268,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         Icons.arrow_back_ios_new_rounded,
                         size: 20,
                       ),
-                      color: AppColors.primary,
+                      color: context.colors.accent,
                       onPressed: _isSubmitting ? null : _handleBack,
                     )
                   else
@@ -281,7 +281,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       shape: BoxShape.circle,
                       color: context.colors.darkGreenMid,
                       border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.4),
+                        color: context.colors.accent.withValues(alpha: 0.4),
                         width: 1.5,
                       ),
                     ),
@@ -300,7 +300,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     child: Text(
                       'Sign In',
                       style: TextStyle(
-                        color: AppColors.primary,
+                        color: context.colors.accent,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -398,8 +398,8 @@ class _SignupScreenState extends State<SignupScreen> {
                             ? null
                             : () => _handleSubmit(skipProfile: true),
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: AppColors.primary),
-                          foregroundColor: AppColors.primary,
+                          side: BorderSide(color: context.colors.accent),
+                          foregroundColor: context.colors.accent,
                           minimumSize: const Size.fromHeight(50),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -485,7 +485,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
         _RoleCard(
           icon: Icons.monetization_on_rounded,
-          iconColor: AppColors.primary,
+          iconColor: context.colors.accent,
           iconBg: const Color(0xFFE8F5E9),
           title: 'Investor / VC',
           subtitle:
@@ -509,7 +509,7 @@ class _SignupScreenState extends State<SignupScreen> {
               child: Text(
                 'Sign In',
                 style: TextStyle(
-                  color: AppColors.primary,
+                  color: context.colors.accent,
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
                 ),
@@ -791,12 +791,12 @@ class _StepIndicator extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: (done || active)
-                          ? AppColors.primary
+                          ? context.colors.accent
                           : Colors.grey.shade300,
                       boxShadow: active
                           ? [
                               BoxShadow(
-                                color: AppColors.primary.withValues(
+                                color: context.colors.accent.withValues(
                                   alpha: 0.35,
                                 ),
                                 blurRadius: 8,
@@ -831,7 +831,7 @@ class _StepIndicator extends StatelessWidget {
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         decoration: BoxDecoration(
                           color: currentStep > step
-                              ? AppColors.primary
+                              ? context.colors.accent
                               : Colors.grey.shade300,
                           borderRadius: BorderRadius.circular(2),
                         ),
@@ -963,7 +963,7 @@ class _RoleCard extends StatelessWidget {
             Icon(
               Icons.arrow_forward_ios_rounded,
               size: 16,
-              color: AppColors.primary,
+              color: context.colors.accent,
             ),
           ],
         ),
@@ -996,7 +996,7 @@ class _Field extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 16, color: AppColors.primary),
+            Icon(icon, size: 16, color: context.colors.accent),
             const SizedBox(width: 6),
             Text(
               label,
@@ -1036,7 +1036,7 @@ class _Field extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+              borderSide: BorderSide(color: context.colors.accent, width: 1.5),
             ),
           ),
         ),
@@ -1070,7 +1070,7 @@ class _PasswordField extends StatelessWidget {
             Icon(
               Icons.lock_outline_rounded,
               size: 16,
-              color: AppColors.primary,
+              color: context.colors.accent,
             ),
             const SizedBox(width: 6),
             Text(
@@ -1118,7 +1118,7 @@ class _PasswordField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+              borderSide: BorderSide(color: context.colors.accent, width: 1.5),
             ),
           ),
         ),
@@ -1177,7 +1177,7 @@ class _DropdownField<T> extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+              borderSide: BorderSide(color: context.colors.accent, width: 1.5),
             ),
           ),
           hint: Text(
@@ -1214,9 +1214,9 @@ class _PrimaryButton extends StatelessWidget {
         style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
       ),
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
+        backgroundColor: context.colors.accent,
         foregroundColor: Colors.white,
-        disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
+        disabledBackgroundColor: context.colors.accent.withValues(alpha: 0.5),
         minimumSize: const Size.fromHeight(52),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         elevation: 2,

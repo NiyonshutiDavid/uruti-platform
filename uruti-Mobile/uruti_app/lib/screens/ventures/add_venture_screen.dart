@@ -57,6 +57,7 @@ class _AddVentureScreenState extends State<AddVentureScreen>
   final _milestonesCtrl = TextEditingController();
   final _fundingPlansCtrl = TextEditingController();
   final _modelCtrl = TextEditingController();
+  final _pitchDeckUrlCtrl = TextEditingController();
   final _iconLogoUrlCtrl = TextEditingController();
   final _landscapeLogoUrlCtrl = TextEditingController();
 
@@ -78,6 +79,11 @@ class _AddVentureScreenState extends State<AddVentureScreen>
   bool get _isEdit => widget.initialVenture != null;
   int? get _ventureId => (widget.initialVenture?['id'] as num?)?.toInt();
 
+  String _textOf(dynamic value) {
+    if (value == null) return '';
+    return value.toString().trim();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -93,31 +99,28 @@ class _AddVentureScreenState extends State<AddVentureScreen>
 
     final initial = widget.initialVenture;
     if (initial != null) {
-      _nameCtrl.text = (initial['name'] as String? ?? '').trim();
-      _taglineCtrl.text = (initial['tagline'] as String? ?? '').trim();
-      _descCtrl.text = (initial['description'] as String? ?? '').trim();
-      _problemCtrl.text = (initial['problem_statement'] as String? ?? '')
-          .trim();
-      _solutionCtrl.text = (initial['solution'] as String? ?? '').trim();
-      _competitiveEdgeCtrl.text = (initial['business_model'] as String? ?? '')
-          .trim();
-      _marketCtrl.text = (initial['target_market'] as String? ?? '').trim();
-      _teamSizeCtrl.text = (initial['team_size'] as String? ?? '').trim();
-      _teamBackgroundCtrl.text = (initial['team_background'] as String? ?? '')
-          .trim();
-      _highlightsCtrl.text = (initial['key_highlights'] as String? ?? '')
-          .trim();
-      _milestonesCtrl.text = (initial['milestones'] as String? ?? '').trim();
-      _fundingPlansCtrl.text = (initial['funding_plans'] as String? ?? '')
-          .trim();
-      _modelCtrl.text = (initial['business_model'] as String? ?? '').trim();
-      _iconLogoUrlCtrl.text = (initial['logo_url'] as String? ?? '').trim();
-      _landscapeLogoUrlCtrl.text = (initial['banner_url'] as String? ?? '')
-          .trim();
-      _stage = (initial['stage'] as String? ?? 'ideation');
-      _industry = (initial['industry'] as String?)?.trim().isEmpty == true
+      _nameCtrl.text = _textOf(initial['name']);
+      _taglineCtrl.text = _textOf(initial['tagline']);
+      _descCtrl.text = _textOf(initial['description']);
+      _problemCtrl.text = _textOf(initial['problem_statement']);
+      _solutionCtrl.text = _textOf(initial['solution']);
+      _competitiveEdgeCtrl.text = _textOf(initial['business_model']);
+      _marketCtrl.text = _textOf(initial['target_market']);
+      _teamSizeCtrl.text = _textOf(initial['team_size']);
+      _teamBackgroundCtrl.text = _textOf(initial['team_background']);
+      _highlightsCtrl.text = _textOf(initial['key_highlights']);
+      _milestonesCtrl.text = _textOf(initial['milestones']);
+      _fundingPlansCtrl.text = _textOf(initial['funding_plans']);
+      _modelCtrl.text = _textOf(initial['business_model']);
+      _pitchDeckUrlCtrl.text = _textOf(initial['pitch_deck_url']);
+      _iconLogoUrlCtrl.text = _textOf(initial['logo_url']);
+      _landscapeLogoUrlCtrl.text = _textOf(initial['banner_url']);
+      _stage = _textOf(initial['stage']).isEmpty
+          ? 'ideation'
+          : _textOf(initial['stage']);
+      _industry = _textOf(initial['industry']).isEmpty
           ? null
-          : (initial['industry'] as String?);
+          : _textOf(initial['industry']);
     }
   }
 
@@ -139,6 +142,7 @@ class _AddVentureScreenState extends State<AddVentureScreen>
       _milestonesCtrl,
       _fundingPlansCtrl,
       _modelCtrl,
+      _pitchDeckUrlCtrl,
       _iconLogoUrlCtrl,
       _landscapeLogoUrlCtrl,
     ]) {
@@ -249,6 +253,9 @@ class _AddVentureScreenState extends State<AddVentureScreen>
         'business_model': mergedBusinessModel.isEmpty
             ? null
             : mergedBusinessModel,
+        'pitch_deck_url': _pitchDeckUrlCtrl.text.trim().isEmpty
+            ? null
+            : _pitchDeckUrlCtrl.text.trim(),
         'logo_url': _iconLogoUrlCtrl.text.trim().isEmpty
             ? null
             : _iconLogoUrlCtrl.text.trim(),
@@ -312,12 +319,12 @@ class _AddVentureScreenState extends State<AddVentureScreen>
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.15),
+                color: context.colors.accent.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.check_rounded,
-                color: AppColors.primary,
+                color: context.colors.accent,
                 size: 36,
               ),
             ),
@@ -347,7 +354,7 @@ class _AddVentureScreenState extends State<AddVentureScreen>
         actions: [
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: context.colors.accent,
               foregroundColor: Colors.white,
               minimumSize: const Size(160, 44),
               shape: RoundedRectangleBorder(
@@ -370,16 +377,16 @@ class _AddVentureScreenState extends State<AddVentureScreen>
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: context.colors.appBarBg,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.close, color: context.colors.textPrimary),
+          icon: Icon(Icons.close, color: Colors.white),
           onPressed: () => context.pop(),
         ),
         title: Text(
           _isEdit ? 'Edit Venture' : 'Add Venture',
           style: TextStyle(
-            color: context.colors.textPrimary,
+            color: Colors.white,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -450,6 +457,7 @@ class _AddVentureScreenState extends State<AddVentureScreen>
                   milestonesCtrl: _milestonesCtrl,
                   fundingPlansCtrl: _fundingPlansCtrl,
                   modelCtrl: _modelCtrl,
+                  pitchDeckUrlCtrl: _pitchDeckUrlCtrl,
                   descCtrl: _descCtrl,
                 ),
               ],
@@ -489,7 +497,7 @@ class _ProgressBar extends StatelessWidget {
       builder: (_, __) => LinearProgressIndicator(
         value: (step + 1) / 4,
         backgroundColor: context.colors.divider,
-        valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+        valueColor: AlwaysStoppedAnimation(context.colors.accent),
         minHeight: 3,
       ),
     );
@@ -516,7 +524,7 @@ class _StepLabel extends StatelessWidget {
           height: 20,
           decoration: BoxDecoration(
             color: isDone || isActive
-                ? AppColors.primary
+                ? context.colors.accent
                 : context.colors.divider,
             shape: BoxShape.circle,
           ),
@@ -828,12 +836,14 @@ class _Step3 extends StatelessWidget {
   final TextEditingController milestonesCtrl;
   final TextEditingController fundingPlansCtrl;
   final TextEditingController modelCtrl;
+  final TextEditingController pitchDeckUrlCtrl;
   final TextEditingController descCtrl;
 
   const _Step3({
     required this.milestonesCtrl,
     required this.fundingPlansCtrl,
     required this.modelCtrl,
+    required this.pitchDeckUrlCtrl,
     required this.descCtrl,
   });
 
@@ -871,6 +881,14 @@ class _Step3 extends StatelessWidget {
             maxLines: 3,
           ),
           const SizedBox(height: 20),
+          _SectionTitle('Pitch Deck Link (optional)'),
+          const SizedBox(height: 12),
+          _Field(
+            controller: pitchDeckUrlCtrl,
+            label: 'Pitch Deck URL',
+            hint: 'https://drive.google.com/... or public slide link',
+          ),
+          const SizedBox(height: 20),
           _SectionTitle('Overview (optional)'),
           const SizedBox(height: 12),
           _Field(
@@ -883,17 +901,17 @@ class _Step3 extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.06),
+              color: context.colors.accent.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.2),
+                color: context.colors.accent.withValues(alpha: 0.2),
               ),
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.info_outline_rounded,
-                  color: AppColors.primary,
+                  color: context.colors.accent,
                   size: 20,
                 ),
                 const SizedBox(width: 12),
@@ -970,7 +988,7 @@ class _NavBar extends StatelessWidget {
                     ? onNext
                     : onSubmit,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: context.colors.accent,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
@@ -1067,7 +1085,7 @@ class _Field extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          borderSide: BorderSide(color: context.colors.accent, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -1179,11 +1197,11 @@ class _IndustryTile extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         decoration: BoxDecoration(
           color: selected
-              ? AppColors.primary.withValues(alpha: 0.12)
+              ? context.colors.accent.withValues(alpha: 0.12)
               : context.colors.card,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: selected ? AppColors.primary : context.colors.divider,
+            color: selected ? context.colors.accent : context.colors.divider,
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -1193,7 +1211,7 @@ class _IndustryTile extends StatelessWidget {
             Icon(
               icon,
               color: selected
-                  ? AppColors.primary
+                  ? context.colors.accent
                   : context.colors.textSecondary,
               size: 22,
             ),
@@ -1203,7 +1221,7 @@ class _IndustryTile extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: selected
-                    ? AppColors.primary
+                    ? context.colors.accent
                     : context.colors.textSecondary,
                 fontSize: 11,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
@@ -1238,11 +1256,11 @@ class _StageTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: selected
-              ? AppColors.primary.withValues(alpha: 0.07)
+              ? context.colors.accent.withValues(alpha: 0.07)
               : context.colors.card,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: selected ? AppColors.primary : context.colors.divider,
+            color: selected ? context.colors.accent : context.colors.divider,
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -1254,7 +1272,9 @@ class _StageTile extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: selected ? AppColors.primary : context.colors.divider,
+                  color: selected
+                      ? context.colors.accent
+                      : context.colors.divider,
                   width: 2,
                 ),
               ),
@@ -1263,8 +1283,8 @@ class _StageTile extends StatelessWidget {
                       child: Container(
                         width: 8,
                         height: 8,
-                        decoration: const BoxDecoration(
-                          color: AppColors.primary,
+                        decoration: BoxDecoration(
+                          color: context.colors.accent,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -1280,7 +1300,7 @@ class _StageTile extends StatelessWidget {
                     label,
                     style: TextStyle(
                       color: selected
-                          ? AppColors.primary
+                          ? context.colors.accent
                           : context.colors.textPrimary,
                       fontWeight: FontWeight.w600,
                       fontSize: 14,

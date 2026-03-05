@@ -41,6 +41,12 @@ android {
     }
 }
 
+// Suppress deprecation warnings from third-party plugin Java sources
+// (e.g. flutter_webrtc SurfaceTextureRenderer.onSurfaceDestroyed)
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.addAll(listOf("-Xlint:-deprecation", "-Xlint:-removal"))
+}
+
 flutter {
     source = "../.."
 }

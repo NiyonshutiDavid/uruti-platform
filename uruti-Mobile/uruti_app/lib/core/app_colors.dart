@@ -18,6 +18,7 @@ class ThemeColors {
   final Color shimmerBase;
   final Color shimmerHighlight;
   final Color textOnPrimary;
+  final Color appBarBg;
 
   const ThemeColors({
     required this.background,
@@ -34,11 +35,13 @@ class ThemeColors {
     required this.shimmerBase,
     required this.shimmerHighlight,
     required this.textOnPrimary,
+    required this.appBarBg,
   });
 
   // Convenience aliases used by screens
   Color get cardBackground => card;
   Color get surfaceBackground => surface;
+  Color get accent => AppColors.primary;
 
   static const ThemeColors dark = ThemeColors(
     background: Color(0xFF000000),
@@ -55,6 +58,7 @@ class ThemeColors {
     shimmerBase: Color(0xFF1E1E1E),
     shimmerHighlight: Color(0xFF2A2A2A),
     textOnPrimary: Color(0xFF000000),
+    appBarBg: Color(0xFF000000),
   );
 
   static const ThemeColors light = ThemeColors(
@@ -68,10 +72,11 @@ class ThemeColors {
     textMuted: Color(0xFF8A9487),
     divider: Color(0xFFE0E4DF),
     navInactive: Color(0xFF9BA89A),
-    darkGreenMid: Color(0xFFD8EDCC),
+    darkGreenMid: Color(0xFF1A3A1A),
     shimmerBase: Color(0xFFE8EBE7),
     shimmerHighlight: Color(0xFFF0F2EF),
     textOnPrimary: Color(0xFFFFFFFF),
+    appBarBg: Color(0xFF1A3A0A),
   );
 }
 
@@ -84,6 +89,7 @@ class AppColors {
   static const Color primaryDark = Color(0xFF5A9235);
   static const Color primaryLight = Color(0xFF9FD16E);
   static const Color darkGreen = Color(0xFF0D2410);
+  static const Color purple = Color(0xFF7C4DFF);
 
   // Semantic
   static const Color success = Color(0xFF76B947);

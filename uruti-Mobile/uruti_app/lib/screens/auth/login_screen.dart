@@ -53,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       shape: BoxShape.circle,
                       color: context.colors.darkGreenMid,
                       border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.4),
+                        color: context.colors.accent.withValues(alpha: 0.4),
                         width: 1.5,
                       ),
                     ),
@@ -123,19 +123,32 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: GestureDetector(
-                    onTap: () => context.push('/forgot-password'),
-                    child: Text(
-                      'Forgot password?',
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    GestureDetector(
+                      onTap: () => context.push('/qr-login'),
+                      child: Text(
+                        'Use another device',
+                        style: TextStyle(
+                          color: context.colors.accent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
+                    GestureDetector(
+                      onTap: () => context.push('/forgot-password'),
+                      child: Text(
+                        'Forgot password?',
+                        style: TextStyle(
+                          color: context.colors.accent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 28),
 
@@ -178,7 +191,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: ElevatedButton(
                     onPressed: auth.isLoading ? null : _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: context.colors.accent,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -219,7 +232,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Text(
                         'Sign Up',
                         style: TextStyle(
-                          color: AppColors.primary,
+                          color: context.colors.accent,
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                         ),
@@ -276,7 +289,7 @@ class _LoginScreenState extends State<LoginScreen> {
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+      borderSide: BorderSide(color: context.colors.accent, width: 1.5),
     ),
     errorBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),

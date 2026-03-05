@@ -1,12 +1,45 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/app_constants.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import '../services/message_notification_handler.dart';
 import '../services/notification_service.dart';
 
 enum AuthStatus { initial, loading, authenticated, unauthenticated }
+
+/// Helper to collect device info for session tracking.
+Future<Map<String, String>> _getDeviceInfo() async {
+  final info = DeviceInfoPlugin();
+  String? deviceId;
+  String? deviceName;
+  String platform = 'unknown';
+  String? osName;
+  try {
+    if (Platform.isAndroid) {
+      final a = await info.androidInfo;
+      deviceId = a.id;
+      deviceName = '${a.brand} ${a.model}';
+      platform = 'android';
+      osName = 'Android ${a.version.release}';
+    } else if (Platform.isIOS) {
+      final i = await info.iosInfo;
+      deviceId = i.identifierForVendor;
+      deviceName = i.utsname.machine;
+      platform = 'ios';
+      osName = '${i.systemName} ${i.systemVersion}';
+    }
+  } catch (_) {}
+  return {
+    if (deviceId != null) 'device_id': deviceId,
+    if (deviceName != null) 'device_name': deviceName,
+    'platform': platform,
+    if (osName != null) 'os': osName,
+  };
+}
 
 class AuthProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
@@ -41,7 +74,17 @@ class AuthProvider extends ChangeNotifier {
         _user = await _api.getCurrentUser();
         _status = AuthStatus.authenticated;
         await _saveUser(_user!);
-        await NotificationService.instance.syncTokenWithBackend();
+        if (_user!.isActive) {
+          await NotificationService.instance.syncTokenWithBackend();
+          // Register/refresh device session for linked-device tracking
+          final devInfo = await _getDeviceInfo();
+          await _api.registerSession(
+            deviceId: devInfo['device_id'],
+            deviceName: devInfo['device_name'],
+            platform: devInfo['platform'],
+            os: devInfo['os'],
+          );
+        }
       } catch (_) {
         await _clearSession();
       }
@@ -57,7 +100,15 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _api.login(email, password);
+      final devInfo = await _getDeviceInfo();
+      final response = await _api.login(
+        email,
+        password,
+        deviceId: devInfo['device_id'],
+        deviceName: devInfo['device_name'],
+        platform: devInfo['platform'],
+        os: devInfo['os'],
+      );
       final token = response['access_token'] as String;
 
       final prefs = await SharedPreferences.getInstance();
@@ -67,7 +118,14 @@ class AuthProvider extends ChangeNotifier {
 
       _user = await _api.getCurrentUser();
       await _saveUser(_user!);
-      await NotificationService.instance.syncTokenWithBackend();
+
+      // Only sync push token for active accounts
+      if (_user!.isActive) {
+        await NotificationService.instance.syncTokenWithBackend();
+      }
+
+      // Start listening for message notifications at OS level
+      MessageNotificationHandler.instance.start(this);
 
       _status = AuthStatus.authenticated;
       notifyListeners();
@@ -118,6 +176,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    MessageNotificationHandler.instance.stop();
     try {
       await NotificationService.instance.unregisterCurrentToken();
     } catch (_) {}

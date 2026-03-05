@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useConfirmDialog } from '../ui/confirm-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -9,7 +11,6 @@ import {
   Search, 
   TrendingUp, 
   Users, 
-  DollarSign,
   MapPin,
   Award,
   Eye,
@@ -22,6 +23,8 @@ import { apiClient } from '../../lib/api-client';
 import { toast } from 'sonner';
 
 export function DealFlowModule() {
+  const { confirm } = useConfirmDialog();
+  const navigate = useNavigate();
   const [ventures, setVentures] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSector, setFilterSector] = useState('all');
@@ -49,8 +52,44 @@ export function DealFlowModule() {
     }
   };
 
-  const handleViewVenture = (venture: any) => {
-    setSelectedVenture(venture);
+  const handleViewVenture = async (venture: any) => {
+    try {
+      // Fetch full venture details from backend
+      const fullVenture = await apiClient.getVentureById(venture.id);
+
+      // Map snake_case API response to camelCase for VentureDetailView
+      const mapped = {
+        id: String(fullVenture.id),
+        name: fullVenture.name || '',
+        sector: fullVenture.industry || '',
+        tagline: fullVenture.tagline || '',
+        problem: fullVenture.problem_statement || '',
+        solution: fullVenture.solution || '',
+        targetMarket: fullVenture.target_market || '',
+        urutiScore: fullVenture.uruti_score || 0,
+        activeUsers: fullVenture.customers || 0,
+        monthlyGrowth: fullVenture.mrr ? Math.round((fullVenture.mrr / Math.max(fullVenture.monthly_burn_rate || 1, 1)) * 100) : 0,
+        highlights: fullVenture.highlights || [],
+        teamBackground: fullVenture.team_background || '',
+        competitiveEdge: fullVenture.competitive_edge || '',
+        fundingPlans: fullVenture.funding_plans || '',
+        milestones: fullVenture.milestones || [],
+        activities: fullVenture.activities || [],
+        pitchDeckUrl: fullVenture.pitch_deck_url || '',
+        pitchVideoUrl: fullVenture.demo_video_url || '',
+        thumbnailUrl: fullVenture.banner_url || '',
+        fundingGoal: fullVenture.funding_goal || 0,
+        fundingRaised: fullVenture.funding_raised || 0,
+        teamSize: fullVenture.team_size || 1,
+        stage: fullVenture.stage || '',
+        founderId: fullVenture.founder_id || 0,
+      };
+
+      setSelectedVenture(mapped);
+    } catch (error) {
+      console.error('Failed to load venture details:', error);
+      toast.error('Failed to load venture details');
+    }
   };
 
   const handleBackToList = () => {
@@ -89,8 +128,8 @@ export function DealFlowModule() {
   };
 
   const filteredVentures = ventures.filter(venture => {
-    const matchesSearch = venture.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         venture.tagline.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (venture.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (venture.tagline || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSector = filterSector === 'all' || venture.sector === filterSector;
     const matchesStage = filterStage === 'all' || venture.stage === filterStage;
     return matchesSearch && matchesSector && matchesStage && venture.bookmarked;
@@ -111,7 +150,11 @@ export function DealFlowModule() {
         </Button>
 
         {/* Venture Detail View */}
-        <VentureDetailView venture={selectedVenture} isPublic={false} />
+        <VentureDetailView
+          venture={selectedVenture}
+          isPublic={false}
+          onViewFounder={(founderId) => navigate(`/dashboard/profile/${founderId}`)}
+        />
       </div>
     );
   }
@@ -137,7 +180,7 @@ export function DealFlowModule() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="glass-card border-black/5 dark:border-white/10">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -162,7 +205,7 @@ export function DealFlowModule() {
                   Avg Uruti Score
                 </p>
                 <p className="text-3xl mt-1 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                  {Math.round(ventures.reduce((acc, v) => acc + v.urutiScore, 0) / ventures.length)}
+                  {ventures.length > 0 ? Math.round(ventures.reduce((acc, v) => acc + (v.urutiScore || v.uruti_score || 0), 0) / ventures.length) : 0}
                 </p>
               </div>
               <Award className="h-8 w-8 text-[#76B947]" />
@@ -178,7 +221,7 @@ export function DealFlowModule() {
                   Total Users
                 </p>
                 <p className="text-3xl mt-1 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                  {(ventures.reduce((acc, v) => acc + v.activeUsers, 0) / 1000).toFixed(0)}K
+                  {(ventures.reduce((acc, v) => acc + (v.activeUsers || 0), 0) / 1000).toFixed(0)}K
                 </p>
               </div>
               <Users className="h-8 w-8 text-[#76B947]" />
@@ -186,21 +229,6 @@ export function DealFlowModule() {
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-black/5 dark:border-white/10">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                  Total Funding
-                </p>
-                <p className="text-3xl mt-1 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                  $900K
-                </p>
-              </div>
-              <DollarSign className="h-8 w-8 text-[#76B947]" />
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Filters */}
@@ -263,9 +291,9 @@ export function DealFlowModule() {
             >
               {/* Thumbnail */}
               <div className="relative h-48 bg-gray-200 dark:bg-gray-800 overflow-hidden">
-                {venture.thumbnailUrl || venture.thumbnail_url ? (
+                {venture.logo_url || venture.banner_url ? (
                   <img 
-                    src={venture.thumbnailUrl || venture.thumbnail_url} 
+                    src={venture.banner_url || venture.logo_url} 
                     alt={venture.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
@@ -349,7 +377,12 @@ export function DealFlowModule() {
                     <Button
                       onClick={async (e) => {
                         e.stopPropagation();
-                        const confirmed = window.confirm('Remove this startup from deal flow bookmarks?');
+                        const confirmed = await confirm({
+                          title: 'Remove from Deal Flow',
+                          description: 'Remove this startup from your deal flow bookmarks? You can always bookmark it again later.',
+                          confirmLabel: 'Remove',
+                          variant: 'danger',
+                        });
                         if (!confirmed) return;
 
                         try {

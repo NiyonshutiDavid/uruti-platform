@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
-import { Mic, MicOff, Video, VideoOff, MonitorUp, StopCircle, Play, Pause, Volume2, Settings, AlertCircle, Check, AlertTriangle, Info } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, Upload, StopCircle, Play, Pause, Volume2, Settings, AlertCircle, Check, AlertTriangle, Info, FileText, ChevronLeft, ChevronRight, X, Maximize, Minimize } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Label } from '../ui/label';
@@ -19,7 +19,10 @@ export function PitchCoachModule() {
   const [isPaused, setIsPaused] = useState(false);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isVideoOn, setIsVideoOn] = useState(false);
-  const [isPresenting, setIsPresenting] = useState(false);
+  const [deckFile, setDeckFile] = useState<File | null>(null);
+  const [deckUrl, setDeckUrl] = useState<string | null>(null);
+  const [deckFileName, setDeckFileName] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [aiListening, setAiListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,9 +45,8 @@ export function PitchCoachModule() {
   const [micSensitivity, setMicSensitivity] = useState([100]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const screenRef = useRef<HTMLVideoElement>(null);
+  const deckInputRef = useRef<HTMLInputElement>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
-  const screenStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -88,7 +90,7 @@ export function PitchCoachModule() {
   useEffect(() => {
     return () => {
       stopCamera();
-      stopScreenShare();
+      if (deckUrl) URL.revokeObjectURL(deckUrl);
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
@@ -128,10 +130,17 @@ export function PitchCoachModule() {
 
       cameraStreamRef.current = stream;
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+          // Debug log
+          console.log('[DEBUG] videoRef.current set:', videoRef.current);
+          console.log('[DEBUG] videoRef.current.srcObject:', videoRef.current.srcObject);
+        } else {
+          console.warn('[DEBUG] videoRef.current is null when setting srcObject');
+        }
+      }, 100);
 
       setIsVideoOn(true);
     } catch (err: any) {
@@ -184,70 +193,26 @@ export function PitchCoachModule() {
     }
   };
 
-  const startScreenShare = async () => {
-    try {
-      setError(null);
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        },
-        audio: false
-      });
-
-      screenStreamRef.current = stream;
-
-      // Handle when user stops sharing via browser UI
-      stream.getVideoTracks()[0].addEventListener('ended', () => {
-        stopScreenShare();
-      });
-
-      if (screenRef.current) {
-        screenRef.current.srcObject = stream;
-        screenRef.current.play();
-      }
-
-      setIsPresenting(true);
-      
-      // Auto-start camera for picture-in-picture view
-      if (!isVideoOn) {
-        await startCamera();
-      }
-    } catch (err: any) {
-      console.error('Error sharing screen:', err);
-      
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setError('Screen sharing was cancelled or denied. Click "Present" to try again.');
-      } else if (err.message && err.message.includes('disallowed by permissions policy')) {
-        setError('Screen sharing requires HTTPS or localhost. Please ensure you\'re using a secure connection.');
-      } else {
-        setError('Unable to share screen. Please check browser permissions and try again.');
-      }
-      
-      setIsPresenting(false);
+  const handleDeckUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    const url = URL.createObjectURL(file);
+    setDeckFile(file);
+    setDeckUrl(url);
+    setDeckFileName(file.name);
+    // Auto-start camera for picture-in-picture view
+    if (!isVideoOn) {
+      startCamera();
     }
-  };
+  }, [isVideoOn]);
 
-  const stopScreenShare = () => {
-    if (screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach(track => track.stop());
-      screenStreamRef.current = null;
-    }
-
-    if (screenRef.current) {
-      screenRef.current.srcObject = null;
-    }
-
-    setIsPresenting(false);
-  };
-
-  const toggleScreenShare = async () => {
-    if (isPresenting) {
-      stopScreenShare();
-    } else {
-      await startScreenShare();
-    }
-  };
+  const removeDeck = useCallback(() => {
+    if (deckUrl) URL.revokeObjectURL(deckUrl);
+    setDeckFile(null);
+    setDeckUrl(null);
+    setDeckFileName(null);
+  }, [deckUrl]);
 
   const toggleRecording = () => {
     if (!isRecording) {
@@ -338,23 +303,22 @@ export function PitchCoachModule() {
     }
   }, [isRecording, isPaused, recordingTime]);
 
-  const handleSaveRecording = async (notes: string) => {
-    if (!selectedVenture || !recordedBlob) {
+  const handleSaveRecording = async (notes: string, ventureId: string | number) => {
+    const venture = ventures.find(v => v.id.toString() === ventureId.toString());
+    if (!venture || !recordedBlob) {
       toast.error('No venture selected or recording not found');
       return;
     }
 
     try {
       const file = new File([recordedBlob], `pitch-${Date.now()}.webm`, { type: 'video/webm' });
-      
-      await apiClient.uploadPitchVideo(selectedVenture.id, file, {
+      await apiClient.uploadPitchVideo(venture.id, file, {
         pitch_type: pitchType,
         duration: recordingTime,
         target_duration: targetDuration * 60, // convert minutes to seconds
       });
 
       toast.success('Pitch video saved successfully!');
-      
       // Reset state
       setRecordedBlob(null);
       setRecordingTime(0);
@@ -422,18 +386,58 @@ export function PitchCoachModule() {
         <div className="lg:col-span-2 space-y-4">
           {/* Video Feed */}
           <Card className="glass-card border-black/5 overflow-hidden">
-            <div className="relative bg-black aspect-video flex items-center justify-center">
-              {isPresenting ? (
-                // Screen Share Display
-                <video
-                  ref={screenRef}
-                  className="w-full h-full object-contain"
-                  autoPlay
-                  playsInline
-                  muted
-                />
+            <div className={`relative bg-black ${isFullscreen ? 'fixed inset-0 z-50' : 'aspect-video'} flex items-center justify-center`}>
+              {/* Debug Overlay: Shows video element state */}
+              <div style={{ position: 'absolute', top: 4, left: 4, zIndex: 1000, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: 12, padding: 6, borderRadius: 6 }}>
+                <div><b>Debug Info</b></div>
+                <div>videoRef: {String(!!videoRef.current)}</div>
+                <div>srcObject: {videoRef.current && videoRef.current.srcObject ? 'set' : 'null'}</div>
+                <div>isVideoOn: {String(isVideoOn)}</div>
+                <div>deckUrl: {String(!!deckUrl)}</div>
+              </div>
+
+              {/* Hidden file input for deck upload */}
+              <input
+                ref={deckInputRef}
+                type="file"
+                accept=".pdf,.ppt,.pptx"
+                className="hidden"
+                onChange={handleDeckUpload}
+              />
+
+              {deckUrl ? (
+                // Pitch Deck Display
+                <div className="w-full h-full relative">
+                  <iframe
+                    src={deckUrl}
+                    className="w-full h-full border-0"
+                    title="Pitch Deck"
+                  />
+                  {/* Deck filename badge */}
+                  <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm rounded-lg px-3 py-1 flex items-center space-x-2">
+                    <FileText className="h-3 w-3 text-[#76B947]" />
+                    <span className="text-white text-xs truncate max-w-[200px]" style={{ fontFamily: 'var(--font-body)' }}>
+                      {deckFileName}
+                    </span>
+                    <button onClick={removeDeck} className="text-gray-400 hover:text-white ml-1">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                  {/* Picture-in-Picture Camera when deck is loaded and camera is on */}
+                  {isVideoOn && (
+                    <div className="absolute bottom-4 right-4 w-48 aspect-video rounded-lg overflow-hidden border-2 border-[#76B947] shadow-lg">
+                      <video
+                        ref={videoRef}
+                        className="w-full h-full object-cover"
+                        autoPlay
+                        playsInline
+                        muted
+                      />
+                    </div>
+                  )}
+                </div>
               ) : isVideoOn ? (
-                // Camera Display
+                // Camera Display (only if deck is not loaded)
                 <video
                   ref={videoRef}
                   className="w-full h-full object-cover"
@@ -450,42 +454,28 @@ export function PitchCoachModule() {
                       Camera Off
                     </p>
                     <p className="text-gray-400 text-sm" style={{ fontFamily: 'var(--font-body)' }}>
-                      Click the camera button to start
+                      Click the camera button or upload a pitch deck to start
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* Picture-in-Picture Camera when screen sharing */}
-              {isPresenting && isVideoOn && (
-                <div className="absolute bottom-4 right-4 w-48 aspect-video rounded-lg overflow-hidden border-2 border-[#76B947] shadow-lg">
-                  <video
-                    ref={videoRef}
-                    className="w-full h-full object-cover"
-                    autoPlay
-                    playsInline
-                    muted
-                  />
-                </div>
+              {/* Fullscreen exit button */}
+              {isFullscreen && (
+                <button
+                  onClick={() => setIsFullscreen(false)}
+                  className="absolute top-2 right-2 z-10 bg-black/60 backdrop-blur-sm rounded-lg p-2 text-white hover:bg-black/80 transition"
+                >
+                  <Minimize className="h-4 w-4" />
+                </button>
               )}
 
               {/* AI Coach Overlay */}
               {isRecording && (
-                <div className="absolute top-4 left-4 right-4">
-                  <div className="glass-panel bg-black/40 backdrop-blur-md rounded-xl p-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex space-x-1">
-                        {[0, 1, 2, 3, 4].map((i) => (
-                          <div
-                            key={i}
-                            className="w-1 bg-[#76B947] rounded-full animate-pulse-wave"
-                            style={{
-                              height: `${20 + Math.random() * 20}px`,
-                              animationDelay: `${i * 0.1}s`
-                            }}
-                          />
-                        ))}
-                      </div>
+                <div className={`absolute ${deckUrl ? 'top-12' : 'top-4'} left-4 right-4`}>
+                  <div className="glass-panel bg-black/40 backdrop-blur-md rounded-xl p-3">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-[#76B947] rounded-full animate-pulse" />
                       <p className="text-white text-sm" style={{ fontFamily: 'var(--font-heading)' }}>
                         AI Coach is listening...
                       </p>
@@ -546,10 +536,21 @@ export function PitchCoachModule() {
                     size="sm"
                     variant="default"
                     className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
-                    onClick={toggleScreenShare}
+                    onClick={() => deckUrl ? removeDeck() : deckInputRef.current?.click()}
                   >
-                    <MonitorUp className="h-4 w-4 mr-2" />
-                    {isPresenting ? 'Stop Presenting' : 'Present'}
+                    {deckUrl ? (
+                      <><X className="h-4 w-4 mr-2" />Remove Deck</>
+                    ) : (
+                      <><Upload className="h-4 w-4 mr-2" />Upload Deck</>
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
+                    onClick={() => setIsFullscreen(!isFullscreen)}
+                  >
+                    {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
                   </Button>
                 </div>
 
@@ -729,9 +730,9 @@ export function PitchCoachModule() {
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className={`w-2 h-2 rounded-full ${isPresenting ? 'bg-[#76B947]' : 'bg-gray-400'}`}></div>
+                    <div className={`w-2 h-2 rounded-full ${deckUrl ? 'bg-[#76B947]' : 'bg-gray-400'}`}></div>
                     <span className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>
-                      Screen {isPresenting ? 'Sharing' : 'Not Sharing'}
+                      Pitch Deck {deckUrl ? 'Loaded' : 'Not Loaded'}
                     </span>
                   </div>
                 </div>
@@ -907,7 +908,13 @@ export function PitchCoachModule() {
         onPracticeAgain={handlePracticeAgain}
         duration={recordingTime}
         pitchType={pitchType}
-        ventureName={selectedVenture?.name || 'Unknown Venture'}
+        ventures={ventures}
+        selectedVentureId={selectedVenture?.id || (ventures[0]?.id ?? '')}
+        onVentureChange={(id) => {
+          const venture = ventures.find(v => v.id.toString() === id.toString());
+          if (venture) setSelectedVenture(venture);
+        }}
+        pitchMetrics={pitchMetrics}
         videoBlob={recordedBlob}
       />
     </div>

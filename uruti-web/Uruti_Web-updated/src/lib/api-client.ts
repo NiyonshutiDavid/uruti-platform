@@ -266,6 +266,12 @@ class ApiClient {
     });
   }
 
+  async getOnlineUserIds(): Promise<number[]> {
+    return this.request<number[]>('/api/v1/users/online-ids', {
+      requiresAuth: true,
+    });
+  }
+
   async deleteUserAsAdmin(userId: number) {
     return this.request<void>(`/api/v1/users/${userId}`, {
       method: 'DELETE',
@@ -407,17 +413,22 @@ class ApiClient {
 
   // Bookmarks endpoints
   async getBookmarks() {
-    return this.request<any[]>('/api/v1/deals/bookmarks', {
+    return this.request<any[]>('/api/v1/bookmarks/', {
       requiresAuth: true,
     });
   }
 
   async getBookmarkedVentures() {
-    return this.getBookmarks(); // Alias for better clarity
+    const bookmarks = await this.getBookmarks();
+    // Flatten: extract the nested venture object from each bookmark, normalize media URLs
+    return (bookmarks || []).map((b: any) => {
+      const v = this.normalizeVentureMedia(b.venture || {});
+      return { ...v, bookmarked: true, bookmark_id: b.id, bookmark_notes: b.notes, bookmark_tags: b.tags };
+    }).filter((v: any) => v.id); // exclude bookmarks with missing/deleted ventures
   }
 
   async createBookmark(ventureId: number) {
-    return this.request<any>('/api/v1/deals/bookmarks', {
+    return this.request<any>('/api/v1/bookmarks/', {
       method: 'POST',
       requiresAuth: true,
       body: JSON.stringify({ venture_id: ventureId }),
@@ -429,7 +440,14 @@ class ApiClient {
   }
 
   async deleteBookmark(ventureId: number) {
-    return this.request<any>(`/api/v1/deals/bookmarks/${ventureId}`, {
+    const bookmarks = await this.getBookmarks();
+    const matchingBookmark = (bookmarks || []).find((bookmark: any) => bookmark?.venture_id === ventureId || bookmark?.venture?.id === ventureId);
+
+    if (!matchingBookmark?.id) {
+      throw new Error('Bookmark not found for selected venture');
+    }
+
+    return this.request<any>(`/api/v1/bookmarks/${matchingBookmark.id}`, {
       method: 'DELETE',
       requiresAuth: true,
     });
@@ -477,15 +495,32 @@ class ApiClient {
     return merged;
   }
 
-  async sendMessage(recipientId: number, content: string) {
+  async sendMessage(recipientId: number, content: string, attachments?: string[]) {
     return this.request<any>('/api/v1/messages/', {
       method: 'POST',
       requiresAuth: true,
       body: JSON.stringify({
         receiver_id: recipientId,
         body: content,
+        ...(attachments ? { attachments } : {}),
       }),
     });
+  }
+
+  async uploadMessageAttachment(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = this.getAuthToken();
+    const response = await fetch(`${this.baseUrl}/api/v1/messages/attachments/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    return this.handleResponse<{ file_name: string; url: string; content_type: string; size: number }>(response);
   }
 
   async markAsRead(messageId: number) {
@@ -551,8 +586,9 @@ class ApiClient {
   }
 
   // Scheduling endpoints
-  async getAvailability(userId: number) {
-    return this.request<any[]>(`/api/v1/availability/${userId}`, {
+  async getAvailability(userId: number, weekStart?: string) {
+    const query = weekStart ? `?week_start=${encodeURIComponent(weekStart)}` : '';
+    return this.request<any[]>(`/api/v1/availability/${userId}${query}`, {
       requiresAuth: true,
     });
   }
@@ -593,6 +629,12 @@ class ApiClient {
 
   async getMeetings() {
     return this.request<any[]>('/api/v1/meetings/', {
+      requiresAuth: true,
+    });
+  }
+
+  async getUpcomingMeetings(days: number = 7) {
+    return this.request<any[]>(`/api/v1/meetings/calendar/upcoming?days=${days}`, {
       requiresAuth: true,
     });
   }
@@ -970,6 +1012,14 @@ class ApiClient {
     });
   }
 
+  async getConnectionCount(userId: number): Promise<number> {
+    const data = await this.request<{ user_id: number; count: number }>(
+      `/api/v1/connections/count/${userId}`,
+      { requiresAuth: true }
+    );
+    return data.count;
+  }
+
   // Availability/Time Slots endpoints
   async getTimeSlots() {
     return this.request<any[]>('/api/v1/scheduling/time-slots', {
@@ -1081,6 +1131,7 @@ class ApiClient {
     user_query: string;
     founder_profile?: string;
     mode?: 'production' | 'research';
+    model?: string;
   }) {
     return this.request<any>('/api/v1/chat/text', {
       method: 'POST',
@@ -1094,6 +1145,7 @@ class ApiClient {
     file: File;
     founder_profile?: string;
     mode?: 'production' | 'research';
+    model?: string;
   }) {
     const form = new FormData();
     form.append('user_query', data.user_query);
@@ -1102,6 +1154,9 @@ class ApiClient {
       form.append('founder_profile', data.founder_profile);
     }
     form.append('mode', data.mode || 'production');
+    if (data.model) {
+      form.append('model', data.model);
+    }
 
     return this.request<any>('/api/v1/chat/file', {
       method: 'POST',
@@ -1115,6 +1170,7 @@ class ApiClient {
     user_query?: string;
     founder_profile?: string;
     mode?: 'production' | 'research';
+    model?: string;
   }) {
     const form = new FormData();
     form.append('file', data.file);
@@ -1123,6 +1179,9 @@ class ApiClient {
       form.append('founder_profile', data.founder_profile);
     }
     form.append('mode', data.mode || 'production');
+    if (data.model) {
+      form.append('model', data.model);
+    }
 
     return this.request<any>('/api/v1/chat/audio', {
       method: 'POST',

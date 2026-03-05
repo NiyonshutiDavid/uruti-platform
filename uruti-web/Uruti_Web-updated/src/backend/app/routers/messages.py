@@ -8,7 +8,7 @@ from jose import JWTError, jwt
 from ..database import get_db
 from ..config import settings
 from ..database import SessionLocal
-from ..models import User, Message, NotificationType
+from ..models import User, Message, NotificationType, Connection
 from ..schemas import MessageCreate, MessageResponse
 from ..auth import get_current_active_user
 from .notifications import (
@@ -36,6 +36,11 @@ class _MessageRealtimeHub:
         if not user_sockets:
             self._connections.pop(user_id, None)
 
+    @property
+    def connected_user_ids(self) -> Set[int]:
+        """Return the set of user IDs with at least one active WebSocket."""
+        return {uid for uid, sockets in self._connections.items() if sockets}
+
     async def broadcast_to_user(self, user_id: int, payload: Dict[str, Any]):
         sockets = list(self._connections.get(user_id, set()))
         if not sockets:
@@ -60,7 +65,30 @@ class _MessageRealtimeHub:
 realtime_hub = _MessageRealtimeHub()
 
 
-def _to_message_payload(message: Message) -> Dict[str, Any]:
+def _get_connection_user_ids(user_id: int, db: Session) -> List[int]:
+    """Return user IDs of all accepted connections for a given user."""
+    rows = db.query(Connection).filter(
+        or_(Connection.user1_id == user_id, Connection.user2_id == user_id)
+    ).all()
+    ids = []
+    for conn in rows:
+        other = conn.user2_id if conn.user1_id == user_id else conn.user1_id
+        ids.append(other)
+    return ids
+
+
+def _to_message_payload(message: Message, sender: Optional[User] = None) -> Dict[str, Any]:
+    # Resolve sender info for the WebSocket payload so the client can show
+    # real names in notifications instead of "Someone messaged you".
+    resolved_sender = sender or getattr(message, "sender", None)
+    sender_name = None
+    sender_full_name = None
+    sender_avatar_url = None
+    if resolved_sender is not None:
+        sender_name = getattr(resolved_sender, "display_name", None)
+        sender_full_name = getattr(resolved_sender, "full_name", None)
+        sender_avatar_url = getattr(resolved_sender, "avatar_url", None)
+
     return {
         "id": message.id,
         "sender_id": message.sender_id,
@@ -73,6 +101,9 @@ def _to_message_payload(message: Message) -> Dict[str, Any]:
         "is_archived": bool(message.is_archived),
         "thread_id": message.thread_id,
         "created_at": message.created_at.isoformat() if message.created_at else None,
+        "sender_name": sender_name,
+        "sender_full_name": sender_full_name,
+        "sender_avatar_url": sender_avatar_url,
     }
 
 
@@ -106,11 +137,22 @@ async def messages_ws(websocket: WebSocket, token: str = Query(...)):
 
         await websocket.accept()
         await realtime_hub.connect(user.id, websocket)
+
+        # Broadcast presence "online" to all connections
+        connection_ids = _get_connection_user_ids(user.id, db)
+        online_payload = {"event": "user_online", "data": {"user_id": user.id}}
+        for cid in connection_ids:
+            await realtime_hub.broadcast_to_user(cid, online_payload)
+            await notification_hub.broadcast_to_user(cid, online_payload)
+
         await websocket.send_json({"event": "connected", "user_id": user.id})
 
         while True:
             raw = await websocket.receive_text()
             if raw:
+                # Update last_login on heartbeat to keep presence fresh
+                user.last_login = datetime.utcnow()
+                db.commit()
                 await websocket.send_json({"event": "pong"})
     except WebSocketDisconnect:
         pass
@@ -119,6 +161,13 @@ async def messages_ws(websocket: WebSocket, token: str = Query(...)):
     finally:
         if user is not None:
             await realtime_hub.disconnect(user.id, websocket)
+            # Broadcast "offline" only when this was the last socket for the user
+            if user.id not in realtime_hub.connected_user_ids:
+                connection_ids = _get_connection_user_ids(user.id, db)
+                offline_payload = {"event": "user_offline", "data": {"user_id": user.id}}
+                for cid in connection_ids:
+                    await realtime_hub.broadcast_to_user(cid, offline_payload)
+                    await notification_hub.broadcast_to_user(cid, offline_payload)
         db.close()
 
 
@@ -150,7 +199,7 @@ async def send_message(
     
     payload = {
         "event": "message_created",
-        "data": _to_message_payload(db_message),
+        "data": _to_message_payload(db_message, sender=current_user),
     }
 
     message_notification = create_notification(
@@ -189,7 +238,9 @@ async def signal_call_event(
 
     if receiver_id <= 0:
         raise HTTPException(status_code=400, detail="receiver_id is required")
-    if action not in {"invite", "accept", "decline", "end"}:
+    valid_actions = {"invite", "accept", "decline", "end",
+                     "webrtc_offer", "webrtc_answer", "webrtc_ice"}
+    if action not in valid_actions:
         raise HTTPException(status_code=400, detail="Invalid call action")
 
     receiver = db.query(User).filter(User.id == receiver_id).first()
@@ -207,6 +258,7 @@ async def signal_call_event(
             "receiver_id": receiver_id,
             "is_video": bool(payload.get("is_video", False)),
             "handle": payload.get("handle"),
+            "webrtc_data": payload.get("webrtc_data"),
             "created_at": datetime.utcnow().isoformat(),
         },
     }

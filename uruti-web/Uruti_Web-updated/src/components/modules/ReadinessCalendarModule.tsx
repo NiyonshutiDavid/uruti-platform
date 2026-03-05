@@ -210,7 +210,7 @@ export function ReadinessCalendarModule() {
       deadline: { icon: Clock, color: 'bg-orange-100 text-orange-700', label: 'Deadline' },
       meeting: { icon: Users, color: 'bg-green-100 text-green-700', label: 'Meeting' }
     };
-    return configs[type as keyof typeof configs];
+    return configs[type as keyof typeof configs] ?? { icon: CalendarIcon, color: 'bg-gray-100 text-gray-700', label: type || 'Event' };
   };
 
   const eventsOnSelectedDate = selectedDate 

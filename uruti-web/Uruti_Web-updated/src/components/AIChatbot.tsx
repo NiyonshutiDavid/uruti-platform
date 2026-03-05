@@ -2,10 +2,9 @@ import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { ScrollArea } from './ui/scroll-area';
+import { Send, Sparkles, X, Lightbulb, TrendingUp, Target, Users, DollarSign, Minimize2, Maximize2, Upload, Mic, StopCircle, ChevronDown, Plus, Settings2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Badge } from './ui/badge';
-import { Send, Sparkles, X, Lightbulb, TrendingUp, Target, Users, DollarSign, Minimize2, Maximize2, Upload, Mic, StopCircle } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 
 interface Message {
@@ -32,6 +31,11 @@ const quickActions = [
   { icon: DollarSign, label: 'Revenue Model', prompt: 'What revenue model would work best?' },
 ];
 
+const modelOptions = [
+  { id: 'production', label: 'Standard', description: 'Answers quickly' },
+  { id: 'research', label: 'Research Mode', description: 'Thinks through complex topics' },
+];
+
 export function AIChatbot({ open, onClose, startupContext }: AIChatbotProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -42,7 +46,10 @@ export function AIChatbot({ open, onClose, startupContext }: AIChatbotProps) {
   const [mode, setMode] = useState<'production' | 'research'>('production');
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [showProfileInput, setShowProfileInput] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const renderFormattedText = (content: string) => {
     const lines = content.split('\n');
@@ -77,18 +84,15 @@ export function AIChatbot({ open, onClose, startupContext }: AIChatbotProps) {
           localStorage.setItem('uruti_founder_profile', response.founder_profile);
         }
       })
-      .catch(() => {
-        // no-op; local profile fallback still works
-      });
+      .catch(() => {});
   }, [open]);
 
   useEffect(() => {
     if (open && messages.length === 0) {
-      // Initial greeting
       const greeting = startupContext
         ? `Hi! I'm your AI Advisory Assistant. I see you want to discuss **${startupContext.name}**. How can I help you refine and grow this idea today?`
         : `Hi! I'm your AI Advisory Assistant powered by Uruti's intelligence engine. I'm here to help you with:\n\n• Refining your startup ideas\n• Market analysis and validation\n• Go-to-market strategies\n• Pitch preparation\n• Investment readiness\n\nWhat would you like to explore?`;
-      
+
       setMessages([{
         id: '1',
         role: 'assistant',
@@ -103,6 +107,17 @@ export function AIChatbot({ open, onClose, startupContext }: AIChatbotProps) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowModelDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const formatAdvisory = (payload: any) => {
     const advisory = payload?.advisory || {};
@@ -138,17 +153,8 @@ export function AIChatbot({ open, onClose, startupContext }: AIChatbotProps) {
       }
 
       const response = selectedFile
-        ? await apiClient.chatFile({
-            user_query: messageText,
-            founder_profile: founderProfile || undefined,
-            mode,
-            file: selectedFile,
-          })
-        : await apiClient.chatText({
-            user_query: messageText,
-            founder_profile: founderProfile || undefined,
-            mode,
-          });
+        ? await apiClient.chatFile({ user_query: messageText, founder_profile: founderProfile || undefined, mode, file: selectedFile })
+        : await apiClient.chatText({ user_query: messageText, founder_profile: founderProfile || undefined, mode });
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -159,13 +165,12 @@ export function AIChatbot({ open, onClose, startupContext }: AIChatbotProps) {
       setMessages(prev => [...prev, assistantMessage]);
       setSelectedFile(null);
     } catch (error: any) {
-      const assistantMessage: Message = {
+      setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: `I couldn't process that request: ${error?.message || 'Unknown error'}`,
         timestamp: new Date()
-      };
-      setMessages(prev => [...prev, assistantMessage]);
+      }]);
     } finally {
       setIsTyping(false);
     }
@@ -178,9 +183,7 @@ export function AIChatbot({ open, onClose, startupContext }: AIChatbotProps) {
       const chunks: Blob[] = [];
 
       recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunks.push(event.data);
-        }
+        if (event.data.size > 0) chunks.push(event.data);
       };
 
       recorder.onstop = async () => {
@@ -196,19 +199,10 @@ export function AIChatbot({ open, onClose, startupContext }: AIChatbotProps) {
             mode,
           });
 
-          const userMessage: Message = {
-            id: Date.now().toString(),
-            role: 'user',
-            content: '[Audio message submitted]',
-            timestamp: new Date()
-          };
-          const assistantMessage: Message = {
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            content: formatAdvisory(response),
-            timestamp: new Date()
-          };
-          setMessages(prev => [...prev, userMessage, assistantMessage]);
+          setMessages(prev => [...prev,
+            { id: Date.now().toString(), role: 'user', content: '[Audio message submitted]', timestamp: new Date() },
+            { id: (Date.now() + 1).toString(), role: 'assistant', content: formatAdvisory(response), timestamp: new Date() }
+          ]);
         } catch (error: any) {
           setMessages(prev => [...prev, {
             id: (Date.now() + 2).toString(),
@@ -242,216 +236,281 @@ export function AIChatbot({ open, onClose, startupContext }: AIChatbotProps) {
     }
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  };
+  const formatTime = (date: Date) =>
+    date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+  const currentModel = modelOptions.find(m => m.id === mode) || modelOptions[0];
+  const isEmptyState = messages.length <= 1;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className={`glass-card border-2 border-purple-500/30 ${isMinimized ? 'max-w-md h-20' : 'max-w-4xl max-h-[85vh]'} p-0 overflow-hidden`}>
-        <DialogHeader className="p-6 pb-4 border-b border-purple-500/20 bg-gradient-to-r from-purple-600 to-purple-800">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-                <Sparkles className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <DialogTitle className="text-white text-xl" style={{ fontFamily: 'var(--font-heading)' }}>
-                  AI Advisory Assistant
-                </DialogTitle>
-                <DialogDescription className="sr-only">
-                  Chat with your AI Advisory Assistant for startup guidance and support
-                </DialogDescription>
-                {startupContext && (
-                  <Badge className="bg-white/20 text-white mt-1">
-                    Discussing: {startupContext.name}
-                  </Badge>
-                )}
-              </div>
+      <DialogContent
+        className={`bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 shadow-2xl rounded-2xl
+          ${isMinimized ? 'max-w-sm h-16' : 'max-w-3xl h-[90vh]'} p-0 overflow-hidden flex flex-col`}
+      >
+        {/* Header — minimal top bar */}
+        <DialogHeader className="flex-shrink-0 px-5 py-3 border-b border-gray-100 dark:border-gray-800 flex-row items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+              <Sparkles className="h-3.5 w-3.5 text-white" />
             </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsMinimized(!isMinimized)}
-                className="text-white hover:bg-white/20"
-              >
-                {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onClose}
-                className="text-white hover:bg-white/20"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            <DialogTitle className="text-gray-800 dark:text-gray-100 text-base font-semibold tracking-tight" style={{ fontFamily: 'var(--font-heading)' }}>
+              AI Advisory
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Chat with your AI Advisory Assistant for startup guidance and support
+            </DialogDescription>
+            {startupContext && (
+              <Badge className="bg-purple-50 text-purple-600 border border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-700 text-xs font-normal ml-1">
+                {startupContext.name}
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsMinimized(!isMinimized)}
+              className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 h-8 w-8 p-0 rounded-full"
+            >
+              {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 h-8 w-8 p-0 rounded-full"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         </DialogHeader>
 
         {!isMinimized && (
-          <>
-            {/* Quick Actions */}
-            {messages.length <= 1 && (
-              <div className="px-6 pt-4 pb-2">
-                <p className="text-sm text-muted-foreground mb-3" style={{ fontFamily: 'var(--font-body)' }}>
-                  Quick actions:
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {quickActions.map((action) => {
-                    const Icon = action.icon;
-                    return (
-                      <Button
-                        key={action.label}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSend(action.prompt)}
-                        className="hover:bg-purple-50 hover:border-purple-300 dark:hover:bg-purple-900/20"
+          <div className="flex flex-col flex-1 min-h-0">
+            {/* Empty state greeting */}
+            {isEmptyState && (
+              <div className="flex-shrink-0 flex flex-col items-center justify-center pt-10 pb-4 px-6 text-center">
+                <h2 className="text-3xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-500 mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                  Hello,
+                </h2>
+                <p className="text-gray-400 dark:text-gray-500 text-sm">What would you like to explore today?</p>
+              </div>
+            )}
+
+            {/* Messages area (only shown after first exchange) */}
+            {!isEmptyState && (
+              <div className="flex-1 overflow-y-auto px-4 pt-4 min-h-0">
+                <div className="space-y-5 pr-2 pb-2" ref={scrollRef}>
+                    {messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
-                        <Icon className="mr-2 h-3 w-3" />
-                        {action.label}
-                      </Button>
-                    );
-                  })}
+                        {message.role === 'assistant' && (
+                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Sparkles className="h-3.5 w-3.5 text-white" />
+                          </div>
+                        )}
+                        <div className={`flex flex-col max-w-[75%] ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                          <div
+                            className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                              message.role === 'user'
+                                ? 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-br-sm'
+                                : 'bg-transparent text-gray-800 dark:text-gray-200'
+                            }`}
+                          >
+                            <p className="whitespace-pre-wrap" style={{ fontFamily: 'var(--font-body)' }}>
+                              {renderFormattedText(message.content)}
+                            </p>
+                          </div>
+                          <span className="text-[10px] text-gray-400 mt-1 px-1" style={{ fontFamily: 'var(--font-body)' }}>
+                            {formatTime(message.timestamp)}
+                          </span>
+                        </div>
+                        {message.role === 'user' && (
+                          <Avatar className="h-7 w-7 flex-shrink-0 mt-0.5">
+                            <AvatarFallback className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs font-semibold">
+                              U
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                      </div>
+                    ))}
+
+                    {isTyping && (
+                      <div className="flex gap-3 justify-start">
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0">
+                          <Sparkles className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <div className="flex items-center gap-1 px-4 py-3">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      </div>
+                    )}
                 </div>
               </div>
             )}
 
-            {/* Messages */}
-            <div className="flex-1 p-6 overflow-hidden">
-              <ScrollArea className="h-[400px]">
-                <div className="space-y-4" ref={scrollRef}>
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div className={`flex items-start space-x-3 max-w-[80%] ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                        <Avatar className="h-8 w-8 flex-shrink-0">
-                          <AvatarFallback className={message.role === 'user' ? 'bg-[#76B947]/20 text-[#76B947]' : 'bg-purple-100 text-purple-600'}>
-                            {message.role === 'user' ? 'U' : <Sparkles className="h-4 w-4" />}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
-                          <div
-                            className={`rounded-2xl px-4 py-3 ${
-                              message.role === 'user'
-                                ? 'bg-[#76B947] text-white'
-                                : 'bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 border border-purple-200 dark:border-purple-700'
-                            }`}
-                          >
-                            <p className="text-sm whitespace-pre-wrap" style={{ fontFamily: 'var(--font-body)' }}>
-                              {renderFormattedText(message.content)}
-                            </p>
-                          </div>
-                          <span className="text-xs text-muted-foreground mt-1" style={{ fontFamily: 'var(--font-body)' }}>
-                            {formatTime(message.timestamp)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {isTyping && (
-                    <div className="flex items-start space-x-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-purple-100 text-purple-600">
-                          <Sparkles className="h-4 w-4" />
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 border border-purple-200 dark:border-purple-700 rounded-2xl px-4 py-3">
-                        <div className="flex space-x-2">
-                          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-            </div>
-
-            {/* Input */}
-            <div className="p-6 pt-4 border-t border-purple-500/20 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
-                <Input
-                  placeholder="Founder profile context (sector, stage, constraints)"
-                  value={founderProfile}
-                  onChange={(e) => setFounderProfile(e.target.value)}
-                  className="border-purple-300 focus:border-purple-500 dark:bg-gray-800 dark:border-purple-700"
-                />
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={mode === 'production' ? 'default' : 'outline'}
-                    onClick={() => setMode('production')}
-                    className="flex-1"
-                  >
-                    Production
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={mode === 'research' ? 'default' : 'outline'}
-                    onClick={() => setMode('research')}
-                    className="flex-1"
-                  >
-                    Research
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <label className="inline-flex items-center cursor-pointer">
-                  <input
-                    type="file"
-                    accept=".pdf,.docx,.csv"
-                    className="hidden"
-                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+            {/* Prompt input area — always pinned to bottom */}
+            <div className={`flex-shrink-0 px-4 sm:px-6 ${isEmptyState ? 'pb-6' : 'pb-4 pt-2'}`}>
+              {/* Founder profile toggle */}
+              {showProfileInput && (
+                <div className="mb-2">
+                  <Input
+                    placeholder="Founder profile context (sector, stage, constraints)"
+                    value={founderProfile}
+                    onChange={(e) => setFounderProfile(e.target.value)}
+                    className="border-gray-200 dark:border-gray-700 dark:bg-gray-900 text-sm rounded-xl h-9 focus:ring-1 focus:ring-purple-400"
                   />
-                  <span className="inline-flex">
-                    <Button type="button" variant="outline" size="icon" className="border-purple-300">
-                      <Upload className="h-4 w-4" />
-                    </Button>
-                  </span>
-                </label>
-                <Input
-                  placeholder="Ask me anything about your startup..."
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                  className="flex-1 border-purple-300 focus:border-purple-500 dark:bg-gray-800 dark:border-purple-700"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="border-purple-300"
-                  onClick={isRecording ? stopRecording : startRecording}
-                >
-                  {isRecording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                </Button>
-                <Button
-                  onClick={() => handleSend()}
-                  disabled={!inputText.trim() || isTyping}
-                  className="bg-gradient-to-r from-purple-600 to-purple-800 text-white hover:from-purple-700 hover:to-purple-900"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-              {selectedFile && (
-                <p className="text-xs text-muted-foreground mt-2" style={{ fontFamily: 'var(--font-body)' }}>
-                  Upload selected: {selectedFile.name}
-                </p>
+                </div>
               )}
-              <p className="text-xs text-muted-foreground mt-2 text-center" style={{ fontFamily: 'var(--font-body)' }}>
+
+              {/* Main input card — Gemini style */}
+              <div className="border border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
+                <div className="px-4 py-3">
+                  <input
+                    type="text"
+                    placeholder="Enter a prompt for Uruti AI..."
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                    className="w-full bg-transparent text-gray-800 dark:text-gray-200 text-sm outline-none placeholder-gray-400 dark:placeholder-gray-500"
+                    style={{ fontFamily: 'var(--font-body)' }}
+                  />
+                </div>
+
+                {selectedFile && (
+                  <div className="px-4 pb-2">
+                    <span className="text-xs text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-2 py-0.5 rounded-full">
+                      📎 {selectedFile.name}
+                    </span>
+                  </div>
+                )}
+
+                {/* Bottom toolbar */}
+                <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 dark:border-gray-800">
+                  <div className="flex items-center gap-1">
+                    {/* Attach */}
+                    <label className="inline-flex items-center cursor-pointer">
+                      <input
+                        type="file"
+                        accept=".pdf,.docx,.csv"
+                        className="hidden"
+                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                      />
+                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-pointer transition-colors">
+                        <Plus className="h-4 w-4" />
+                      </span>
+                    </label>
+
+                    {/* Tools / profile context */}
+                    <button
+                      type="button"
+                      onClick={() => setShowProfileInput(v => !v)}
+                      className="flex items-center gap-1.5 px-3 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs font-medium transition-colors"
+                    >
+                      <Settings2 className="h-3.5 w-3.5" />
+                      <span>Context</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {/* Model selector */}
+                    <div className="relative" ref={dropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() => setShowModelDropdown(v => !v)}
+                        className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-medium transition-colors"
+                      >
+                        <span>{currentModel.label}</span>
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </button>
+
+                      {showModelDropdown && (
+                        <div className="fixed inset-x-4 bottom-24 sm:absolute sm:inset-auto sm:bottom-full sm:right-0 sm:mb-2 sm:w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl overflow-hidden z-50 max-h-[60vh] overflow-y-auto">
+                          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
+                            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Choose your model</p>
+                          </div>
+                          {modelOptions.map((opt) => (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => { setMode(opt.id as 'production' | 'research'); setShowModelDropdown(false); }}
+                              className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
+                                mode === opt.id ? 'bg-gray-50 dark:bg-gray-800/60' : ''
+                              }`}
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-gray-800 dark:text-gray-200 break-words">{opt.label}</p>
+                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 whitespace-normal break-words">{opt.description}</p>
+                              </div>
+                              {mode === opt.id && (
+                                <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Mic */}
+                    <button
+                      type="button"
+                      onClick={isRecording ? stopRecording : startRecording}
+                      className={`flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
+                        isRecording
+                          ? 'bg-red-100 dark:bg-red-900/30 text-red-500'
+                          : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400'
+                      }`}
+                    >
+                      {isRecording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                    </button>
+
+                    {/* Send */}
+                    <button
+                      type="button"
+                      onClick={() => handleSend()}
+                      disabled={!inputText.trim() || isTyping}
+                      className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-800 dark:bg-gray-200 hover:bg-gray-700 dark:hover:bg-gray-300 text-white dark:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick action chips */}
+              {isEmptyState && (
+                <div className="flex flex-wrap gap-2 mt-3 justify-center">
+                  {quickActions.map((action) => {
+                    const Icon = action.icon;
+                    return (
+                      <button
+                        key={action.label}
+                        type="button"
+                        onClick={() => handleSend(action.prompt)}
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-medium transition-colors"
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {action.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-3 text-center" style={{ fontFamily: 'var(--font-body)' }}>
                 Powered by Uruti AI • Advisory support, not legal/financial advice
               </p>
             </div>
-          </>
+          </div>
         )}
       </DialogContent>
     </Dialog>

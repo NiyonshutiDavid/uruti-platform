@@ -199,6 +199,12 @@ class VentureUpdate(BaseModel):
     team_info: Optional[Dict[str, Any]] = None
     customers: Optional[int] = None
     mrr: Optional[float] = None
+    highlights: Optional[List[str]] = None
+    competitive_edge: Optional[str] = None
+    team_background: Optional[str] = None
+    funding_plans: Optional[str] = None
+    milestones: Optional[List[Dict[str, Any]]] = None
+    activities: Optional[List[Dict[str, Any]]] = None
     logo_url: Optional[str] = None
     banner_url: Optional[str] = None
     pitch_deck_url: Optional[str] = None
@@ -220,6 +226,12 @@ class VentureResponse(VentureBase):
     mrr: Optional[float] = None
     uruti_score: float
     score_breakdown: Optional[Dict[str, Any]] = None
+    highlights: Optional[List[str]] = None
+    competitive_edge: Optional[str] = None
+    team_background: Optional[str] = None
+    funding_plans: Optional[str] = None
+    milestones: Optional[List[Dict[str, Any]]] = None
+    activities: Optional[List[Dict[str, Any]]] = None
     logo_url: Optional[str] = None
     banner_url: Optional[str] = None
     pitch_deck_url: Optional[str] = None
@@ -615,6 +627,7 @@ class ChatTextRequest(BaseModel):
     user_query: str
     founder_profile: Optional[str] = None
     mode: Literal["production", "research"] = "production"
+    model: Optional[str] = None
 
 
 class ChatResponse(BaseModel):

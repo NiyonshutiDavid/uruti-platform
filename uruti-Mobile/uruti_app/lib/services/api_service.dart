@@ -127,13 +127,50 @@ class ApiService {
   }
 
   // ──────────────────── AUTH ────────────────────
-  Future<Map<String, dynamic>> login(String email, String password) async {
+  Future<Map<String, dynamic>> login(
+    String email,
+    String password, {
+    String? deviceId,
+    String? deviceName,
+    String? platform,
+    String? os,
+  }) async {
     final res = await http.post(
       Uri.parse('${AppConstants.apiV1}/auth/login'),
       headers: await _headers(),
-      body: jsonEncode({'email': email, 'password': password}),
+      body: jsonEncode({
+        'email': email,
+        'password': password,
+        if (deviceId != null) 'device_id': deviceId,
+        if (deviceName != null) 'device_name': deviceName,
+        if (platform != null) 'platform': platform,
+        if (os != null) 'os': os,
+      }),
     );
     return _handleResponse(res);
+  }
+
+  /// Register / refresh a session for the current device on the backend.
+  Future<void> registerSession({
+    String? deviceId,
+    String? deviceName,
+    String? platform,
+    String? os,
+  }) async {
+    try {
+      await http.post(
+        Uri.parse('${AppConstants.apiV1}/auth/sessions/register'),
+        headers: await _headers(auth: true),
+        body: jsonEncode({
+          if (deviceId != null) 'device_id': deviceId,
+          if (deviceName != null) 'device_name': deviceName,
+          if (platform != null) 'platform': platform,
+          if (os != null) 'os': os,
+        }),
+      );
+    } catch (_) {
+      // Non-critical — don't crash if session tracking is temporarily unavailable
+    }
   }
 
   Future<UserModel> register({
@@ -300,6 +337,23 @@ class ApiService {
     _handleResponse(res);
   }
 
+  /// Get IDs of connections currently online.
+  Future<Set<int>> getOnlineConnectionIds() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${AppConstants.apiV1}/connections/online-ids'),
+        headers: await _headers(auth: true),
+      );
+      final data = await _handleListResponse(res);
+      return data
+          .map<int>((e) => int.tryParse('$e') ?? 0)
+          .where((id) => id > 0)
+          .toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
   // ──────────────────── MESSAGES ────────────────────
   Future<List<dynamic>> getConversations([String? token]) async {
     try {
@@ -338,9 +392,15 @@ class ApiService {
         if (!isActive || rawLastLogin == null || rawLastLogin.isEmpty) {
           return false;
         }
-        final lastLogin = DateTime.tryParse(rawLastLogin);
+        // Backend sends UTC timestamps without timezone indicator.
+        // Append 'Z' so Dart parses as UTC, then compare against UTC now.
+        final normalized =
+            rawLastLogin.contains('Z') || rawLastLogin.contains('+')
+            ? rawLastLogin
+            : '${rawLastLogin}Z';
+        final lastLogin = DateTime.tryParse(normalized)?.toUtc();
         if (lastLogin == null) return false;
-        return DateTime.now().difference(lastLogin).inMinutes <= 10;
+        return DateTime.now().toUtc().difference(lastLogin).inMinutes <= 10;
       }
 
       String roleLabel(dynamic role) {
@@ -548,6 +608,7 @@ class ApiService {
     required String callId,
     required bool isVideo,
     String? handle,
+    Map<String, dynamic>? webrtcData,
   }) async {
     final res = await http.post(
       Uri.parse('${AppConstants.apiV1}/messages/call/signal'),
@@ -558,6 +619,7 @@ class ApiService {
         'call_id': callId,
         'is_video': isVideo,
         if (handle != null && handle.trim().isNotEmpty) 'handle': handle.trim(),
+        if (webrtcData != null) 'webrtc_data': webrtcData,
       }),
     );
 
@@ -776,6 +838,18 @@ class ApiService {
     return _handleResponse(res);
   }
 
+  Future<List<dynamic>> getAiModels() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${AppConstants.apiV1}/ai/models'),
+        headers: await _headers(auth: true),
+      );
+      return _handleListResponse(res);
+    } catch (_) {
+      return [];
+    }
+  }
+
   /// Returns list of past chat sessions [{session_id, first_message, message_count, created_at, model_used}]
   Future<List<dynamic>> getAiChatSessions() async {
     try {
@@ -950,6 +1024,15 @@ class ApiService {
     } catch (_) {
       return [];
     }
+  }
+
+  /// Fetches a single venture by its ID.
+  Future<Map<String, dynamic>> getVentureById(int ventureId) async {
+    final res = await http.get(
+      Uri.parse('${AppConstants.apiV1}/ventures/$ventureId'),
+      headers: await _headers(auth: true),
+    );
+    return _handleResponse(res);
   }
 
   /// Creates a new venture for the current user.
@@ -1138,6 +1221,50 @@ class ApiService {
       body: jsonEncode({'request_id': requestId, 'code': code}),
     );
     return _handleResponse(res);
+  }
+
+  /// Request a new QR login challenge (generates QR payload for another device).
+  Future<Map<String, dynamic>> requestQrLogin() async {
+    final res = await http.post(
+      Uri.parse('${AppConstants.apiV1}/auth/qr/request'),
+      headers: await _headers(),
+    );
+    return _handleResponse(res);
+  }
+
+  /// Poll QR login status. Returns {status, access_token?, token_type?}.
+  Future<Map<String, dynamic>> pollQrLoginStatus({
+    required String requestId,
+    required String code,
+  }) async {
+    final res = await http.get(
+      Uri.parse('${AppConstants.apiV1}/auth/qr/status/$requestId?code=$code'),
+      headers: await _headers(),
+    );
+    return _handleResponse(res);
+  }
+
+  /// Fetch active device sessions for the current user.
+  Future<List<dynamic>> getActiveSessions() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${AppConstants.apiV1}/auth/sessions'),
+        headers: await _headers(auth: true),
+      );
+      final data = await _handleResponse(res);
+      return (data['sessions'] as List?) ?? [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Revoke / log out a specific device session.
+  Future<void> revokeSession(String sessionId) async {
+    final res = await http.delete(
+      Uri.parse('${AppConstants.apiV1}/auth/sessions/$sessionId'),
+      headers: await _headers(auth: true),
+    );
+    await _handleResponse(res);
   }
 }
 

@@ -118,13 +118,13 @@ class AppTheme {
         tc.textMuted,
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: tc.background,
+        backgroundColor: tc.appBarBg,
         elevation: 0,
         scrolledUnderElevation: 0,
-        iconTheme: IconThemeData(color: tc.textPrimary),
-        titleTextStyle: TextStyle(
+        iconTheme: const IconThemeData(color: Colors.white),
+        titleTextStyle: const TextStyle(
           fontFamily: 'InterTight',
-          color: tc.textPrimary,
+          color: Colors.white,
           fontSize: 20,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.4,
@@ -271,20 +271,20 @@ class AppTheme {
         tc.textMuted,
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: tc.background,
+        backgroundColor: tc.appBarBg,
         elevation: 0,
         scrolledUnderElevation: 0,
-        iconTheme: IconThemeData(color: tc.textPrimary),
-        titleTextStyle: TextStyle(
+        iconTheme: const IconThemeData(color: Colors.white),
+        titleTextStyle: const TextStyle(
           fontFamily: 'InterTight',
-          color: tc.textPrimary,
+          color: Colors.white,
           fontSize: 20,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.4,
         ),
         systemOverlayStyle: const SystemUiOverlayStyle(
-          statusBarBrightness: Brightness.light,
-          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.dark,
+          statusBarIconBrightness: Brightness.light,
           statusBarColor: Colors.transparent,
         ),
       ),

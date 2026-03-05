@@ -68,19 +68,32 @@ export function BookingWeekDialog({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [meetingLink, setMeetingLink] = useState('');
   const [meetingType, setMeetingType] = useState('general_meeting');
+
+  const weekStartDate = useMemo(() => {
+    const now = new Date();
+    const currentWeekStart = startOfWeek(now);
+    currentWeekStart.setDate(currentWeekStart.getDate() + weekOffset * 7);
+    return currentWeekStart;
+  }, [weekOffset]);
+
+  const weekStartIso = useMemo(() => toIsoDate(weekStartDate), [weekStartDate]);
 
   useEffect(() => {
     if (!open) {
       setWeekOffset(0);
+      setSelectedDayIndex(0);
       setSelectedDate('');
       setSelectedSlotId(null);
       setDescription('');
+      setMeetingLink('');
       setTitle('');
       setMeetingType('general_meeting');
       return;
@@ -89,7 +102,7 @@ export function BookingWeekDialog({
     const load = async () => {
       setLoading(true);
       try {
-        const data = await apiClient.getAvailability(targetUserId);
+        const data = await apiClient.getAvailability(targetUserId, weekStartIso);
         setSlots((data || []).filter((slot: TimeSlot) => slot.is_available));
       } catch (error) {
         console.error('Failed to fetch availability:', error);
@@ -101,19 +114,14 @@ export function BookingWeekDialog({
     };
 
     load();
-  }, [open, targetUserId]);
+  }, [open, targetUserId, weekStartIso]);
 
   useEffect(() => {
     if (!open) return;
     setTitle(`Session with ${targetUserName}`);
   }, [open, targetUserName]);
 
-  const weekStart = useMemo(() => {
-    const now = new Date();
-    const currentWeekStart = startOfWeek(now);
-    currentWeekStart.setDate(currentWeekStart.getDate() + weekOffset * 7);
-    return currentWeekStart;
-  }, [weekOffset]);
+  const weekStart = weekStartDate;
 
   const weekDays = useMemo(() => {
     return Array.from({ length: 7 }).map((_, index) => {
@@ -136,6 +144,17 @@ export function BookingWeekDialog({
     setSelectedSlotId(slot.id);
     setSelectedDate(toIsoDate(date));
   };
+
+  useEffect(() => {
+    if (!open || weekDays.length === 0) return;
+
+    const firstDayWithSlot = weekDays.findIndex((day) => slotsForDay(day).length > 0);
+    const nextIndex = firstDayWithSlot >= 0 ? firstDayWithSlot : 0;
+
+    setSelectedDayIndex(nextIndex);
+    setSelectedDate(toIsoDate(weekDays[nextIndex]));
+    setSelectedSlotId(null);
+  }, [open, weekOffset, slots]);
 
   const handleSubmit = async () => {
     if (!selectedSlot || !selectedDate) {
@@ -163,6 +182,7 @@ export function BookingWeekDialog({
         start_time: startDate.toISOString(),
         end_time: endDate.toISOString(),
         timezone: 'Africa/Kigali',
+        ...(meetingLink.trim() ? { meeting_url: meetingLink.trim() } : {}),
         ...(description.trim() ? { description: description.trim() } : {}),
       });
 
@@ -170,7 +190,12 @@ export function BookingWeekDialog({
       onOpenChange(false);
     } catch (error: any) {
       console.error('Failed to book session:', error);
-      toast.error(error?.message || 'Failed to book session');
+      const message = (error?.message || '').toString();
+      if (message.toLowerCase().includes('already booked')) {
+        toast.error('This slot was just booked by someone else. Please choose another slot.');
+      } else {
+        toast.error(message || 'Failed to book session');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -178,7 +203,7 @@ export function BookingWeekDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="w-[96vw] !max-w-[1200px]">
         <DialogHeader>
           <DialogTitle>Book Session with {targetUserName}</DialogTitle>
           <DialogDescription>Select an available slot from the week view.</DialogDescription>
@@ -216,44 +241,76 @@ export function BookingWeekDialog({
               No available slots configured for this person yet.
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-7 gap-2">
-              {weekDays.map((day) => {
-                const daySlots = slotsForDay(day);
-                const dayLabel = day.toLocaleDateString(undefined, { weekday: 'short' });
-                const dayDate = day.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+            <div className="space-y-4">
+              <div className="overflow-x-auto pb-2">
+                <div className="flex gap-2 min-w-max">
+                  {weekDays.map((day, index) => {
+                    const daySlots = slotsForDay(day);
+                    const isSelected = index === selectedDayIndex;
 
-                return (
-                  <div key={day.toISOString()} className="border rounded-lg p-2 space-y-2 bg-background/40">
-                    <div className="text-center">
-                      <p className="text-xs font-semibold">{dayLabel}</p>
-                      <p className="text-[11px] text-muted-foreground">{dayDate}</p>
-                    </div>
-                    <div className="space-y-1 max-h-40 overflow-y-auto">
-                      {daySlots.length === 0 ? (
-                        <p className="text-[11px] text-muted-foreground text-center py-2">No slots</p>
-                      ) : (
-                        daySlots.map((slot) => {
-                          const selected = selectedSlotId === slot.id && selectedDate === toIsoDate(day);
-                          return (
-                            <button
-                              key={`${slot.id}-${toIsoDate(day)}`}
-                              type="button"
-                              onClick={() => handlePickSlot(slot, day)}
-                              className={`w-full text-left text-[11px] px-2 py-1 rounded border transition-colors ${
-                                selected
-                                  ? 'bg-[#76B947] text-white border-[#76B947]'
-                                  : 'hover:bg-[#76B947]/10 border-border text-foreground'
-                              }`}
-                            >
-                              {formatTimeRange(slot.start_time, slot.end_time)}
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
+                    return (
+                      <button
+                        key={day.toISOString()}
+                        type="button"
+                        onClick={() => {
+                          setSelectedDayIndex(index);
+                          setSelectedDate(toIsoDate(day));
+                          setSelectedSlotId(null);
+                        }}
+                        className={`min-w-[82px] rounded-xl border px-3 py-2 text-center transition-colors ${
+                          isSelected
+                            ? 'bg-[#76B947] text-white border-[#76B947]'
+                            : 'bg-background hover:bg-[#76B947]/10 border-border text-foreground'
+                        }`}
+                      >
+                        <p className="text-sm font-bold mb-1">
+                          {daySlots.length}
+                        </p>
+                        <p className="text-xs font-semibold">
+                          {day.toLocaleDateString(undefined, { weekday: 'short' })}
+                        </p>
+                        <p className="text-xs opacity-90">
+                          {day.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-3 bg-background/40">
+                <p className="text-sm font-semibold mb-2">
+                  {weekDays[selectedDayIndex]?.toLocaleDateString(undefined, {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </p>
+
+                {slotsForDay(weekDays[selectedDayIndex]).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No available slots for this day.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {slotsForDay(weekDays[selectedDayIndex]).map((slot) => {
+                      const selected = selectedSlotId === slot.id && selectedDate === toIsoDate(weekDays[selectedDayIndex]);
+                      return (
+                        <button
+                          key={`${slot.id}-${toIsoDate(weekDays[selectedDayIndex])}`}
+                          type="button"
+                          onClick={() => handlePickSlot(slot, weekDays[selectedDayIndex])}
+                          className={`rounded-lg border px-3 py-2 text-sm text-left transition-colors ${
+                            selected
+                              ? 'bg-[#76B947] text-white border-[#76B947]'
+                              : 'hover:bg-[#76B947]/10 border-border text-foreground'
+                          }`}
+                        >
+                          {formatTimeRange(slot.start_time, slot.end_time)}
+                        </button>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                )}
+              </div>
             </div>
           )}
 
@@ -285,6 +342,15 @@ export function BookingWeekDialog({
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               placeholder="Agenda or context for this session"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Meeting Link (optional)</label>
+            <Input
+              value={meetingLink}
+              onChange={(e) => setMeetingLink(e.target.value)}
+              placeholder="https://meet.google.com/..."
             />
           </div>
 

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/app_colors.dart';
 import '../../providers/auth_provider.dart';
-import '../../screens/main_scaffold.dart';
+import '../../services/notification_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -17,23 +18,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _emailAlerts = true;
 
   @override
+  void initState() {
+    super.initState();
+    _loadPrefs();
+  }
+
+  Future<void> _loadPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _notifications = prefs.getBool('push_notifications') ?? true;
+      _emailAlerts = prefs.getBool('email_alerts') ?? true;
+    });
+  }
+
+  Future<void> _togglePush(bool value) async {
+    setState(() => _notifications = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('push_notifications', value);
+    if (value) {
+      await NotificationService.instance.syncTokenWithBackend();
+    } else {
+      await NotificationService.instance.unregisterCurrentToken();
+    }
+  }
+
+  Future<void> _toggleEmail(bool value) async {
+    setState(() => _emailAlerts = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('email_alerts', value);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: context.colors.appBarBg,
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
-          onPressed: () => MainScaffold.scaffoldKey.currentState?.openDrawer(),
-        ),
-        title: Text(
-          'Settings',
-          style: TextStyle(
-            color: context.colors.textPrimary,
-            fontWeight: FontWeight.w700,
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
           ),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
         ),
+        title: const Text(
+          'Settings',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.home_rounded, color: Colors.white),
+            tooltip: 'Go home',
+            onPressed: () => context.go('/home'),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -55,13 +101,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.notifications_outlined,
             title: 'Push Notifications',
             value: _notifications,
-            onChanged: (v) => setState(() => _notifications = v),
+            onChanged: _togglePush,
           ),
           _SwitchTile(
             icon: Icons.email_outlined,
             title: 'Email Alerts',
             value: _emailAlerts,
-            onChanged: (v) => setState(() => _emailAlerts = v),
+            onChanged: _toggleEmail,
           ),
           const Divider(height: 24),
           _SectionHeader('Security'),
@@ -85,12 +131,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _SettingsTile(
             icon: Icons.privacy_tip_outlined,
             title: 'Privacy Policy',
-            onTap: () => _openExternalUrl('https://uruti.rw/privacy'),
+            onTap: () => _openExternalUrl('https://uruti.rw/privacy-policy'),
           ),
           _SettingsTile(
             icon: Icons.description_outlined,
             title: 'Terms of Service',
-            onTap: () => _openExternalUrl('https://uruti.rw/terms'),
+            onTap: () => _openExternalUrl('https://uruti.rw/terms-of-service'),
           ),
           const Divider(height: 24),
           ListTile(
@@ -186,7 +232,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: context.colors.accent,
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(48),
                 shape: RoundedRectangleBorder(
@@ -285,7 +331,7 @@ class _SwitchTile extends StatelessWidget {
     trailing: Switch(
       value: value,
       onChanged: onChanged,
-      activeColor: AppColors.primary,
+      activeColor: context.colors.accent,
     ),
   );
 }

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useConfirmDialog } from './ui/confirm-dialog';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
@@ -11,7 +12,8 @@ import {
   Calendar,
   MessageSquare,
   Plus,
-  Send
+  Send,
+  Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -30,18 +32,26 @@ interface VentureActivitySectionProps {
   activities?: Activity[];
   isOwner: boolean;
   onAddActivity?: (activity: Omit<Activity, 'id' | 'date'>) => void;
+  onDeleteActivity?: (activityId: string) => void;
 }
 
 export function VentureActivitySection({ 
   ventureId, 
   activities: initialActivities = [], 
   isOwner,
-  onAddActivity 
+  onAddActivity,
+  onDeleteActivity 
 }: VentureActivitySectionProps) {
-  const [activities, setActivities] = useState<Activity[]>(initialActivities);
+  const { confirm } = useConfirmDialog();
+  const [activities, setActivities] = useState<Activity[]>(initialActivities ?? []);
   const [isAddingUpdate, setIsAddingUpdate] = useState(false);
   const [updateText, setUpdateText] = useState('');
   const [updateType, setUpdateType] = useState<Activity['type']>('update');
+
+  // Sync activities with props when parent updates them (e.g. after API save)
+  useEffect(() => {
+    setActivities(initialActivities ?? []);
+  }, [initialActivities]);
 
   const activityTypeConfig = {
     milestone: { icon: Award, color: 'text-purple-600 bg-purple-100 dark:bg-purple-900/30', label: 'Milestone' },
@@ -73,6 +83,21 @@ export function VentureActivitySection({
     setUpdateText('');
     setIsAddingUpdate(false);
     toast.success('Activity update posted successfully!');
+  };
+
+  const handleDeleteActivity = async (activityId: string) => {
+    const confirmed = await confirm({
+      title: 'Delete Activity',
+      description: 'Are you sure you want to delete this activity? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+    setActivities((prev) => prev.filter((a) => a.id !== activityId));
+    if (onDeleteActivity) {
+      onDeleteActivity(activityId);
+    }
+    toast.success('Activity deleted');
   };
 
   const getUpdateTitle = (type: Activity['type']) => {
@@ -235,9 +260,21 @@ export function VentureActivitySection({
                               {activity.title}
                             </h3>
                           </div>
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Calendar className="h-3 w-3" />
-                            <span>{formatDate(activity.date)}</span>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Calendar className="h-3 w-3" />
+                              <span>{formatDate(activity.date)}</span>
+                            </div>
+                            {isOwner && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                onClick={() => handleDeleteActivity(activity.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                         <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>

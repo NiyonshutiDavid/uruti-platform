@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../bloc/founder/founder_cubit.dart';
 import '../../bloc/founder/founder_state.dart';
 import '../../core/app_constants.dart';
@@ -13,6 +14,16 @@ String? _ventureMediaUrl(String? raw) {
   if (raw == null || raw.trim().isEmpty) return null;
   if (raw.startsWith('http')) return raw;
   return '${AppConstants.apiBaseUrl}$raw';
+}
+
+Uri? _externalUri(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return null;
+  final trimmed = raw.trim();
+  Uri? uri = Uri.tryParse(trimmed);
+  if (uri == null || uri.scheme.isEmpty) {
+    uri = Uri.tryParse('https://$trimmed');
+  }
+  return uri;
 }
 
 // ─── Stage / Industry labels (mirrors add_venture_screen constants) ───────────
@@ -65,6 +76,22 @@ class VentureHubScreen extends StatefulWidget {
   const VentureHubScreen({super.key});
   @override
   State<VentureHubScreen> createState() => _VentureHubScreenState();
+}
+
+// ── Stage → status ────────────────────────────────────────────────────────────
+
+({String label, Color color}) _stageToStatus(
+  String stage,
+  BuildContext context,
+) {
+  return switch (stage) {
+    'validation' => (label: 'Validation', color: const Color(0xFF2196F3)),
+    'mvp' ||
+    'early_traction' ||
+    'growth' => (label: 'Development', color: const Color(0xFFFF9800)),
+    'scale' => (label: 'Investment Ready', color: context.colors.accent),
+    _ => (label: 'Idea', color: const Color(0xFF9E9E9E)),
+  };
 }
 
 class _VentureHubScreenState extends State<VentureHubScreen> {
@@ -228,19 +255,6 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
     }
   }
 
-  // ── Stage → status ────────────────────────────────────────────────────────────
-
-  static ({String label, Color color}) _stageToStatus(String stage) {
-    return switch (stage) {
-      'validation' => (label: 'Validation', color: const Color(0xFF2196F3)),
-      'mvp' ||
-      'early_traction' ||
-      'growth' => (label: 'Development', color: const Color(0xFFFF9800)),
-      'scale' => (label: 'Investment Ready', color: AppColors.primary),
-      _ => (label: 'Idea', color: const Color(0xFF9E9E9E)),
-    };
-  }
-
   // ── Stats row ─────────────────────────────────────────────────────────────────
 
   Widget _buildStatsRow(List<Map<String, dynamic>> ventures) {
@@ -295,9 +309,10 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
         final solution = venture['solution'] as String? ?? '';
         final market = venture['target_market'] as String? ?? '';
         final score = (venture['uruti_score'] as num?)?.toDouble() ?? 0.0;
+        final pitchDeckUrl = venture['pitch_deck_url'] as String?;
         final iconLogoUrl = _ventureMediaUrl(venture['logo_url'] as String?);
         final bannerUrl = _ventureMediaUrl(venture['banner_url'] as String?);
-        final status = _stageToStatus(stage);
+        final status = _stageToStatus(stage, context);
         final stageColor = _stageColors[stage] ?? const Color(0xFF9E9E9E);
         final industryIcon = _industryIcons[industry] ?? Icons.category_rounded;
 
@@ -385,7 +400,7 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
                         Text(
                           score.round().toString(),
                           style: TextStyle(
-                            color: AppColors.primary,
+                            color: context.colors.accent,
                             fontWeight: FontWeight.w800,
                             fontSize: 22,
                           ),
@@ -412,7 +427,7 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
                   _Badge(label: status.label, color: status.color),
                   _Badge(
                     label: _industryLabels[industry] ?? industry,
-                    color: AppColors.primary.withValues(alpha: 0.7),
+                    color: context.colors.accent.withValues(alpha: 0.7),
                   ),
                 ],
               ),
@@ -432,6 +447,51 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
                 const SizedBox(height: 12),
                 _DetailSection(title: 'Target Market', body: market, ctx: ctx),
               ],
+              const SizedBox(height: 12),
+              Text(
+                'Pitch Deck',
+                style: TextStyle(
+                  color: ctx.colors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 6),
+              if ((pitchDeckUrl ?? '').trim().isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final uri = _externalUri(pitchDeckUrl);
+                    if (uri != null && await canLaunchUrl(uri)) {
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
+                      return;
+                    }
+                    if (!ctx.mounted) return;
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                        content: Text('Unable to open pitch deck link'),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.slideshow_rounded, size: 16),
+                  label: const Text('View Pitch Deck'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: context.colors.accent,
+                    side: BorderSide(
+                      color: context.colors.accent.withValues(alpha: 0.35),
+                    ),
+                  ),
+                )
+              else
+                Text(
+                  'Pitch deck not available',
+                  style: TextStyle(
+                    color: ctx.colors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
               const SizedBox(height: 20),
               Row(
                 children: [
@@ -444,9 +504,9 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
                       icon: const Icon(Icons.edit_outlined, size: 16),
                       label: const Text('Edit'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
+                        foregroundColor: context.colors.accent,
                         side: BorderSide(
-                          color: AppColors.primary.withValues(alpha: 0.4),
+                          color: context.colors.accent.withValues(alpha: 0.4),
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -468,7 +528,7 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
                         style: TextStyle(color: Colors.white),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: context.colors.accent,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -493,30 +553,30 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
         return Scaffold(
           backgroundColor: context.colors.background,
           appBar: AppBar(
-            backgroundColor: context.colors.background,
+            backgroundColor: context.colors.appBarBg,
             elevation: 0,
             leading: IconButton(
-              icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
+              icon: Icon(Icons.menu_rounded, color: Colors.white),
               onPressed: () =>
                   MainScaffold.scaffoldKey.currentState?.openDrawer(),
             ),
             title: Text(
               'My Ventures',
               style: TextStyle(
-                color: context.colors.textPrimary,
+                color: Colors.white,
                 fontWeight: FontWeight.w700,
               ),
             ),
             actions: [
               IconButton(
-                icon: Icon(Icons.refresh, color: context.colors.textSecondary),
+                icon: Icon(Icons.refresh, color: Colors.white70),
                 onPressed: () =>
                     context.read<FounderCubit>().refreshVentureHub(),
               ),
             ],
           ),
           floatingActionButton: FloatingActionButton.extended(
-            backgroundColor: AppColors.primary,
+            backgroundColor: context.colors.accent,
             icon: const Icon(Icons.add, color: Colors.white),
             label: const Text(
               'Add Venture',
@@ -542,7 +602,7 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                 child: TextField(
                   controller: _searchCtrl,
-                  style: TextStyle(color: context.colors.textPrimary),
+                  style: TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: 'Search ventures…',
                     hintStyle: TextStyle(color: context.colors.textSecondary),
@@ -618,7 +678,7 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
             ElevatedButton(
               onPressed: () => context.read<FounderCubit>().refreshVentureHub(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: context.colors.accent,
               ),
               child: const Text('Retry', style: TextStyle(color: Colors.white)),
             ),
@@ -667,7 +727,7 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
     }
     return RefreshIndicator(
       onRefresh: () => context.read<FounderCubit>().refreshVentureHub(),
-      color: AppColors.primary,
+      color: context.colors.accent,
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
         itemCount: state.filteredVentures.length,
@@ -724,7 +784,7 @@ class _VentureCard extends StatelessWidget {
     final stageColor = _stageColors[stage] ?? const Color(0xFF9E9E9E);
     final industryIcon = _industryIcons[industry] ?? Icons.category_rounded;
     final logoUrl = _ventureMediaUrl(venture['logo_url'] as String?);
-    final status = _VentureHubScreenState._stageToStatus(stage);
+    final status = _stageToStatus(stage, context);
 
     return GestureDetector(
       onTap: onView,
@@ -875,7 +935,7 @@ class _VentureCard extends StatelessWidget {
                   ),
                   _Badge(
                     label: _industryLabels[industry] ?? industry,
-                    color: AppColors.primary.withValues(alpha: 0.8),
+                    color: context.colors.accent.withValues(alpha: 0.8),
                   ),
                   _Badge(label: status.label, color: status.color),
                 ],
@@ -914,7 +974,7 @@ class _VentureCard extends StatelessWidget {
                           : const Icon(Icons.auto_graph_rounded, size: 15),
                       label: Text(analyzingScore ? 'Analyzing...' : 'Analyze'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: context.colors.accent,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
@@ -936,13 +996,13 @@ class _VentureCard extends StatelessWidget {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.15),
+                      color: context.colors.accent.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       'Uruti Score: ${score.round()}/100',
-                      style: const TextStyle(
-                        color: AppColors.primary,
+                      style: TextStyle(
+                        color: context.colors.accent,
                         fontWeight: FontWeight.w700,
                         fontSize: 12,
                       ),
@@ -955,13 +1015,13 @@ class _VentureCard extends StatelessWidget {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.12),
+                        color: context.colors.accent.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         'Leaderboard #$leaderboardRank',
-                        style: const TextStyle(
-                          color: AppColors.primary,
+                        style: TextStyle(
+                          color: context.colors.accent,
                           fontWeight: FontWeight.w700,
                           fontSize: 11,
                         ),
@@ -1019,7 +1079,7 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? AppColors.primary;
+    final c = color ?? context.colors.accent;
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: GestureDetector(
@@ -1065,7 +1125,7 @@ class _StatChip extends StatelessWidget {
             Text(
               value,
               style: TextStyle(
-                color: AppColors.primary,
+                color: context.colors.accent,
                 fontWeight: FontWeight.w800,
                 fontSize: 18,
               ),

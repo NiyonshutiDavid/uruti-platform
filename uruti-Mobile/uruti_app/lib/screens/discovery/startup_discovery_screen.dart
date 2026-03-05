@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_constants.dart';
 import '../../core/app_colors.dart';
@@ -10,6 +11,16 @@ String? _mediaUrl(String? raw) {
   if (raw == null || raw.trim().isEmpty) return null;
   if (raw.startsWith('http')) return raw;
   return '${AppConstants.apiBaseUrl}$raw';
+}
+
+Uri? _externalUri(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return null;
+  final trimmed = raw.trim();
+  Uri? uri = Uri.tryParse(trimmed);
+  if (uri == null || uri.scheme.isEmpty) {
+    uri = Uri.tryParse('https://$trimmed');
+  }
+  return uri;
 }
 
 class StartupDiscoveryScreen extends StatefulWidget {
@@ -202,6 +213,32 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
     }
   }
 
+  String _formatCurrency(double amount) {
+    if (amount >= 1000000) {
+      return '\$${(amount / 1000000).toStringAsFixed(1)}M';
+    }
+    if (amount >= 1000) {
+      return '\$${(amount / 1000).toStringAsFixed(1)}K';
+    }
+    return '\$${amount.toStringAsFixed(0)}';
+  }
+
+  Future<void> _openExternalUrl(
+    BuildContext ctx,
+    String rawUrl, {
+    String errorMessage = 'Unable to open link',
+  }) async {
+    final uri = _externalUri(rawUrl);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
+    if (!ctx.mounted) return;
+    ScaffoldMessenger.of(
+      ctx,
+    ).showSnackBar(SnackBar(content: Text(errorMessage)));
+  }
+
   void _showVentureDetails(Map<String, dynamic> venture) {
     showModalBottomSheet(
       context: context,
@@ -217,9 +254,19 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
         final problem = _s(venture['problem_statement']);
         final solution = _s(venture['solution']);
         final market = _s(venture['target_market']);
+        final businessModel = _s(venture['business_model']);
+        final fundingGoal = (venture['funding_goal'] as num?)?.toDouble();
+        final fundingRaised = (venture['funding_raised'] as num?)?.toDouble();
+        final revenue = (venture['revenue'] as num?)?.toDouble();
+        final burnRate = (venture['monthly_burn_rate'] as num?)?.toDouble();
+        final mrr = (venture['mrr'] as num?)?.toDouble();
+        final teamSize = (venture['team_size'] as num?)?.toInt();
+        final customers = (venture['customers'] as num?)?.toInt();
         final stage = _s(venture['stage']);
         final industry = _s(venture['industry']);
         final score = (venture['uruti_score'] as num?)?.toInt() ?? 0;
+        final pitchDeckUrl = _s(venture['pitch_deck_url']);
+        final demoVideoUrl = _s(venture['demo_video_url']);
         final founderId = (venture['founder_id'] as num?)?.toInt();
         final logoUrl = _mediaUrl(venture['logo_url'] as String?);
         final bannerUrl = _mediaUrl(venture['banner_url'] as String?);
@@ -273,15 +320,15 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
                             child: Image.network(
                               logoUrl,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(
+                              errorBuilder: (_, __, ___) => Icon(
                                 Icons.rocket_launch_rounded,
-                                color: AppColors.primary,
+                                color: context.colors.accent,
                               ),
                             ),
                           )
-                        : const Icon(
+                        : Icon(
                             Icons.rocket_launch_rounded,
-                            color: AppColors.primary,
+                            color: context.colors.accent,
                           ),
                   ),
                   const SizedBox(width: 12),
@@ -314,13 +361,13 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.15),
+                      color: context.colors.accent.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       'Uruti: $score',
-                      style: const TextStyle(
-                        color: AppColors.primary,
+                      style: TextStyle(
+                        color: context.colors.accent,
                         fontWeight: FontWeight.w700,
                         fontSize: 12,
                       ),
@@ -417,6 +464,105 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
                   ),
                 ),
               ],
+              if (businessModel.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Business Model',
+                  style: TextStyle(
+                    color: ctx.colors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  businessModel,
+                  style: TextStyle(
+                    color: ctx.colors.textSecondary,
+                    fontSize: 14,
+                    height: 1.6,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Text(
+                'Business Snapshot',
+                style: TextStyle(
+                  color: ctx.colors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (fundingGoal != null)
+                    _Tag('Funding Goal: ${_formatCurrency(fundingGoal)}'),
+                  if (fundingRaised != null)
+                    _Tag('Funding Raised: ${_formatCurrency(fundingRaised)}'),
+                  if (revenue != null)
+                    _Tag('Revenue: ${_formatCurrency(revenue)}'),
+                  if (burnRate != null)
+                    _Tag('Burn Rate: ${_formatCurrency(burnRate)} / mo'),
+                  if (mrr != null) _Tag('MRR: ${_formatCurrency(mrr)}'),
+                  if (teamSize != null) _Tag('Team Size: $teamSize'),
+                  if (customers != null) _Tag('Customers: $customers'),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Pitch Deck',
+                style: TextStyle(
+                  color: ctx.colors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 6),
+              if (pitchDeckUrl.isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: () => _openExternalUrl(
+                    ctx,
+                    pitchDeckUrl,
+                    errorMessage: 'Unable to open pitch deck link',
+                  ),
+                  icon: const Icon(Icons.slideshow_rounded),
+                  label: const Text('View Pitch Deck'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: context.colors.accent,
+                    side: BorderSide(
+                      color: context.colors.accent.withValues(alpha: 0.35),
+                    ),
+                  ),
+                )
+              else
+                Text(
+                  'Pitch deck not available',
+                  style: TextStyle(
+                    color: ctx.colors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              if (demoVideoUrl.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () => _openExternalUrl(
+                    ctx,
+                    demoVideoUrl,
+                    errorMessage: 'Unable to open demo video link',
+                  ),
+                  icon: const Icon(Icons.play_circle_outline_rounded),
+                  label: const Text('View Demo Video'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: context.colors.accent,
+                    side: BorderSide(
+                      color: context.colors.accent.withValues(alpha: 0.35),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 18),
               if (founderId != null)
                 SizedBox(
@@ -429,9 +575,9 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
                     icon: const Icon(Icons.person_outline_rounded),
                     label: const Text('View Founder Profile'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
+                      foregroundColor: context.colors.accent,
                       side: BorderSide(
-                        color: AppColors.primary.withValues(alpha: 0.35),
+                        color: context.colors.accent.withValues(alpha: 0.35),
                       ),
                     ),
                   ),
@@ -448,15 +594,15 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: context.colors.appBarBg,
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
+          icon: Icon(Icons.menu_rounded, color: Colors.white),
           onPressed: () => MainScaffold.scaffoldKey.currentState?.openDrawer(),
         ),
         title: Text(
           'Startup Discovery',
           style: TextStyle(
-            color: context.colors.textPrimary,
+            color: Colors.white,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -464,14 +610,14 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
           IconButton(
             icon: Icon(
               Icons.emoji_events_outlined,
-              color: context.colors.textPrimary,
+              color: Colors.white,
             ),
             onPressed: () => context.go('/leaderboard'),
           ),
         ],
       ),
       body: RefreshIndicator(
-        color: AppColors.primary,
+        color: context.colors.accent,
         onRefresh: _load,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -479,7 +625,7 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
           children: [
             TextField(
               controller: _searchCtrl,
-              style: TextStyle(color: context.colors.textPrimary),
+              style: TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Search startups...',
                 hintStyle: TextStyle(color: context.colors.textMuted),
@@ -497,9 +643,9 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: context.colors.cardBorder),
                 ),
-                focusedBorder: const OutlineInputBorder(
+                focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.all(Radius.circular(12)),
-                  borderSide: BorderSide(color: AppColors.primary),
+                  borderSide: BorderSide(color: context.colors.accent),
                 ),
               ),
             ),
@@ -518,10 +664,12 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
             ),
             const SizedBox(height: 6),
             if (_loading)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 42),
                 child: Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
+                  child: CircularProgressIndicator(
+                    color: context.colors.accent,
+                  ),
                 ),
               )
             else if (_error != null)
@@ -640,12 +788,12 @@ class _FilterRow extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: selectedNow
-                            ? AppColors.primary.withValues(alpha: 0.15)
+                            ? context.colors.accent.withValues(alpha: 0.15)
                             : context.colors.surface,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: selectedNow
-                              ? AppColors.primary
+                              ? context.colors.accent
                               : context.colors.divider,
                         ),
                       ),
@@ -653,7 +801,7 @@ class _FilterRow extends StatelessWidget {
                         s,
                         style: TextStyle(
                           color: selectedNow
-                              ? AppColors.primary
+                              ? context.colors.accent
                               : context.colors.textSecondary,
                           fontSize: 12,
                           fontWeight: selectedNow
@@ -738,7 +886,7 @@ class _StartupCard extends StatelessWidget {
                           child: Text(
                             initials,
                             style: TextStyle(
-                              color: AppColors.primary,
+                              color: context.colors.accent,
                               fontWeight: FontWeight.w800,
                               fontSize: 16,
                             ),
@@ -750,7 +898,7 @@ class _StartupCard extends StatelessWidget {
                       child: Text(
                         initials,
                         style: TextStyle(
-                          color: AppColors.primary,
+                          color: context.colors.accent,
                           fontWeight: FontWeight.w800,
                           fontSize: 16,
                         ),
@@ -780,13 +928,13 @@ class _StartupCard extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.15),
+                          color: context.colors.accent.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
                           '$score',
                           style: TextStyle(
-                            color: AppColors.primary,
+                            color: context.colors.accent,
                             fontWeight: FontWeight.w800,
                             fontSize: 13,
                           ),
@@ -826,7 +974,7 @@ class _StartupCard extends StatelessWidget {
                     ? Icons.bookmark_rounded
                     : Icons.bookmark_border_rounded,
                 color: isBookmarked
-                    ? AppColors.primary
+                    ? context.colors.accent
                     : context.colors.textSecondary,
               ),
             ),

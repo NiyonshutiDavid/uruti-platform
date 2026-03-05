@@ -15,7 +15,7 @@ class CallDemoScreen extends StatelessWidget {
       backgroundColor: context.colors.background,
       appBar: AppBar(
         title: const Text('Call System Demo'),
-        backgroundColor: context.colors.surface,
+        backgroundColor: context.colors.appBarBg,
       ),
       body: SafeArea(
         child: Padding(
@@ -39,7 +39,7 @@ class CallDemoScreen extends StatelessWidget {
               _DemoButton(
                 label: 'Voice Call (Ben Mark)',
                 icon: Icons.phone,
-                color: AppColors.primary,
+                color: context.colors.accent,
                 onTap: () {
                   context.read<CallProvider>().simulateIncomingCall(
                     callerName: 'Ben Mark',
@@ -157,7 +157,7 @@ class CallDemoScreen extends StatelessWidget {
                                 label: calls.muted ? 'Unmute' : 'Mute',
                                 color: calls.muted
                                     ? AppColors.warning
-                                    : AppColors.primary,
+                                    : context.colors.accent,
                                 onTap: calls.toggleMute,
                               ),
                               _Chip(
@@ -166,7 +166,7 @@ class CallDemoScreen extends StatelessWidget {
                                     : 'Speaker On',
                                 color: calls.speakerOn
                                     ? AppColors.warning
-                                    : AppColors.primary,
+                                    : context.colors.accent,
                                 onTap: calls.toggleSpeaker,
                               ),
                               _Chip(

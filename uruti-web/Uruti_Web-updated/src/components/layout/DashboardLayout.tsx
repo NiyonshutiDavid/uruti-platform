@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../../lib/auth-context';
 import { getDefaultRouteForRole, hasAccessToRoute } from '../../lib/router-config';
@@ -30,6 +30,80 @@ import { AdminUserManagementModule } from '../modules/AdminUserManagementModule'
 import { AdminCredentialsModule } from '../modules/AdminCredentialsModule';
 import { useCall } from '../../lib/call-context';
 import { Button } from '../ui/button';
+import { apiClient } from '../../lib/api-client';
+import { toast } from 'sonner';
+
+/* ── Draggable incoming-call banner ──────────────────────────────────────── */
+function DraggableCallBanner({
+  type,
+  contactName,
+  onDecline,
+  onAccept,
+}: {
+  type: string;
+  contactName: string;
+  onDecline: () => void;
+  onAccept: () => void;
+}) {
+  const bannerRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const dragging = useRef(false);
+  const offset = useRef({ x: 0, y: 0 });
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    // Ignore if clicking a button
+    if ((e.target as HTMLElement).closest('button')) return;
+    dragging.current = true;
+    const rect = bannerRef.current!.getBoundingClientRect();
+    offset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragging.current) return;
+    const el = bannerRef.current!;
+    const maxX = window.innerWidth - el.offsetWidth;
+    const maxY = window.innerHeight - el.offsetHeight;
+    setPos({
+      x: Math.max(0, Math.min(e.clientX - offset.current.x, maxX)),
+      y: Math.max(0, Math.min(e.clientY - offset.current.y, maxY)),
+    });
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    dragging.current = false;
+  }, []);
+
+  const style: React.CSSProperties = pos
+    ? { left: pos.x, top: pos.y, transform: 'none' }
+    : { left: '50%', top: 80, transform: 'translateX(-50%)' };
+
+  return (
+    <div
+      ref={bannerRef}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      style={{ ...style, touchAction: 'none' }}
+      className="fixed z-[220] w-[min(92vw,420px)] cursor-grab rounded-2xl border border-border/70 bg-card/95 p-4 text-foreground shadow-2xl backdrop-blur active:cursor-grabbing"
+    >
+      <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+        Incoming {type} call
+      </p>
+      <p className="mt-1 text-base font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>
+        {contactName}
+      </p>
+      <div className="mt-3 flex items-center gap-2">
+        <Button onClick={onDecline} variant="destructive" className="flex-1">
+          Decline
+        </Button>
+        <Button onClick={onAccept} className="flex-1 bg-[#76B947] text-white hover:bg-[#76B947]/90">
+          Accept
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export function DashboardLayout() {
   const navigate = useNavigate();
@@ -39,7 +113,28 @@ export function DashboardLayout() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [aiChatContext, setAiChatContext] = useState<{ name: string; description: string } | undefined>();
   const [aiAnalysisContext, setAiAnalysisContext] = useState<any>(undefined);
+  const remindedMeetingKeys = useRef<Set<string>>(new Set());
   const { callState, endCall, acceptIncomingCall, declineIncomingCall } = useCall();
+
+  const showBrowserReminder = useCallback(async (title: string, body: string) => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+
+    if (Notification.permission === 'default') {
+      try {
+        await Notification.requestPermission();
+      } catch {
+        return;
+      }
+    }
+
+    if (Notification.permission !== 'granted') return;
+
+    const browserNotification = new Notification(title, { body });
+    browserNotification.onclick = () => {
+      window.focus();
+      navigate('/dashboard/calendar');
+    };
+  }, [navigate]);
 
   // Keep module state synced with URL and enforce role-based access
   useEffect(() => {
@@ -163,6 +258,53 @@ export function DashboardLayout() {
     };
   }, [handleModuleChange, handleNavigate]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    let cancelled = false;
+
+    const checkMeetingReminders = async () => {
+      try {
+        const meetings = await apiClient.getUpcomingMeetings(1);
+        if (cancelled || !Array.isArray(meetings)) return;
+
+        const nowMs = Date.now();
+
+        for (const meeting of meetings) {
+          const startTimeValue = meeting?.start_time;
+          const meetingId = meeting?.id;
+          if (!startTimeValue || !meetingId) continue;
+
+          const startMs = new Date(startTimeValue).getTime();
+          const minutesUntil = Math.round((startMs - nowMs) / 60000);
+          if (minutesUntil < 0 || minutesUntil > 30) continue;
+
+          const key = `${meetingId}:${startTimeValue}`;
+          if (remindedMeetingKeys.current.has(key)) continue;
+          remindedMeetingKeys.current.add(key);
+
+          const title = (meeting?.title || 'Upcoming meeting').toString();
+          const body = `Starts in ${minutesUntil} minute${minutesUntil === 1 ? '' : 's'}.`;
+
+          toast.info(`${title} · ${body}`);
+          await showBrowserReminder(title, body);
+        }
+      } catch {
+        // Silent fail to avoid noisy reminder loop errors
+      }
+    };
+
+    void checkMeetingReminders();
+    const interval = setInterval(() => {
+      void checkMeetingReminders();
+    }, 60000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [user, showBrowserReminder]);
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
@@ -175,7 +317,7 @@ export function DashboardLayout() {
         onToggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         onLogout={handleLogout}
       />
-      <div className="flex">
+      <div className="flex h-[calc(100dvh-4rem)] overflow-hidden">
         <Sidebar 
           activeModule={activeModule} 
           onModuleChange={handleModuleChange}
@@ -183,7 +325,9 @@ export function DashboardLayout() {
           isMobileSidebarOpen={isMobileSidebarOpen}
           setIsMobileSidebarOpen={setIsMobileSidebarOpen}
         />
-        <main className="flex-1 p-3 sm:p-4 md:p-6 ml-0 lg:ml-64 w-full lg:w-auto">
+        <main className={`flex-1 ml-0 lg:ml-64 w-full lg:w-auto overflow-hidden ${
+          activeModule === 'ai-chat' ? '' : 'p-3 sm:p-4 md:p-6 overflow-y-auto'
+        }`}>
           <Routes>
             {/* Founder routes */}
             <Route path="dashboard" element={user.role === 'founder' ? <FounderSnapshotModule /> : <Navigate to="/dashboard" replace />} />
@@ -224,29 +368,12 @@ export function DashboardLayout() {
       {user.role !== 'admin' && <OnboardingTour />}
 
       {callState?.isOpen && callState.isRinging && callState.isIncoming && (
-        <div className="fixed left-1/2 top-4 z-[220] w-[min(92vw,420px)] -translate-x-1/2 rounded-2xl border border-border/70 bg-card/95 p-4 text-foreground shadow-2xl backdrop-blur sm:top-6 md:top-20">
-          <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-            Incoming {callState.type} call
-          </p>
-          <p className="mt-1 text-base font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>
-            {callState.contactName}
-          </p>
-          <div className="mt-3 flex items-center gap-2">
-            <Button
-              onClick={() => void declineIncomingCall()}
-              variant="destructive"
-              className="flex-1"
-            >
-              Decline
-            </Button>
-            <Button
-              onClick={() => void acceptIncomingCall()}
-              className="flex-1 bg-[#76B947] text-white hover:bg-[#76B947]/90"
-            >
-              Accept
-            </Button>
-          </div>
-        </div>
+        <DraggableCallBanner
+          type={callState.type}
+          contactName={callState.contactName}
+          onDecline={() => void declineIncomingCall()}
+          onAccept={() => void acceptIncomingCall()}
+        />
       )}
 
       {callState && (
