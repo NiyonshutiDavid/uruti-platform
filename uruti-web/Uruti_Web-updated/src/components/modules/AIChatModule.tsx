@@ -645,7 +645,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
   const isAnalysisSelected = selectedModel?.type === 'analysis';
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden bg-white dark:bg-gray-900">
+    <div className="flex h-full min-h-0 overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="glass-card border-purple-200 dark:border-purple-500/30">
@@ -668,12 +668,12 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
       </AlertDialog>
 
       {/* Chat History Sidebar */}
-      <aside 
-        className={`w-80 border-r border-gray-200 dark:border-gray-800 flex h-full min-h-0 flex-col overflow-hidden ${
+      <aside
+        className={`w-80 shrink-0 border-r border-slate-200/80 bg-white/90 dark:border-slate-800 dark:bg-slate-900/70 flex h-full min-h-0 flex-col overflow-hidden backdrop-blur supports-[backdrop-filter]:bg-white/80 supports-[backdrop-filter]:dark:bg-slate-900/70 ${
           isSidebarOpen ? 'flex' : 'hidden md:flex'
         }`}
       >
-        <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">
@@ -710,7 +710,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
               placeholder="Search conversations..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 dark:bg-gray-800 dark:border-gray-700 border-gray-200"
+              className="pl-10 bg-slate-100 border-slate-200 text-slate-900 placeholder:text-slate-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-400"
             />
           </div>
         </div>
@@ -785,10 +785,10 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
       </aside>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex min-h-0 flex-col">
+      <div className="flex-1 flex min-h-0 flex-col overflow-hidden">
         
         {/* Chat Header - Fixed at top */}
-        <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-800 p-4 bg-white dark:bg-gray-900">
+        <div className="sticky top-0 z-10 flex-shrink-0 border-b border-slate-200 dark:border-slate-800 p-4 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center space-x-3">
               <Button
@@ -822,7 +822,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
         </div>
 
         {/* Messages Area - Scrollable */}
-        <div className="flex-1 min-h-0 overflow-y-auto" ref={scrollRef}>
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain" ref={scrollRef}>
             <div className="max-w-4xl mx-auto p-6 w-full">
               {/* Welcome Message when no messages */}
               {messages.length === 0 && (
@@ -898,7 +898,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                             className={`rounded-2xl px-5 py-4 glass-card ${
                               message.role === 'user'
                                 ? 'bg-gradient-to-br from-[#76B947] to-[#5a8f35] border-none'
-                                : 'bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 border border-purple-200 dark:border-purple-700'
+                                : 'bg-gradient-to-br from-white to-purple-50 border border-purple-200 dark:from-slate-900 dark:to-purple-950/40 dark:border-purple-800/60'
                             }`}
                           >
                             <p className={`text-sm whitespace-pre-wrap ${message.role === 'user' ? 'text-black dark:text-white' : ''}`} style={{ fontFamily: 'var(--font-body)' }}>
@@ -954,7 +954,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
         </div>
 
         {/* Input Area - Fixed at bottom */}
-        <div className="z-20 flex-shrink-0 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
+        <div className="sticky bottom-0 z-20 flex-shrink-0 border-t border-slate-200 dark:border-slate-800 bg-slate-50/95 dark:bg-slate-950/95 p-4 backdrop-blur">
           <div className="max-w-4xl mx-auto">
             <div className="relative border border-purple-300 dark:border-purple-600 rounded-3xl overflow-hidden bg-white dark:bg-gray-800 shadow-lg">
               <div className="flex items-end p-2 gap-2">

@@ -325,7 +325,7 @@ export function DashboardLayout() {
           isMobileSidebarOpen={isMobileSidebarOpen}
           setIsMobileSidebarOpen={setIsMobileSidebarOpen}
         />
-        <main className={`flex-1 ml-0 lg:ml-64 w-full lg:w-auto overflow-hidden ${
+        <main className={`flex-1 min-h-0 ml-0 lg:ml-64 w-full lg:w-auto overflow-hidden ${
           activeModule === 'ai-chat' ? '' : 'p-3 sm:p-4 md:p-6 overflow-y-auto'
         }`}>
           <Routes>
