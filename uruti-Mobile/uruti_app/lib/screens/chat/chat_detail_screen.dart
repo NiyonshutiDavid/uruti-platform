@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:record/record.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/app_constants.dart';
@@ -35,8 +36,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   String? _attachedFileName;
   String? _attachedFilePath;
   bool _sending = false;
+  bool _isRecordingVoiceNote = false;
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
   Timer? _onlineRefreshTimer;
+  final AudioRecorder _audioRecorder = AudioRecorder();
 
   static final RegExp _callSummaryRegex = RegExp(
     r'^(Voice|Video)\s+call\s+(ended|missed|declined)\s*[·•-]\s*(\d+)m\s*(\d{1,2})s$',
@@ -82,6 +85,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _onlineRefreshTimer?.cancel();
     _ctrl.dispose();
     _scroll.dispose();
+    _audioRecorder.dispose();
     super.dispose();
   }
 
@@ -446,6 +450,130 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         _attachedFilePath = file.path;
       });
     } catch (_) {}
+  }
+
+  Future<void> _toggleVoiceNoteRecording() async {
+    if (_sending) return;
+
+    if (_isRecordingVoiceNote) {
+      try {
+        final path = await _audioRecorder.stop();
+        if (!mounted) return;
+        setState(() {
+          _isRecordingVoiceNote = false;
+          if (path != null && path.isNotEmpty) {
+            final fileName = path.split('/').last;
+            _attachedFilePath = path;
+            _attachedFileName = fileName.isEmpty ? 'voice-note.m4a' : fileName;
+          }
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _isRecordingVoiceNote = false);
+      }
+      return;
+    }
+
+    try {
+      final allowed = await _audioRecorder.hasPermission();
+      if (!allowed) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone permission is required.')),
+        );
+        return;
+      }
+
+      final outputPath =
+          '/tmp/uruti_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _audioRecorder.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc),
+        path: outputPath,
+      );
+
+      if (!mounted) return;
+      setState(() => _isRecordingVoiceNote = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Recording voice note... tap mic again to stop.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isRecordingVoiceNote = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to start voice recording.')),
+      );
+    }
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  String _dayLabel(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(date.year, date.month, date.day);
+    final diff = today.difference(target).inDays;
+    if (diff == 0) return 'Today';
+    if (diff == 1) return 'Yesterday';
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  List<Widget> _buildMessageListItems(int meId) {
+    final widgets = <Widget>[];
+    DateTime? lastDate;
+
+    for (final msg in _messages) {
+      final createdAtRaw = msg['created_at'] as String?;
+      final createdAt = DateTime.tryParse(createdAtRaw ?? '')?.toLocal();
+      if (createdAt != null && (lastDate == null || !_isSameDay(lastDate, createdAt))) {
+        widgets.add(
+          Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                color: context.colors.card,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: context.colors.cardBorder),
+              ),
+              child: Text(
+                _dayLabel(createdAt),
+                style: TextStyle(
+                  color: context.colors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        );
+        lastDate = createdAt;
+      }
+
+      final isMe = msg['sender_id'] == meId;
+      if (msg['kind'] == 'call_event') {
+        widgets.add(_CallSummaryBubble(msg: msg));
+      } else {
+        widgets.add(_MessageBubble(msg: msg, isMe: isMe));
+      }
+    }
+
+    return widgets;
   }
 
   void _openComposerActions() {
@@ -1004,26 +1132,20 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       color: context.colors.accent,
                     ),
                   )
-                : ListView.builder(
+                : ListView(
                     controller: _scroll,
                     padding: const EdgeInsets.all(16),
-                    itemCount: _messages.length,
-                    itemBuilder: (_, i) {
-                      final msg = _messages[i];
-                      final isMe = msg['sender_id'] == me.id;
-                      if (msg['kind'] == 'call_event') {
-                        return _CallSummaryBubble(msg: msg);
-                      }
-                      return _MessageBubble(msg: msg, isMe: isMe);
-                    },
+                    children: _buildMessageListItems(me.id),
                   ),
           ),
           _InputBar(
             ctrl: _ctrl,
             onSend: _send,
             onAttach: _openComposerActions,
+            onRecordVoice: _toggleVoiceNoteRecording,
             hasAttachment: _hasPendingAttachments(),
             sending: _sending,
+            recordingVoiceNote: _isRecordingVoiceNote,
           ),
         ],
       ),
@@ -2293,14 +2415,18 @@ class _InputBar extends StatelessWidget {
   final TextEditingController ctrl;
   final VoidCallback onSend;
   final VoidCallback onAttach;
+  final VoidCallback onRecordVoice;
   final bool hasAttachment;
   final bool sending;
+  final bool recordingVoiceNote;
   const _InputBar({
     required this.ctrl,
     required this.onSend,
     required this.onAttach,
+    required this.onRecordVoice,
     required this.hasAttachment,
     required this.sending,
+    required this.recordingVoiceNote,
   });
 
   @override
@@ -2360,16 +2486,24 @@ class _InputBar extends StatelessWidget {
                     visualDensity: VisualDensity.compact,
                   ),
                   GestureDetector(
-                    onTap: canSend && !sending ? onSend : null,
+                    onTap: sending
+                        ? null
+                        : (canSend ? onSend : onRecordVoice),
                     child: Container(
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: context.colors.accent,
+                        color: recordingVoiceNote
+                            ? Colors.redAccent
+                            : context.colors.accent,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        canSend ? Icons.send_rounded : Icons.mic_rounded,
+                        canSend
+                            ? Icons.send_rounded
+                            : (recordingVoiceNote
+                                  ? Icons.stop_rounded
+                                  : Icons.mic_rounded),
                         color: Colors.white,
                         size: 20,
                       ),

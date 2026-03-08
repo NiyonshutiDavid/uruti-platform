@@ -145,6 +145,9 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
   const [modelSelectOpen, setModelSelectOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [chatToDelete, setChatToDelete] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -279,7 +282,28 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
           startup: undefined,
         }));
 
+        formattedHistory.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
         setChatHistories(formattedHistory);
+
+        // Open the latest conversation by default so users land on newest messages.
+        if (formattedHistory.length > 0 && !currentChatId && messages.length === 0) {
+          const latest = formattedHistory[0];
+          setCurrentChatId(latest.id);
+          try {
+            const messagesData = await apiClient.getAiSessionMessages(latest.id);
+            const formattedMessages: Message[] = messagesData.map((msg: any) => ({
+              id: String(msg.id),
+              role: msg.role,
+              content: msg.content,
+              timestamp: new Date(msg.created_at),
+              startup: undefined,
+            }));
+            setMessages(formattedMessages);
+          } catch {
+            // Keep app usable even if a session fetch fails.
+          }
+        }
       } catch (error) {
         // Silently handle error - AI chat endpoints might not be implemented yet
         setChatHistories([]);
@@ -292,6 +316,13 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
       loadChatHistory();
     }
   }, [user]);
+
+  useEffect(() => {
+    return () => {
+      mediaRecorderRef.current?.stop();
+      audioStreamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
 
   // Handle startup context from external navigation
   useEffect(() => {
@@ -486,18 +517,50 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
     setAttachDialogOpen(false);
   };
 
-  const handleRecording = () => {
-    setIsRecording(!isRecording);
-    if (!isRecording) {
-      setTimeout(() => {
+  const handleRecording = async () => {
+    if (isRecording) {
+      mediaRecorderRef.current?.stop();
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
+
+      const preferredTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+      const mimeType = preferredTypes.find((t) => MediaRecorder.isTypeSupported(t));
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        if (blob.size > 0) {
+          const extension = (recorder.mimeType || 'audio/webm').includes('mp4') ? 'm4a' : 'webm';
+          const attachment: Attachment = {
+            id: Date.now().toString(),
+            name: `Voice Note ${new Date().toLocaleTimeString()}.${extension}`,
+            type: 'audio',
+            url: URL.createObjectURL(blob),
+          };
+          setAttachments((prev) => [...prev, attachment]);
+        }
         setIsRecording(false);
-        const audioAttachment: Attachment = {
-          id: Date.now().toString(),
-          name: 'Voice Recording',
-          type: 'audio',
-        };
-        setAttachments(prev => [...prev, audioAttachment]);
-      }, 3000);
+        audioStreamRef.current?.getTracks().forEach((track) => track.stop());
+        audioStreamRef.current = null;
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Voice recording failed:', error);
+      setIsRecording(false);
     }
   };
 
@@ -582,7 +645,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
   const isAnalysisSelected = selectedModel?.type === 'analysis';
 
   return (
-    <div className="flex h-full bg-white dark:bg-gray-900">
+    <div className="flex h-full min-h-0 overflow-hidden bg-white dark:bg-gray-900">
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="glass-card border-purple-200 dark:border-purple-500/30">
@@ -606,7 +669,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
 
       {/* Chat History Sidebar */}
       <aside 
-        className={`w-80 border-r border-gray-200 dark:border-gray-800 flex flex-col h-full ${
+        className={`w-80 border-r border-gray-200 dark:border-gray-800 flex h-full min-h-0 flex-col overflow-hidden ${
           isSidebarOpen ? 'flex' : 'hidden md:flex'
         }`}
       >
@@ -722,7 +785,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
       </aside>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col h-screen">
+      <div className="flex-1 flex min-h-0 flex-col">
         
         {/* Chat Header - Fixed at top */}
         <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-800 p-4 bg-white dark:bg-gray-900">

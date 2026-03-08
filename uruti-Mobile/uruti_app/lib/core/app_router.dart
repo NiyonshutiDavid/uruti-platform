@@ -120,15 +120,6 @@ GoRouter createRouter(AuthProvider authProvider) {
         },
         builder: (_, __) => const RecordingScreen(),
       ),
-      GoRoute(
-        path: '/pitch-performance',
-        redirect: (_, __) {
-          final role = authProvider.user?.role.toLowerCase();
-          if (role == 'founder') return null;
-          return '/home';
-        },
-        builder: (_, __) => const PitchPerformanceScreen(),
-      ),
 
       // ── Shell: all main app routes share the bottom nav ─────────────────
       ShellRoute(
@@ -163,6 +154,15 @@ GoRouter createRouter(AuthProvider authProvider) {
               return '/home';
             },
             builder: (_, __) => const PitchCoachScreen(),
+          ),
+          GoRoute(
+            path: '/pitch-performance',
+            redirect: (_, __) {
+              final role = authProvider.user?.role.toLowerCase();
+              if (role == 'founder') return null;
+              return '/home';
+            },
+            builder: (_, __) => const PitchPerformanceScreen(),
           ),
           GoRoute(path: '/inbox', builder: (_, __) => const InboxScreen()),
           // Peer-to-peer messages (accessed from Inbox tab)
