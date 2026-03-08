@@ -4,6 +4,7 @@
 import config from './config';
 
 const API_BASE_URL = config.apiUrl;
+const CHATBOT_BASE_URL = config.chatbotApiUrl;
 
 interface RequestConfig extends RequestInit {
   requiresAuth?: boolean;
@@ -11,12 +12,18 @@ interface RequestConfig extends RequestInit {
 
 class ApiClient {
   private baseUrl: string;
+  private chatbotBaseUrl: string;
 
   constructor(baseUrl: string) {
     const normalized = baseUrl.replace(/\/+$/, '');
     this.baseUrl = normalized.endsWith('/api/v1')
       ? normalized.replace(/\/api\/v1$/, '')
       : normalized;
+
+    const chatbotNormalized = CHATBOT_BASE_URL.replace(/\/+$/, '');
+    this.chatbotBaseUrl = chatbotNormalized.endsWith('/api/v1')
+      ? chatbotNormalized.replace(/\/api\/v1$/, '')
+      : chatbotNormalized;
   }
 
   private getAuthToken(): string | null {
@@ -101,13 +108,73 @@ class ApiClient {
     return response.text() as any;
   }
 
+  private isLocalhostBase(baseUrl: string): boolean {
+    try {
+      const parsed = new URL(baseUrl);
+      return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+    } catch {
+      return false;
+    }
+  }
+
+  private withPort(baseUrl: string, port: number): string {
+    const parsed = new URL(baseUrl);
+    parsed.port = String(port);
+    return parsed.origin;
+  }
+
+  private candidateBaseUrls(baseUrl: string, endpoint: string): string[] {
+    const candidates: string[] = [baseUrl];
+    if (!this.isLocalhostBase(baseUrl)) {
+      return candidates;
+    }
+
+    const isAiEndpoint = endpoint.startsWith('/api/v1/ai');
+    // Only AI endpoints should probe the dedicated chatbot service port.
+    // Core endpoints (ventures, meetings, connections, etc.) must stay on core backend ports.
+    const ports = isAiEndpoint ? [8020, 8010, 8000] : [8010, 8000];
+    for (const port of ports) {
+      try {
+        const candidate = this.withPort(baseUrl, port);
+        if (!candidates.includes(candidate)) {
+          candidates.push(candidate);
+        }
+      } catch {
+        // Keep existing candidates when URL parsing fails.
+      }
+    }
+
+    return candidates;
+  }
+
+  private async fetchWithFallback<T>(
+    baseUrl: string,
+    endpoint: string,
+    fetchConfig: RequestInit,
+  ): Promise<T> {
+    const candidates = this.candidateBaseUrls(baseUrl, endpoint);
+    let lastError: unknown = null;
+
+    for (const candidateBase of candidates) {
+      const url = `${candidateBase}${endpoint}`;
+      try {
+        const response = await fetch(url, fetchConfig);
+        return await this.handleResponse<T>(response);
+      } catch (error) {
+        lastError = error;
+        console.warn('⚠️ Fetch candidate failed:', { url, error });
+      }
+    }
+
+    throw lastError ?? new Error('Failed to fetch from all configured API endpoints');
+  }
+
   async request<T>(
     endpoint: string,
     config: RequestConfig = {}
   ): Promise<T> {
     const { requiresAuth = false, ...fetchConfig } = config;
 
-    const url = `${this.baseUrl}${endpoint}`;
     const headers = this.getHeaders(requiresAuth);
 
     const isFormDataBody = typeof FormData !== 'undefined' && fetchConfig.body instanceof FormData;
@@ -115,34 +182,49 @@ class ApiClient {
       delete (headers as Record<string, string>)['Content-Type'];
     }
 
-    console.log('🌐 Fetching:', { 
-      url, 
+    console.log('🌐 Fetching:', {
+      baseUrl: this.baseUrl,
+      endpoint,
       method: fetchConfig.method || 'GET',
       headers,
       body: fetchConfig.body ? '(data present)' : '(no body)'
     });
 
     try {
-      const response = await fetch(url, {
+      return await this.fetchWithFallback<T>(this.baseUrl, endpoint, {
         ...fetchConfig,
         headers: {
           ...headers,
           ...fetchConfig.headers,
         },
       });
-
-      console.log('📥 Response:', { 
-        url, 
-        status: response.status, 
-        ok: response.ok,
-        statusText: response.statusText
-      });
-
-      return this.handleResponse<T>(response);
     } catch (error) {
-      console.error('🔴 Fetch error:', { url, error });
+      console.error('🔴 Fetch error:', { baseUrl: this.baseUrl, endpoint, error });
       throw error;
     }
+  }
+
+  async requestAgainstBase<T>(
+    baseUrl: string,
+    endpoint: string,
+    config: RequestConfig = {}
+  ): Promise<T> {
+    const { requiresAuth = false, ...fetchConfig } = config;
+
+    const headers = this.getHeaders(requiresAuth);
+
+    const isFormDataBody = typeof FormData !== 'undefined' && fetchConfig.body instanceof FormData;
+    if (isFormDataBody) {
+      delete (headers as Record<string, string>)['Content-Type'];
+    }
+
+    return this.fetchWithFallback<T>(baseUrl, endpoint, {
+      ...fetchConfig,
+      headers: {
+        ...headers,
+        ...fetchConfig.headers,
+      },
+    });
   }
 
   // Auth endpoints
@@ -708,6 +790,13 @@ class ApiClient {
     });
   }
 
+  async deletePitchAnalysis(sessionId: string | number) {
+    return this.request<void>(`/api/v1/pitch/analyses/${sessionId}`, {
+      method: 'DELETE',
+      requiresAuth: true,
+    });
+  }
+
   // Advisory endpoints
   async getAdvisoryTracks() {
     return this.request<any[]>('/api/v1/advisory/tracks', {
@@ -1211,7 +1300,13 @@ class ApiClient {
   }
 
   async getAiModels() {
-    return this.request<any[]>('/api/v1/ai/models', {
+    return this.requestAgainstBase<any[]>(this.chatbotBaseUrl, '/api/v1/ai/models', {
+      requiresAuth: true,
+    });
+  }
+
+  async getAdminAiRuntimeStatus() {
+    return this.requestAgainstBase<any>(this.chatbotBaseUrl, '/api/v1/ai/admin/runtime-status', {
       requiresAuth: true,
     });
   }
@@ -1222,7 +1317,7 @@ class ApiClient {
     session_id?: string;
     startup_context?: {
       venture_id?: number;
-      name: string;
+      name?: string;
       description?: string;
       stage?: string;
       industry?: string;
@@ -1230,11 +1325,24 @@ class ApiClient {
       solution?: string;
       target_market?: string;
       business_model?: string;
+      tagline?: string;
+      funding_goal?: number;
+      funding_raised?: number;
+      revenue?: number;
+      mrr?: number;
+      customers?: number;
+      team_size?: number;
+      highlights?: string[];
+      competitive_edge?: string;
+      team_background?: string;
+      funding_plans?: string;
+      milestones?: any[];
+      activities?: any[];
     };
     file_content?: string;
     file_name?: string;
   }) {
-    return this.request<any>('/api/v1/ai/chat', {
+    return this.requestAgainstBase<any>(this.chatbotBaseUrl, '/api/v1/ai/chat', {
       method: 'POST',
       requiresAuth: true,
       body: JSON.stringify(data),
@@ -1242,21 +1350,29 @@ class ApiClient {
   }
 
   async getAiHistorySessions() {
-    return this.request<any[]>('/api/v1/ai/history', {
+    return this.requestAgainstBase<any[]>(this.chatbotBaseUrl, '/api/v1/ai/history', {
       requiresAuth: true,
     });
   }
 
   async getAiSessionMessages(sessionId: string) {
-    return this.request<any[]>(`/api/v1/ai/history/${sessionId}`, {
+    return this.requestAgainstBase<any[]>(this.chatbotBaseUrl, `/api/v1/ai/history/${sessionId}`, {
       requiresAuth: true,
     });
   }
 
   async deleteAiSessionHistory(sessionId: string) {
-    return this.request<void>(`/api/v1/ai/history/${sessionId}`, {
+    return this.requestAgainstBase<void>(this.chatbotBaseUrl, `/api/v1/ai/history/${sessionId}`, {
       method: 'DELETE',
       requiresAuth: true,
+    });
+  }
+
+  async renameAiSessionHistory(sessionId: string, title: string) {
+    return this.requestAgainstBase<any>(this.chatbotBaseUrl, `/api/v1/ai/history/${sessionId}/title`, {
+      method: 'PUT',
+      requiresAuth: true,
+      body: JSON.stringify({ title }),
     });
   }
 

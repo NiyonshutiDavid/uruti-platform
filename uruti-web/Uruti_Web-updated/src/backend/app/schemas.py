@@ -566,7 +566,8 @@ class AdvisoryTrackResponse(AdvisoryTrackBase):
 
 class AiStartupContext(BaseModel):
     venture_id: Optional[int] = None
-    name: str
+    name: Optional[str] = None
+    tagline: Optional[str] = None
     description: Optional[str] = None
     stage: Optional[str] = None
     industry: Optional[str] = None
@@ -574,11 +575,23 @@ class AiStartupContext(BaseModel):
     solution: Optional[str] = None
     target_market: Optional[str] = None
     business_model: Optional[str] = None
+    funding_goal: Optional[float] = None
+    funding_raised: Optional[float] = None
+    revenue: Optional[float] = None
+    mrr: Optional[float] = None
+    customers: Optional[int] = None
+    team_size: Optional[int] = None
+    highlights: Optional[List[str]] = None
+    competitive_edge: Optional[str] = None
+    team_background: Optional[str] = None
+    funding_plans: Optional[str] = None
+    milestones: Optional[List[Dict[str, Any]]] = None
+    activities: Optional[List[Dict[str, Any]]] = None
 
 
 class AiChatRequest(BaseModel):
     message: str
-    model: Optional[str] = "uruti-ai"          # uruti-ai | gpt-4 | gpt-3.5-turbo
+    model: Optional[str] = "uruti-ai"          # chatbot model id from /ai/models
     session_id: Optional[str] = None            # continue existing session
     startup_context: Optional[AiStartupContext] = None
     file_content: Optional[str] = None          # plain-text file content
@@ -589,6 +602,9 @@ class AiChatResponse(BaseModel):
     message: str
     session_id: str
     model: str
+    fallback_used: bool = False
+    inference_backend: Optional[str] = None
+    inference_error: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -617,6 +633,10 @@ class AiChatSessionSummary(BaseModel):
     model_used: Optional[str] = None
 
     model_config = ConfigDict(protected_namespaces=())
+
+
+class AiChatSessionTitleUpdate(BaseModel):
+    title: str
 
 
 class FounderProfilePayload(BaseModel):

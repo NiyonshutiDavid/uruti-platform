@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -9,13 +10,20 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from ..auth import get_current_user
 from ..models import User
 from ..schemas import ChatResponse, ChatTextRequest, FounderProfilePayload
-from ..services.rag_advisor import advisor_service
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 PROFILE_DIR = Path("uploads") / "founder_profiles"
 PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@lru_cache(maxsize=1)
+def _advisor_service():
+    # Import lazily so core backend can start quickly even when RAG indexes are large.
+    from ..services.rag_advisor import advisor_service
+
+    return advisor_service
 
 
 def _profile_path(user_id: int) -> Path:
@@ -35,7 +43,7 @@ def _read_profile(user_id: int) -> str:
 
 def _write_profile(user_id: int, founder_profile: str) -> str:
     path = _profile_path(user_id)
-    profile = advisor_service.normalize_whitespace(founder_profile)
+    profile = _advisor_service().normalize_whitespace(founder_profile)
     path.write_text(json.dumps({"founder_profile": profile}, ensure_ascii=False), encoding="utf-8")
     return profile
 
@@ -68,7 +76,7 @@ async def chat_text(
     if not payload.user_query.strip():
         raise HTTPException(status_code=400, detail="user_query is required")
 
-    return advisor_service.advise(
+    return _advisor_service().advise(
         user_query=payload.user_query,
         founder_profile=founder_profile,
         mode=payload.mode,
@@ -90,7 +98,7 @@ async def chat_file(
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
     try:
-        advisor_service.ingest_file(file.filename or "uploaded_file", content)
+        _advisor_service().ingest_file(file.filename or "uploaded_file", content)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -98,7 +106,7 @@ async def chat_file(
     if founder_profile:
         _write_profile(current_user.id, founder_profile)
 
-    return advisor_service.advise(
+    return _advisor_service().advise(
         user_query=user_query,
         founder_profile=resolved_profile,
         mode=mode,
@@ -120,11 +128,11 @@ async def chat_audio(
         raise HTTPException(status_code=400, detail="Uploaded audio is empty")
 
     try:
-        transcript = advisor_service.transcribe_audio(file.filename or "founder_audio.wav", content)
+        transcript = _advisor_service().transcribe_audio(file.filename or "founder_audio.wav", content)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    advisor_service.ingest_text(
+    _advisor_service().ingest_text(
         transcript,
         source=file.filename or "founder_audio.wav",
         upload_type="audio",
@@ -135,7 +143,7 @@ async def chat_audio(
     if founder_profile:
         _write_profile(current_user.id, founder_profile)
 
-    return advisor_service.advise(
+    return _advisor_service().advise(
         user_query=effective_query,
         founder_profile=resolved_profile,
         mode=mode,

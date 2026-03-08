@@ -1,5 +1,7 @@
 import os
 import warnings
+import asyncio
+import logging
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 warnings.filterwarnings(
@@ -27,11 +29,14 @@ from .routers import (
     advisory_tracks,
     availability,
     profile,
-    ai,
     chat,
     pitch_coach,
     pitch,
 )
+from .services.pitch_coach_engine import pitch_coach_engine
+from .services.chatbot_engine import chatbot_engine
+
+logger = logging.getLogger(__name__)
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -133,10 +138,23 @@ app.include_router(support.router, prefix=settings.API_V1_PREFIX)
 app.include_router(advisory_tracks.router, prefix=settings.API_V1_PREFIX)
 app.include_router(availability.router, prefix=settings.API_V1_PREFIX)
 app.include_router(profile.router, prefix=settings.API_V1_PREFIX)
-app.include_router(ai.router, prefix=settings.API_V1_PREFIX)
 app.include_router(chat.router, prefix=settings.API_V1_PREFIX)
 app.include_router(pitch_coach.router, prefix=settings.API_V1_PREFIX)
 app.include_router(pitch.router, prefix=settings.API_V1_PREFIX)
+
+
+@app.on_event("startup")
+async def _warmup_optional_models() -> None:
+    """Warm optional AI runtimes in background without blocking API startup."""
+
+    async def _run_warmup(name: str, fn) -> None:
+        try:
+            await asyncio.to_thread(fn)
+        except Exception as exc:  # pragma: no cover - defensive logging for runtime-only paths
+            logger.warning("%s warmup failed: %s", name, exc)
+
+    asyncio.create_task(_run_warmup("chatbot", chatbot_engine.warmup))
+    asyncio.create_task(_run_warmup("pitch_coach", pitch_coach_engine.warmup))
 
 
 if __name__ == "__main__":

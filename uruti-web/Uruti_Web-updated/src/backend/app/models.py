@@ -500,7 +500,7 @@ class AiChatMessage(Base):
     content = Column(Text, nullable=False)
 
     # Optional metadata stored alongside message
-    model_used = Column(String, nullable=True)          # e.g. gpt-4, gpt-3.5-turbo
+    model_used = Column(String, nullable=True)          # e.g. uruti-ai, venture-mlop
     startup_context = Column(JSON, nullable=True)       # {name, description, ...}
     has_attachment = Column(Boolean, default=False)
     attachment_name = Column(String, nullable=True)
@@ -510,6 +510,22 @@ class AiChatMessage(Base):
 
     # Relationships
     user = relationship("User", back_populates="ai_chat_messages")
+
+
+class AiChatSession(Base):
+    """Per-user AI chat session metadata (title, timestamps)."""
+    __tablename__ = "ai_chat_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    session_id = Column(String, nullable=False, index=True)
+    title = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "session_id", name="uq_ai_chat_session_user_session"),
+    )
 
 
 class UserSession(Base):

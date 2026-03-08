@@ -12,6 +12,7 @@ from ..schemas import VentureCreate, VentureResponse, VentureUpdate
 from ..auth import get_current_active_user
 from .notifications import create_notification, publish_notification
 from ..services.venture_scorer import venture_scorer
+from ..services.pitch_coach_engine import pitch_coach_engine
 
 router = APIRouter(prefix="/ventures", tags=["Ventures"])
 
@@ -568,16 +569,22 @@ async def upload_pitch_video(
         clarity_score = round(68 + ratio * 28, 2)
         overall_score = round((pacing_score + confidence_score + clarity_score) / 3, 2)
 
+        generated_tips = pitch_coach_engine.generate_feedback(
+            notes or f"{pitch_type} pitch session",
+            duration_seconds=duration,
+            target_duration_seconds=target_duration,
+            pitch_type=pitch_type,
+        )
+        coach_status = pitch_coach_engine.status()
+
         ai_feedback = {
             "pitch_type": pitch_type,
             "target_duration": target_duration,
             "duration": duration,
             "notes": notes,
-            "tips": [
-                "Open with the strongest traction point in the first 20 seconds.",
-                "Keep each section focused on one key message.",
-                "End with a clear ask and next step.",
-            ],
+            "tips": generated_tips,
+            "model_backend": coach_status.get("backend"),
+            "model_loaded": coach_status.get("loaded"),
         }
 
         session = PitchSession(

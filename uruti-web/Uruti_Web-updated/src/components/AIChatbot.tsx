@@ -343,10 +343,15 @@ export function AIChatbot({ open, onClose, startupContext }: AIChatbotProps) {
                         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0">
                           <Sparkles className="h-3.5 w-3.5 text-white" />
                         </div>
-                        <div className="flex items-center gap-1 px-4 py-3">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        <div className="flex items-center gap-2 px-4 py-3">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-300" style={{ fontFamily: 'var(--font-body)' }}>
+                            Thinking
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                          </div>
                         </div>
                       </div>
                     )}

@@ -3,13 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
-import { Mic, MicOff, Video, VideoOff, Upload, StopCircle, Play, Pause, Volume2, Settings, AlertCircle, Check, AlertTriangle, Info, FileText, ChevronLeft, ChevronRight, X, Maximize, Minimize } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, Upload, StopCircle, Play, Pause, Volume2, Settings, AlertCircle, Check, AlertTriangle, Info, FileText, X, Maximize, Minimize } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Slider } from '../ui/slider';
 import { Switch } from '../ui/switch';
+import { Input } from '../ui/input';
 import { SaveRecordingDialog } from '../SaveRecordingDialog';
 import { apiClient } from '../../lib/api-client';
 import { toast } from 'sonner';
@@ -33,7 +34,6 @@ export function PitchCoachModule() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasShownFullscreenTip, setHasShownFullscreenTip] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [aiListening, setAiListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -59,11 +59,14 @@ export function PitchCoachModule() {
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const composedStreamRef = useRef<MediaStream | null>(null);
+  const displayStreamRef = useRef<MediaStream | null>(null);
+  const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const compositionCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const compositionRafRef = useRef<number | null>(null);
   const recorderMimeTypeRef = useRef('video/webm');
   const recordedChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoStopTriggeredRef = useRef(false);
 
   // Real-time AI feedback metrics
   const [pitchMetrics, setPitchMetrics] = useState({
@@ -112,6 +115,7 @@ export function PitchCoachModule() {
   useEffect(() => {
     return () => {
       stopCamera();
+      stopDisplayCapture();
       stopComposition();
       if (deckUrl) URL.revokeObjectURL(deckUrl);
       if (timerRef.current) {
@@ -191,6 +195,52 @@ export function PitchCoachModule() {
     }
 
     setIsVideoOn(false);
+  };
+
+  const stopDisplayCapture = () => {
+    if (displayStreamRef.current) {
+      displayStreamRef.current.getTracks().forEach((track) => track.stop());
+      displayStreamRef.current = null;
+    }
+    if (screenVideoRef.current) {
+      screenVideoRef.current.srcObject = null;
+      screenVideoRef.current = null;
+    }
+  };
+
+  const startDisplayCapture = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          frameRate: { ideal: 30, max: 30 },
+        },
+        audio: false,
+      });
+
+      const previewVideo = document.createElement('video');
+      previewVideo.srcObject = stream;
+      previewVideo.muted = true;
+      previewVideo.playsInline = true;
+      await previewVideo.play();
+
+      displayStreamRef.current = stream;
+      screenVideoRef.current = previewVideo;
+
+      const [videoTrack] = stream.getVideoTracks();
+      if (videoTrack) {
+        videoTrack.onended = () => {
+          stopDisplayCapture();
+          if (isRecording) {
+            toast.warning('Slide sharing stopped. Recording continues with camera only.');
+          }
+        };
+      }
+
+      return stream;
+    } catch (err) {
+      console.error('Display capture denied or unavailable:', err);
+      return null;
+    }
   };
 
   const toggleCamera = async () => {
@@ -282,6 +332,21 @@ export function PitchCoachModule() {
     }
   }, [isFullscreen]);
 
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const onFullscreenChange = () => {
+      const activeElement = document.fullscreenElement;
+      setIsFullscreen(activeElement === stage);
+    };
+
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+    };
+  }, []);
+
   const toggleFullscreen = () => {
     if (!isFullscreen && !hasShownFullscreenTip) {
       toast.info(
@@ -294,64 +359,102 @@ export function PitchCoachModule() {
 
   const toggleRecording = () => {
     if (!isRecording) {
+      autoStopTriggeredRef.current = false;
       setIsRecording(true);
-      setAiListening(true);
       setRecordingTime(0);
       setSlideTransitions([]);
       startRecording();
     } else {
       setIsRecording(false);
-      setAiListening(false);
       setIsPaused(false);
       stopRecording();
     }
   };
 
+  useEffect(() => {
+    if (!isRecording || isPaused) return;
+
+    const targetSeconds = Math.max(1, Math.round(targetDuration * 60));
+    if (recordingTime < targetSeconds || autoStopTriggeredRef.current) {
+      return;
+    }
+
+    autoStopTriggeredRef.current = true;
+    setIsRecording(false);
+    setIsPaused(false);
+    stopRecording();
+    toast.info('Target duration reached. Recording stopped automatically.');
+  }, [isRecording, isPaused, recordingTime, targetDuration]);
+
   const startRecording = () => {
     if (!cameraStreamRef.current) {
       toast.error('Turn on camera before starting the recording');
       setIsRecording(false);
-      setAiListening(false);
       return;
     }
 
-    const sourceStream = cameraStreamRef.current;
-    const composedStream = createComposedStream(sourceStream);
-    composedStreamRef.current = composedStream;
-
-    const preferredMimeTypes = [
-      'video/mp4;codecs=h264,aac',
-      'video/mp4',
-      'video/webm;codecs=vp9,opus',
-      'video/webm;codecs=vp8,opus',
-      'video/webm',
-    ];
-    const chosenMimeType =
-      preferredMimeTypes.find((mime) => MediaRecorder.isTypeSupported(mime)) ||
-      'video/webm';
-    recorderMimeTypeRef.current = chosenMimeType;
-
-    const mediaRecorder = new MediaRecorder(composedStream, {
-      mimeType: chosenMimeType,
-    });
-    mediaRecorderRef.current = mediaRecorder;
-
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        recordedChunksRef.current.push(event.data);
+    const begin = async () => {
+      const sourceStream = cameraStreamRef.current;
+      if (!sourceStream) {
+        toast.error('Turn on camera before starting the recording');
+        setIsRecording(false);
+        return;
       }
-    };
 
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(recordedChunksRef.current, {
-        type: recorderMimeTypeRef.current,
+      let displayStream: MediaStream | null = null;
+      if (deckUrl) {
+        toast.info('Select the presentation window/tab so slides appear inside the recorded video.');
+        displayStream = await startDisplayCapture();
+      }
+
+      const composedStream = createComposedStream(sourceStream, displayStream ?? undefined);
+      composedStreamRef.current = composedStream;
+
+      if (deckUrl && !displayStream) {
+        toast.warning('Slides were not shared. Recording will keep camera feed and slide progression metadata.');
+      }
+
+      const preferredMimeTypes = [
+        'video/mp4;codecs=h264,aac',
+        'video/mp4',
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm',
+      ];
+      const chosenMimeType =
+        preferredMimeTypes.find((mime) => MediaRecorder.isTypeSupported(mime)) ||
+        'video/webm';
+      recorderMimeTypeRef.current = chosenMimeType;
+
+      const mediaRecorder = new MediaRecorder(composedStream, {
+        mimeType: chosenMimeType,
       });
-      setRecordedBlob(blob);
-      recordedChunksRef.current = [];
-      stopComposition();
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, {
+          type: recorderMimeTypeRef.current,
+        });
+        setRecordedBlob(blob);
+        recordedChunksRef.current = [];
+        stopComposition();
+      };
+
+      mediaRecorder.start(1000);
     };
 
-    mediaRecorder.start(1000);
+    begin().catch((err) => {
+      console.error('Unable to start recording:', err);
+      toast.error('Unable to start recording. Please try again.');
+      setIsRecording(false);
+      stopComposition();
+    });
   };
 
   const stopRecording = () => {
@@ -363,9 +466,10 @@ export function PitchCoachModule() {
       }, 500);
     }
     stopComposition();
+    stopDisplayCapture();
   };
 
-  const createComposedStream = (sourceStream: MediaStream) => {
+  const createComposedStream = (sourceStream: MediaStream, displayStream?: MediaStream) => {
     const canvas = document.createElement('canvas');
     canvas.width = 1280;
     canvas.height = 720;
@@ -375,13 +479,20 @@ export function PitchCoachModule() {
       return sourceStream;
     }
 
+    const displayVideo = screenVideoRef.current;
     const drawFrame = () => {
       // Main background (slides area)
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.fillStyle = '#1f2937';
-      ctx.fillRect(20, 20, canvas.width - 40, canvas.height - 40);
+      if (displayStream && displayVideo && displayVideo.readyState >= 2) {
+        ctx.drawImage(displayVideo, 0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.22)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      } else {
+        ctx.fillStyle = '#1f2937';
+        ctx.fillRect(20, 20, canvas.width - 40, canvas.height - 40);
+      }
 
       ctx.fillStyle = '#76B947';
       ctx.font = 'bold 26px sans-serif';
@@ -401,7 +512,7 @@ export function PitchCoachModule() {
 
       const video = videoRef.current;
       if (video && video.readyState >= 2) {
-        if (deckUrl) {
+        if (deckUrl || displayStream) {
           const pipWidth = 380;
           const pipHeight = 214;
           const pipX = canvas.width - pipWidth - 28;
@@ -438,22 +549,20 @@ export function PitchCoachModule() {
     compositionCanvasRef.current = null;
   };
 
-  const changeSlide = (delta: number) => {
-    const nextSlide = Math.min(Math.max(currentSlide + delta, 1), Math.max(totalSlides, 1));
-    if (nextSlide === currentSlide) return;
-
-    setCurrentSlide(nextSlide);
-    if (isRecording) {
-      setSlideTransitions((prev) => [
-        ...prev,
-        { slide: nextSlide, atSecond: recordingTime },
-      ]);
-    }
-  };
-
   // Simulate live feedback during recording
   useEffect(() => {
     if (isRecording && !isPaused) {
+      if (liveFeedback.length === 0) {
+        setLiveFeedback([
+          {
+            id: Date.now(),
+            type: 'info',
+            message: 'Session started. Keep your opening clear while AI tracks pacing and confidence.',
+            time: formatTime(recordingTime),
+          },
+        ]);
+      }
+
       // Update metrics randomly to simulate AI feedback
       const metricsInterval = setInterval(() => {
         setPitchMetrics((prev) => ({
@@ -485,14 +594,14 @@ export function PitchCoachModule() {
         };
 
         setLiveFeedback(prev => [newFeedback, ...prev].slice(0, 5)); // Keep only last 5 feedback items
-      }, 8000);
+      }, 5000);
 
       return () => {
         clearInterval(metricsInterval);
         clearInterval(feedbackInterval);
       };
     }
-  }, [isRecording, isPaused, recordingTime]);
+  }, [isRecording, isPaused, recordingTime, liveFeedback.length]);
 
   const handleSaveRecording = async (notes: string, ventureId: string | number) => {
     const venture = ventures.find(v => v.id.toString() === ventureId.toString());
@@ -626,25 +735,9 @@ export function PitchCoachModule() {
                     </button>
                   </div>
                   <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded-lg px-2 py-1 flex items-center space-x-2">
-                    <button
-                      onClick={() => changeSlide(-1)}
-                      className="text-white/90 hover:text-white disabled:text-white/40"
-                      disabled={currentSlide <= 1}
-                      aria-label="Previous slide"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
                     <span className="text-white text-xs min-w-[70px] text-center" style={{ fontFamily: 'var(--font-heading)' }}>
                       {currentSlide}/{Math.max(totalSlides, 1)}
                     </span>
-                    <button
-                      onClick={() => changeSlide(1)}
-                      className="text-white/90 hover:text-white disabled:text-white/40"
-                      disabled={currentSlide >= Math.max(totalSlides, 1)}
-                      aria-label="Next slide"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
                   </div>
                   {/* Picture-in-Picture Camera when deck is loaded and camera is on */}
                   {isVideoOn && (
@@ -713,22 +806,8 @@ export function PitchCoachModule() {
                 </button>
               )}
 
-              {/* AI Coach Overlay */}
               {isRecording && (
-                <div className={`absolute ${deckUrl ? 'top-12' : 'top-4'} left-4 right-4`}>
-                  <div className="glass-panel bg-black/40 backdrop-blur-md rounded-xl p-3">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-[#76B947] rounded-full animate-pulse" />
-                      <p className="text-white text-sm" style={{ fontFamily: 'var(--font-heading)' }}>
-                        AI Coach is listening...
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isFullscreen && isRecording && (
-                <div className="absolute top-16 right-4 w-72 rounded-xl bg-black/55 p-3 backdrop-blur-md">
+                <div className="absolute top-16 right-4 w-[min(90vw,22rem)] rounded-xl bg-black/65 p-3 backdrop-blur-md border border-white/10">
                   <p className="text-xs font-semibold text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>
                     Live AI Feedback
                   </p>
@@ -757,7 +836,7 @@ export function PitchCoachModule() {
               )}
 
               {/* Live Feedback Toast */}
-              {isRecording && liveFeedback[0] && (
+              {isRecording && liveFeedback[0] && !isFullscreen && (
                 <div className="absolute bottom-20 left-4 right-4">
                   <div className={`glass-panel backdrop-blur-md rounded-xl p-3 ${
                     liveFeedback[0].type === 'positive' ? 'bg-[#76B947]/20' :
@@ -770,10 +849,69 @@ export function PitchCoachModule() {
                   </div>
                 </div>
               )}
+
+              {/* Floating controls while fullscreen */}
+              {isFullscreen && (
+                <div className="absolute bottom-4 left-1/2 z-20 w-[min(96vw,52rem)] -translate-x-1/2 rounded-2xl border border-white/20 bg-black/70 p-2 backdrop-blur-md">
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <Button
+                      size="sm"
+                      variant={isMicOn ? 'default' : 'destructive'}
+                      className={isMicOn ? 'bg-[#76B947] hover:bg-[#5a8f35]' : ''}
+                      onClick={toggleMicrophone}
+                    >
+                      {isMicOn ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={isVideoOn ? 'default' : 'destructive'}
+                      className={isVideoOn ? 'bg-[#76B947] hover:bg-[#5a8f35]' : ''}
+                      onClick={toggleCamera}
+                    >
+                      {isVideoOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={isRecording ? 'destructive' : 'default'}
+                      className={!isRecording ? 'bg-[#76B947] hover:bg-[#5a8f35]' : ''}
+                      onClick={toggleRecording}
+                    >
+                      {isRecording ? <StopCircle className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
+                      {isRecording ? 'Stop Session' : 'Start Practice'}
+                    </Button>
+                    {isRecording && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
+                        onClick={() => setIsPaused(!isPaused)}
+                      >
+                        {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
+                      onClick={() => setShowSettings(!showSettings)}
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
+                      onClick={toggleFullscreen}
+                    >
+                      <Minimize className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Control Bar */}
-            <div className="glass-panel bg-black/95 backdrop-blur-md p-4">
+            <div className={`glass-panel bg-black/95 backdrop-blur-md p-4 ${isFullscreen ? 'hidden' : ''}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Button
@@ -951,26 +1089,24 @@ export function PitchCoachModule() {
               {/* Editable Target Duration */}
               <div>
                 <Label htmlFor="targetDuration" style={{ fontFamily: 'var(--font-body)' }}>Target Duration</Label>
-                <Select
-                  value={targetDuration.toString()}
-                  onValueChange={(value: string) => setTargetDuration(parseInt(value))}
+                <Input
+                  id="targetDuration"
+                  type="number"
+                  min={1}
+                  max={240}
+                  step={1}
+                  value={targetDuration}
+                  onChange={(e) => {
+                    const parsed = Number(e.target.value);
+                    if (!Number.isFinite(parsed)) return;
+                    setTargetDuration(Math.min(240, Math.max(1, Math.floor(parsed))));
+                  }}
                   disabled={isRecording}
-                >
-                  <SelectTrigger className="w-full mt-1">
-                    <SelectValue placeholder="Select duration">
-                      {targetDuration} minutes
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1 minute</SelectItem>
-                    <SelectItem value="2">2 minutes</SelectItem>
-                    <SelectItem value="3">3 minutes</SelectItem>
-                    <SelectItem value="5">5 minutes</SelectItem>
-                    <SelectItem value="7">7 minutes</SelectItem>
-                    <SelectItem value="10">10 minutes</SelectItem>
-                    <SelectItem value="15">15 minutes</SelectItem>
-                  </SelectContent>
-                </Select>
+                  className="w-full mt-1"
+                />
+                <p className="mt-1 text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                  Set any value from 1 to 240 minutes.
+                </p>
               </div>
 
               {/* Non-editable Status */}
@@ -1010,28 +1146,6 @@ export function PitchCoachModule() {
                       <span className="text-sm font-medium" style={{ fontFamily: 'var(--font-heading)' }}>
                         {currentSlide}/{Math.max(totalSlides, 1)}
                       </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1"
-                        onClick={() => changeSlide(-1)}
-                        disabled={currentSlide <= 1}
-                      >
-                        <ChevronLeft className="h-4 w-4 mr-1" />
-                        Previous
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1"
-                        onClick={() => changeSlide(1)}
-                        disabled={currentSlide >= Math.max(totalSlides, 1)}
-                      >
-                        Next
-                        <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
                     </div>
                     <div>
                       <Label style={{ fontFamily: 'var(--font-body)' }} htmlFor="totalSlides">

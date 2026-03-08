@@ -1,4 +1,4 @@
-import { LayoutDashboard, Lightbulb, TrendingUp, GraduationCap, Users, Calendar, Video, Briefcase, DollarSign, Home, BookOpen, Mic, Target, Sparkles, MessageSquare, User, X, Clock, Shield, Headphones } from 'lucide-react';
+import { LayoutDashboard, Lightbulb, TrendingUp, GraduationCap, Users, Calendar, Video, Briefcase, DollarSign, Home, BookOpen, Mic, Target, Sparkles, MessageSquare, User, X, Clock, Shield, Headphones, Activity } from 'lucide-react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Input } from './ui/input';
@@ -47,6 +47,7 @@ const investorMenuItems = [
 
 const adminMenuItems = [
   { id: 'admin-dashboard', label: 'Admin Dashboard', icon: Shield },
+  { id: 'model-performance', label: 'Model Performance', icon: Activity },
   { id: 'user-management', label: 'User Management', icon: Users },
   { id: 'startup-discovery', label: 'All Startups', icon: Target },
   { id: 'admin-advisory-tracks', label: 'Advisory Tracks', icon: BookOpen },

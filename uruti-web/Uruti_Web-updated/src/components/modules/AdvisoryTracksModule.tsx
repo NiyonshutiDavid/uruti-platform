@@ -1807,9 +1807,6 @@ export function AdvisoryTracksModule() {
                 <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
                   Unlock advanced tracks with personalized AI mentorship
                 </p>
-                <Button size="sm" className="bg-black dark:bg-[#76B947] text-white hover:bg-black/90 dark:hover:bg-[#76B947]/90">
-                  Upgrade Now
-                </Button>
               </div>
             </CardContent>
           </Card>
@@ -1830,10 +1827,6 @@ export function AdvisoryTracksModule() {
               AI-driven educational tracks to refine your business models
             </p>
           </div>
-          <Button className="bg-gradient-to-r from-[#76B947] to-[#5a8f35] text-white hover:from-[#5a8f35] hover:to-[#76B947] shadow-lg lg:self-start">
-            <Sparkles className="mr-2 h-4 w-4" />
-            Upgrade to Premium
-          </Button>
         </div>
 
         {/* Search and Filters */}

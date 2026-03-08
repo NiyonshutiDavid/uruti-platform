@@ -79,7 +79,10 @@ class Settings(BaseSettings):
     URUTI_CHATBOT_CTX: int = 4096
     URUTI_CHATBOT_MAX_TOKENS: int = 512
     URUTI_CHATBOT_TEMPERATURE: float = 0.2
+    CHATBOT_SERVICE_URL: str = os.getenv("CHATBOT_SERVICE_URL", "http://127.0.0.1:8020")
+    CORE_SERVICE_URL: str = os.getenv("CORE_SERVICE_URL", "http://127.0.0.1:8010")
     PITCH_COACH_MODEL_ID: Optional[str] = None
+    PITCH_COACH_LOCAL_MODEL_DIR: Optional[str] = None
 
     # Push Notifications (Firebase Cloud Messaging)
     FCM_SERVICE_ACCOUNT_PATH: Optional[str] = os.getenv("FCM_SERVICE_ACCOUNT_PATH")

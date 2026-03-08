@@ -835,7 +835,7 @@ class ApiService {
     if (fileContent != null) body['file_content'] = fileContent;
     if (fileName != null) body['file_name'] = fileName;
     final res = await http.post(
-      Uri.parse('${AppConstants.apiV1}/ai/chat'),
+      Uri.parse('${AppConstants.aiApiV1}/ai/chat'),
       headers: await _headers(auth: true),
       body: jsonEncode(body),
     );
@@ -845,7 +845,7 @@ class ApiService {
   Future<List<dynamic>> getAiModels() async {
     try {
       final res = await http.get(
-        Uri.parse('${AppConstants.apiV1}/ai/models'),
+        Uri.parse('${AppConstants.aiApiV1}/ai/models'),
         headers: await _headers(auth: true),
       );
       return _handleListResponse(res);
@@ -858,7 +858,7 @@ class ApiService {
   Future<List<dynamic>> getAiChatSessions() async {
     try {
       final res = await http.get(
-        Uri.parse('${AppConstants.apiV1}/ai/history'),
+        Uri.parse('${AppConstants.aiApiV1}/ai/history'),
         headers: await _headers(auth: true),
       );
       return _handleListResponse(res);
@@ -871,7 +871,7 @@ class ApiService {
   Future<List<dynamic>> getAiChatSession(String sessionId) async {
     try {
       final res = await http.get(
-        Uri.parse('${AppConstants.apiV1}/ai/history/$sessionId'),
+        Uri.parse('${AppConstants.aiApiV1}/ai/history/$sessionId'),
         headers: await _headers(auth: true),
       );
       return _handleListResponse(res);
@@ -882,14 +882,14 @@ class ApiService {
 
   Future<void> clearAiChatHistory() async {
     await http.delete(
-      Uri.parse('${AppConstants.apiV1}/ai/history'),
+      Uri.parse('${AppConstants.aiApiV1}/ai/history'),
       headers: await _headers(auth: true),
     );
   }
 
   Future<void> clearAiChatSession(String sessionId) async {
     await http.delete(
-      Uri.parse('${AppConstants.apiV1}/ai/history/$sessionId'),
+      Uri.parse('${AppConstants.aiApiV1}/ai/history/$sessionId'),
       headers: await _headers(auth: true),
     );
   }

@@ -1,15 +1,13 @@
-"""
-AI Chat router — handles conversation with Uruti's AI advisor.
-
-Uses OpenAI when OPENAI_API_KEY is set in environment/.env, otherwise
-falls back to a smart rule-based response engine so development works
-without a paid API key.
-"""
+"""AI Chat router — handles conversation with Uruti's AI advisor."""
+import asyncio
+import json
+import time
+import urllib.request
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sqlfunc
 from typing import List
-import uuid, os
+import uuid
 
 from ..database import get_db
 from ..models import AiChatMessage, User, Venture, Bookmark
@@ -21,17 +19,66 @@ from ..auth import get_current_user
 from ..config import settings
 from ..services.venture_scorer import venture_scorer
 from ..services.chatbot_engine import chatbot_engine
+from ..services.pitch_coach_engine import pitch_coach_engine
+from ..services.venture_context import build_venture_context
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 # ─── Available models ────────────────────────────────────────────────────────
 ANALYSIS_MODEL_ID = "venture-mlop"
 CHATBOT_MODEL_ID = settings.URUTI_BEST_MODEL_ID
+PITCH_MODEL_ID = "pitch-coach-ai"
+
+
+def _probe_chatbot_service(base_url: str) -> dict:
+    normalized = (base_url or "").rstrip("/")
+    health_url = f"{normalized}/health" if normalized else ""
+    start = time.perf_counter()
+
+    if not health_url:
+        return {
+            "configured_url": base_url,
+            "health_url": None,
+            "reachable": False,
+            "status_code": None,
+            "latency_ms": None,
+            "error": "CHATBOT_SERVICE_URL is not configured",
+        }
+
+    try:
+        request = urllib.request.Request(health_url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(request, timeout=2.5) as response:
+            raw = response.read().decode("utf-8", errors="ignore")
+            payload = json.loads(raw) if raw else None
+            latency_ms = round((time.perf_counter() - start) * 1000, 2)
+            return {
+                "configured_url": base_url,
+                "health_url": health_url,
+                "reachable": True,
+                "status_code": response.getcode(),
+                "latency_ms": latency_ms,
+                "payload": payload,
+                "error": None,
+            }
+    except Exception as exc:
+        latency_ms = round((time.perf_counter() - start) * 1000, 2)
+        return {
+            "configured_url": base_url,
+            "health_url": health_url,
+            "reachable": False,
+            "status_code": None,
+            "latency_ms": latency_ms,
+            "payload": None,
+            "error": str(exc),
+        }
 
 
 def _available_models() -> list[dict]:
-    model_info = venture_scorer.get_model_info()
-    analysis_name = str(model_info.get("model_folder") or model_info.get("model_name") or "Uruti-Investor_Intelligence_and_Ranker")
+    try:
+        model_info = venture_scorer.get_model_info()
+        analysis_name = str(model_info.get("model_folder") or model_info.get("model_name") or "Uruti-Investor_Intelligence_and_Ranker")
+    except Exception:
+        analysis_name = "Uruti-Investor_Intelligence_and_Ranker"
 
     models = [
         {
@@ -53,50 +100,16 @@ def _available_models() -> list[dict]:
             "is_default": False,
         },
         {
-            "id": "gpt-4",
-            "name": "GPT-4",
-            "description": "Advanced external LLM (requires OPENAI_API_KEY)",
-            "type": "chatbot",
-            "requires_venture_context": False,
-            "fixed_prompt": None,
-            "is_default": False,
-        },
-        {
-            "id": "gpt-4-turbo",
-            "name": "GPT-4 Turbo",
-            "description": "Faster external LLM (requires OPENAI_API_KEY)",
-            "type": "chatbot",
-            "requires_venture_context": False,
-            "fixed_prompt": None,
-            "is_default": False,
-        },
-        {
-            "id": "gpt-3.5-turbo",
-            "name": "GPT-3.5 Turbo",
-            "description": "Lightweight external LLM (requires OPENAI_API_KEY)",
-            "type": "chatbot",
+            "id": PITCH_MODEL_ID,
+            "name": "Uruti Pitch Coach",
+            "description": "Pitch coaching tips powered by Uruti pitch models",
+            "type": "coach",
             "requires_venture_context": False,
             "fixed_prompt": None,
             "is_default": False,
         },
     ]
     return models
-
-
-# ─── OpenAI helper (optional) ────────────────────────────────────────────────
-def _openai_chat(messages: list[dict], model: str) -> str:
-    """Call OpenAI Chat Completions if key is present, else raise ImportError."""
-    api_key = getattr(settings, "OPENAI_API_KEY", None) or os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("No OpenAI API key configured")
-    try:
-        import openai  # type: ignore
-        client = openai.OpenAI(api_key=api_key)
-        oai_model = model if model.startswith("gpt") else "gpt-3.5-turbo"
-        resp = client.chat.completions.create(model=oai_model, messages=messages)
-        return resp.choices[0].message.content or ""
-    except Exception as exc:
-        raise ValueError(f"OpenAI error: {exc}") from exc
 
 
 # ─── Uruti fallback AI ────────────────────────────────────────────────────────
@@ -109,7 +122,7 @@ _SYSTEM_PROMPT = (
 )
 
 def _fallback_response(user_text: str, context: dict | None, history: list[dict]) -> str:
-    """Rule-based fallback when OpenAI is not configured."""
+    """Rule-based fallback when primary chatbot runtime is unavailable."""
     lower = user_text.lower()
     name = context.get("name", "your startup") if context else "your startup"
 
@@ -276,17 +289,7 @@ async def chat(
     # Build context string to inject
     ctx = payload.startup_context.model_dump(exclude_none=True) if payload.startup_context else None
     if authorized_venture:
-        ctx = {
-            "venture_id": authorized_venture.id,
-            "name": authorized_venture.name,
-            "description": authorized_venture.description,
-            "stage": authorized_venture.stage,
-            "industry": authorized_venture.industry,
-            "problem_statement": authorized_venture.problem_statement,
-            "solution": authorized_venture.solution,
-            "target_market": authorized_venture.target_market,
-            "business_model": authorized_venture.business_model,
-        }
+        ctx = build_venture_context(authorized_venture)
     ctx_text = ""
     if ctx:
         ctx_text = (
@@ -294,7 +297,12 @@ async def chat(
             f"Stage: {ctx.get('stage','')} | "
             f"Industry: {ctx.get('industry','')} | "
             f"Problem: {ctx.get('problem_statement','')} | "
-            f"Solution: {ctx.get('solution','')}]"
+            f"Solution: {ctx.get('solution','')} | "
+            f"Target Market: {ctx.get('target_market','')} | "
+            f"Business Model: {ctx.get('business_model','')} | "
+            f"Traction: customers={ctx.get('customers','n/a')}, mrr={ctx.get('mrr','n/a')}, revenue={ctx.get('revenue','n/a')} | "
+            f"Funding: goal={ctx.get('funding_goal','n/a')}, raised={ctx.get('funding_raised','n/a')} | "
+            f"Edge: {ctx.get('competitive_edge','')}]"
         )
 
     # Build user message (include file content if present)
@@ -331,6 +339,9 @@ async def chat(
     # Generate AI response
     ai_text = ""
     resolved_model = model
+    fallback_used = False
+    inference_backend = "unknown"
+    inference_error = None
 
     if model == ANALYSIS_MODEL_ID:
         if user_role not in {"founder", "investor"}:
@@ -362,21 +373,26 @@ async def chat(
             f"Summary: This score is generated by the {analysis.get('model_name', 'Uruti-Investor_Intelligence_and_Ranker')} ranking model."
         )
         resolved_model = ANALYSIS_MODEL_ID
-    elif model.startswith("gpt"):
-        oai_messages = [{"role": "system", "content": _SYSTEM_PROMPT + ctx_text}]
-        oai_messages += history
-        oai_messages.append({"role": "user", "content": user_content})
-        try:
-            ai_text = _openai_chat(oai_messages, model)
-        except ValueError:
-            ai_text = _fallback_response(payload.message, ctx, history)
-            resolved_model = CHATBOT_MODEL_ID
+        inference_backend = "venture-ranker"
+    elif model == PITCH_MODEL_ID:
+        tips = pitch_coach_engine.generate_feedback(payload.message)
+        pitch_status = pitch_coach_engine.status()
+        ai_text = "Pitch Coach Feedback\n\n" + "\n".join([f"- {tip}" for tip in tips])
+        resolved_model = PITCH_MODEL_ID
+        inference_backend = str(pitch_status.get("backend") or "pitch-coach")
+        fallback_used = not bool(pitch_status.get("loaded"))
+        if pitch_status.get("load_error"):
+            inference_error = str(pitch_status.get("load_error"))
     else:
         llama_messages = history + [{"role": "user", "content": user_content}]
         try:
             ai_text = chatbot_engine.chat(_SYSTEM_PROMPT + ctx_text, llama_messages)
-        except Exception:
+            inference_backend = "llama-cpp"
+        except Exception as exc:
             ai_text = _fallback_response(payload.message, ctx, history)
+            fallback_used = True
+            inference_backend = "rule-fallback"
+            inference_error = str(exc)
         resolved_model = CHATBOT_MODEL_ID
 
     if not ai_text:
@@ -394,7 +410,39 @@ async def chat(
     db.add(ai_msg)
     db.commit()
 
-    return AiChatResponse(message=ai_text, session_id=session_id, model=resolved_model)
+    return AiChatResponse(
+        message=ai_text,
+        session_id=session_id,
+        model=resolved_model,
+        fallback_used=fallback_used,
+        inference_backend=inference_backend,
+        inference_error=inference_error,
+    )
+
+
+@router.get("/admin/runtime-status")
+async def get_admin_runtime_status(
+    current_user: User = Depends(get_current_user),
+):
+    """Return chatbot runtime status for admin diagnostics."""
+
+    role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    chatbot_service = await asyncio.to_thread(_probe_chatbot_service, settings.CHATBOT_SERVICE_URL)
+
+    return {
+        "chatbot_model_id": CHATBOT_MODEL_ID,
+        "chatbot_engine": chatbot_engine.status(),
+        "pitch_model_id": PITCH_MODEL_ID,
+        "pitch_coach_engine": pitch_coach_engine.status(),
+        "core_service": {
+            "service": "core-backend",
+            "status": "healthy",
+        },
+        "chatbot_service": chatbot_service,
+    }
 
 
 @router.get("/models")
@@ -404,7 +452,8 @@ async def get_models(
     """Return AI models available in backend so frontend model picker is not hardcoded."""
 
     models = _available_models()
-    if current_user.role.value not in {"founder", "investor"}:
+    role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
+    if role not in {"founder", "investor", "admin"}:
         models = [m for m in models if m["type"] != "analysis"]
     return models
 

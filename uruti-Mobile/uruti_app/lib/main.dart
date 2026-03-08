@@ -19,11 +19,11 @@ import 'screens/no_internet_screen.dart';
 import 'widgets/call_overlay_host.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 🔧 BACKEND URL — update this single line to switch environments.
+// 🔧 BACKEND URL — set to null for local defaults or provide a full override.
 //    Everything in the app reads from AppConstants.apiV1 which is set below.
 // ─────────────────────────────────────────────────────────────────────────────
 const String? kBackendUrlOverride =
-    'http://173.249.25.80:1199'; // e.g. 'http://192.168.1.100:8000' or 'https://api.uruti.rw'
+    null; // e.g. 'http://192.168.1.100:8000' or 'https://api.uruti.rw'
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Gets the host machine's local network IP by querying network interfaces.
@@ -53,34 +53,23 @@ Future<String> _resolveBackendUrl() async {
   }
 
   if (kIsWeb) {
-    return 'http://173.249.25.80:1199';
+    return 'http://localhost:8010';
   }
 
   if (Platform.isAndroid) {
-    final deviceIp = await _getHostMachineIp();
-    final isEmulator =
-        deviceIp != null &&
-        (deviceIp.startsWith('10.0.2.') || deviceIp.startsWith('10.0.3.'));
-
-    if (isEmulator) {
-      return 'http://173.249.25.80:1199';
-    }
-
-    if (kDebugMode) {
-      debugPrint('Physical Android device detected (IP: $deviceIp)');
-      debugPrint('Trying to reach backend on local network...');
-    }
-
-    final hostMachineIp = await _getHostMachineIp();
-
-    if (hostMachineIp != null && hostMachineIp.startsWith('192.168.')) {
-      return 'http://$hostMachineIp:8000';
-    }
-
-    return 'http://192.168.0.136:8000';
+    // Android emulator maps host localhost to 10.0.2.2.
+    return 'http://10.0.2.2:8010';
   }
 
-  return 'http://173.249.25.80:1199';
+  if (Platform.isIOS) {
+    return 'http://localhost:8010';
+  }
+
+  final hostMachineIp = await _getHostMachineIp();
+  if (hostMachineIp != null) {
+    return 'http://$hostMachineIp:8010';
+  }
+  return 'http://localhost:8010';
 }
 
 void main() async {
@@ -89,6 +78,7 @@ void main() async {
 
   if (kDebugMode) {
     debugPrint('🌐 Backend URL: ${AppConstants.apiBaseUrl}');
+    debugPrint('🤖 AI Modules URL: ${AppConstants.aiBaseUrl}');
   }
 
   await NotificationService.instance.initialize();

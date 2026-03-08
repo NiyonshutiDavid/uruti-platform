@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import List, Dict, Any
@@ -22,11 +22,16 @@ def _map_session(session: PitchSession, venture_name: str) -> Dict[str, Any]:
     raw_tips = ai_feedback.get("tips") if isinstance(ai_feedback, dict) else None
     feedback = [str(item) for item in raw_tips] if isinstance(raw_tips, list) else []
     if not feedback:
-        feedback = [
-            "Strong opening and market framing.",
-            "Keep pacing steady around the value proposition.",
-            "Close with a crisp ask and next steps.",
-        ]
+        score_hints: List[str] = []
+        if (session.clarity_score or 0) < 70:
+            score_hints.append("Simplify key points and use shorter sentences to improve clarity.")
+        if (session.pacing_score or 0) < 70:
+            score_hints.append("Slow down in the core value proposition to improve pacing.")
+        if (session.confidence_score or 0) < 70:
+            score_hints.append("Use a stronger voice and fewer filler words to build confidence.")
+        if not score_hints:
+            score_hints.append("Delivery is consistent. Keep your close focused on a clear investor ask.")
+        feedback = score_hints
 
     confidence = int(round(session.confidence_score or 0))
     pacing = int(round(session.pacing_score or 0))
@@ -100,8 +105,44 @@ def create_pitch_analysis(
         overall_score=float(payload.get("overallScore") or payload.get("overall_score") or 0),
         ai_feedback={"tips": feedback},
     )
+
+    # Keep startup profile pitch video aligned with latest recorded session.
+    if session.video_url:
+        venture.demo_video_url = session.video_url
+
     db.add(session)
     db.commit()
     db.refresh(session)
 
     return _map_session(session, venture.name)
+
+
+@router.delete("/analyses/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_pitch_analysis(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    session = db.query(PitchSession).filter(PitchSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Pitch session not found")
+
+    venture = db.query(Venture).filter(Venture.id == session.venture_id).first()
+    if not venture or venture.founder_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this pitch session")
+
+    deleted_video_url = session.video_url
+    db.delete(session)
+    db.flush()
+
+    if deleted_video_url and venture.demo_video_url == deleted_video_url:
+        latest_session = (
+            db.query(PitchSession)
+            .filter(PitchSession.venture_id == venture.id)
+            .order_by(desc(PitchSession.created_at))
+            .first()
+        )
+        venture.demo_video_url = latest_session.video_url if latest_session else None
+
+    db.commit()
+    return None

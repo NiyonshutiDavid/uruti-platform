@@ -44,6 +44,7 @@ class _RecordingScreenState extends State<RecordingScreen>
   int? _selectedVentureId;
   String _pitchType = 'Investor Pitch';
   int _targetMinutes = 5;
+  bool _autoStopTriggered = false;
   String? _deckFilePath;
   String? _deckFileName;
   int _deckCurrentPage = 1;
@@ -196,7 +197,14 @@ class _RecordingScreenState extends State<RecordingScreen>
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      setState(() => _seconds++);
+      final next = _seconds + 1;
+      final targetSeconds = (_targetMinutes <= 0 ? 1 : _targetMinutes) * 60;
+      setState(() => _seconds = next);
+
+      if (_recording && !_autoStopTriggered && next >= targetSeconds) {
+        _autoStopTriggered = true;
+        unawaited(_stopRecording(autoStopped: true));
+      }
     });
   }
 
@@ -229,6 +237,7 @@ class _RecordingScreenState extends State<RecordingScreen>
 
     try {
       _seconds = 0;
+      _autoStopTriggered = false;
       _slideTransitions.clear();
       await _cameraController!.startVideoRecording();
       setState(() => _recording = true);
@@ -241,7 +250,7 @@ class _RecordingScreenState extends State<RecordingScreen>
     }
   }
 
-  Future<void> _stopRecording() async {
+  Future<void> _stopRecording({bool autoStopped = false}) async {
     if (_cameraController == null || !_recording) return;
     try {
       final file = await _cameraController!.stopVideoRecording();
@@ -253,6 +262,15 @@ class _RecordingScreenState extends State<RecordingScreen>
         _recordedFilePath = file.path;
         _recordedDurationSeconds = _seconds;
       });
+      if (autoStopped) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Target duration reached. Recording stopped automatically.',
+            ),
+          ),
+        );
+      }
     } catch (e) {
       _stopTimer();
       if (!mounted) return;
@@ -607,28 +625,21 @@ class _RecordingScreenState extends State<RecordingScreen>
                                       ),
                                       const SizedBox(width: 10),
                                       Expanded(
-                                        child: DropdownButtonFormField<int>(
-                                          value: _targetMinutes,
-                                          items: const [1, 2, 3, 5, 7, 10]
-                                              .map(
-                                                (m) => DropdownMenuItem(
-                                                  value: m,
-                                                  child: Text('$m min'),
-                                                ),
-                                              )
-                                              .toList(),
-                                          onChanged: _recording
-                                              ? null
-                                              : (value) {
-                                                  if (value != null) {
-                                                    setState(
-                                                      () => _targetMinutes =
-                                                          value,
-                                                    );
-                                                  }
-                                                },
+                                        child: TextFormField(
+                                          initialValue: '$_targetMinutes',
+                                          enabled: !_recording,
+                                          keyboardType: TextInputType.number,
+                                          onChanged: (value) {
+                                            final parsed = int.tryParse(value);
+                                            if (parsed == null) return;
+                                            setState(() {
+                                              _targetMinutes = parsed
+                                                  .clamp(1, 240)
+                                                  .toInt();
+                                            });
+                                          },
                                           decoration: const InputDecoration(
-                                            labelText: 'Target',
+                                            labelText: 'Target (minutes)',
                                             border: OutlineInputBorder(),
                                           ),
                                         ),

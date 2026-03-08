@@ -35,6 +35,7 @@ export const investorRoutes = [
 // Admin routes (accessed via /dashboard)
 export const adminRoutes = [
   { id: 'admin-dashboard', path: '/dashboard/admin-dashboard', label: 'Admin Dashboard' },
+  { id: 'model-performance', path: '/dashboard/model-performance', label: 'Model Performance' },
   { id: 'user-management', path: '/dashboard/user-management', label: 'User Management' },
   { id: 'startup-discovery', path: '/dashboard/startup-discovery', label: 'All Startups' },
   { id: 'admin-advisory-tracks', path: '/dashboard/admin-advisory-tracks', label: 'Advisory Tracks' },

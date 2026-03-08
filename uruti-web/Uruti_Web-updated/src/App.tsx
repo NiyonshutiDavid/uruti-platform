@@ -108,6 +108,7 @@ function AppContent() {
       'startup-discovery': 'Startup Discovery',
       'deal-flow': 'Deal Flow',
       'admin-dashboard': 'Admin Dashboard',
+      'model-performance': 'Model Performance',
       'admin-advisory-tracks': 'Admin Advisory Tracks',
       'user-management': 'User Management',
       'ai-chat': 'AI Chat',

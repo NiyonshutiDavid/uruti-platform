@@ -47,6 +47,7 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
   const [viewingStartup, setViewingStartup] = useState<any | null>(null);
   const [isCreatingVenture, setIsCreatingVenture] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isDeletingStartupId, setIsDeletingStartupId] = useState<string | null>(null);
 
   const mapIndustryToEnum = (sector: string | undefined) => {
     const normalized = (sector || '').trim().toLowerCase();
@@ -169,6 +170,36 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
   const handleEditVenture = (startup: Startup) => {
     setSelectedStartup(startup);
     setIsEditDialogOpen(true);
+  };
+
+  const handleDeleteStartup = async (startup: Startup) => {
+    const confirmed = await confirm({
+      title: 'Delete Startup',
+      description: `Delete "${startup.name}"? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+
+    try {
+      setIsDeletingStartupId(startup.id);
+      await apiClient.deleteVenture(Number(startup.id));
+
+      setStartups((prev) => prev.filter((item) => item.id !== startup.id));
+      if (selectedStartup?.id === startup.id) {
+        setSelectedStartup(null);
+      }
+      if (viewingStartup?.id === startup.id) {
+        setViewingStartup(null);
+      }
+
+      toast.success(`Deleted ${startup.name}`);
+    } catch (error: any) {
+      console.error('Failed to delete startup:', error);
+      toast.error(error?.message || 'Failed to delete startup. Please try again.');
+    } finally {
+      setIsDeletingStartupId(null);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -553,16 +584,8 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
                           variant="ghost"
                           size="sm"
                           className="hover:bg-destructive/10 text-destructive"
-                          onClick={async () => {
-                            const confirmed = await confirm({
-                              title: 'Delete Startup',
-                              description: `Delete "${startup.name}"? This action cannot be undone.`,
-                              confirmLabel: 'Delete',
-                              variant: 'danger',
-                            });
-                            if (!confirmed) return;
-                            toast.info('Delete from this list is not wired yet.');
-                          }}
+                          disabled={isDeletingStartupId === startup.id}
+                          onClick={() => handleDeleteStartup(startup)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

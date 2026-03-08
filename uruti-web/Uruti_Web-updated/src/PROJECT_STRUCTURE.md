@@ -130,8 +130,8 @@ uruti-digital-ecosystem/
 │   │   ├── 📄 PrivacyPolicy.tsx          # Privacy policy
 │   │   └── 📄 TermsOfService.tsx         # Terms of service
 │   │
-│   ├── 📂 figma/                          # Figma Components (1 file)
-│   │   └── 📄 ImageWithFallback.tsx      # Image with fallback (protected)
+│   ├── 📂 media/                          # Media Helpers (1 file)
+│   │   └── 📄 ImageWithFallback.tsx      # Image with fallback
 │   │
 │   └── 📂 (root - 19 files)               # Shared Components
 │       ├── 📄 AIChatbot.tsx              # AI assistant (floating)
@@ -166,8 +166,8 @@ uruti-digital-ecosystem/
 ├── 📂 styles/                             # Global Styles (1 file)
 │   └── 📄 globals.css                    # Tailwind v4 + custom tokens
 │
-└── 📂 imports/                            # Figma Imports (2 files)
-    ├── 📄 Pitchcoach.tsx                 # Pitch coach Figma import
+└── 📂 imports/                            # Generated UI imports (2 files)
+    ├── 📄 Pitchcoach.tsx                 # Pitch coach generated import
     └── 📄 svg-27obdul0fd.ts              # SVG path definitions
 ```
 
@@ -195,7 +195,7 @@ components/
 ├── ui/               41 files (shadcn/ui components)
 ├── auth/             3 files  (authentication pages)
 ├── landing/          9 files  (landing pages)
-├── figma/            1 file   (Figma components)
+├── media/            1 file   (media helpers)
 └── shared/          19 files  (shared components)
 ```
 
@@ -205,7 +205,7 @@ components/
 ```
 lib/                   7 files  (contexts & utilities)
 styles/                1 file   (global styles)
-imports/               2 files  (Figma imports)
+imports/               2 files  (generated UI imports)
 root/                  4 files  (App.tsx, docs, config)
 ```
 
@@ -312,7 +312,7 @@ All components use:
 ## 🔐 Protected Files
 
 These files are **system-protected** and should not be modified:
-- `/components/figma/ImageWithFallback.tsx`
+- `/components/media/ImageWithFallback.tsx`
 - `/guidelines/Guidelines.md`
 
 ---

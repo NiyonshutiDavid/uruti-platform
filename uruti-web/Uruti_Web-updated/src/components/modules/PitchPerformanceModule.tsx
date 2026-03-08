@@ -5,7 +5,7 @@ import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, LineChart, Line } from 'recharts';
-import { TrendingUp, Download, Play, Eye, Award, Target, X, Sparkles, ArrowLeft } from 'lucide-react';
+import { TrendingUp, Download, Play, Eye, Award, Target, X, Sparkles, ArrowLeft, Trash2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { toast } from 'sonner';
 import { apiClient } from '../../lib/api-client';
@@ -27,79 +27,10 @@ interface PitchSession {
   feedback: string[];
 }
 
-const mockSessions: PitchSession[] = [
-  {
-    id: '1',
-    date: '2026-02-03',
-    venture: 'AgriConnect',
-    duration: '5:23',
-    overallScore: 85,
-    pacing: 82,
-    clarity: 88,
-    confidence: 84,
-    structure: 90,
-    engagement: 80,
-    videoUrl: '#',
-    transcriptUrl: '#',
-    feedback: ['Excellent market data presentation', 'Consider slowing down in problem section', 'Strong closing']
-  },
-  {
-    id: '2',
-    date: '2026-02-01',
-    venture: 'FinTrack',
-    duration: '4:45',
-    overallScore: 90,
-    pacing: 88,
-    clarity: 92,
-    confidence: 89,
-    structure: 91,
-    engagement: 90,
-    videoUrl: '#',
-    transcriptUrl: '#',
-    feedback: ['Perfect pacing', 'Clear value proposition', 'Engaging storytelling']
-  },
-  {
-    id: '3',
-    date: '2026-01-28',
-    venture: 'HealthBridge',
-    duration: '6:10',
-    overallScore: 72,
-    pacing: 68,
-    clarity: 75,
-    confidence: 70,
-    structure: 78,
-    engagement: 69,
-    videoUrl: '#',
-    transcriptUrl: '#',
-    feedback: ['Too fast in opening', 'Need more confidence in delivery', 'Good technical details']
-  },
-  {
-    id: '4',
-    date: '2026-01-25',
-    venture: 'EduLearn Rwanda',
-    duration: '5:00',
-    overallScore: 78,
-    pacing: 76,
-    clarity: 80,
-    confidence: 75,
-    structure: 82,
-    engagement: 77,
-    videoUrl: '#',
-    transcriptUrl: '#',
-    feedback: ['Good structure', 'Improve vocal variety', 'Strong problem statement']
-  }
-];
-
-const progressData = [
-  { session: 'Session 1', score: 72 },
-  { session: 'Session 2', score: 78 },
-  { session: 'Session 3', score: 85 },
-  { session: 'Session 4', score: 90 },
-];
-
 export function PitchPerformanceModule() {
   const [sessions, setSessions] = useState<PitchSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [selectedSession, setSelectedSession] = useState<PitchSession | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'video'>('list');
   const [videoSession, setVideoSession] = useState<PitchSession | null>(null);
@@ -137,6 +68,36 @@ export function PitchPerformanceModule() {
   const handleBackToList = () => {
     setViewMode('list');
     setVideoSession(null);
+  };
+
+  const handleDeleteSession = async (session: PitchSession, e: MouseEvent) => {
+    e.stopPropagation();
+    const confirmed = window.confirm(`Delete recording for ${session.venture} from ${new Date(session.date).toLocaleDateString()}?`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingSessionId(session.id);
+      await apiClient.deletePitchAnalysis(session.id);
+
+      const updatedSessions = sessions.filter((item) => item.id !== session.id);
+      setSessions(updatedSessions);
+
+      if (selectedSession?.id === session.id) {
+        setSelectedSession(updatedSessions[0] || null);
+      }
+      if (videoSession?.id === session.id) {
+        setVideoSession(null);
+        setViewMode('list');
+      }
+
+      toast.success('Recording deleted successfully');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to delete recording');
+    } finally {
+      setDeletingSessionId(null);
+    }
   };
 
   const toAbsoluteUrl = (url?: string) => {
@@ -657,6 +618,15 @@ export function PitchPerformanceModule() {
                             }}
                           >
                             <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-red-100 hover:text-red-600"
+                            disabled={deletingSessionId === session.id}
+                            onClick={(e: MouseEvent) => handleDeleteSession(session, e)}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>

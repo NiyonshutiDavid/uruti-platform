@@ -24,22 +24,6 @@ const _fallbackModels = [
     'fixed_prompt': null,
     'is_default': true,
   },
-  {
-    'id': 'gpt-4',
-    'name': 'GPT-4',
-    'type': 'chatbot',
-    'requires_venture_context': false,
-    'fixed_prompt': null,
-    'is_default': false,
-  },
-  {
-    'id': 'gpt-3.5-turbo',
-    'name': 'GPT-3.5 Turbo',
-    'type': 'chatbot',
-    'requires_venture_context': false,
-    'fixed_prompt': null,
-    'is_default': false,
-  },
 ];
 
 class AiChatScreen extends StatefulWidget {
@@ -204,6 +188,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
           .where(
             (model) => (model['id']?.toString().trim().isNotEmpty ?? false),
           )
+          .map((model) {
+            final normalized = Map<String, dynamic>.from(model);
+            final rawName = normalized['name']?.toString() ?? '';
+            if (rawName.trim().isNotEmpty) {
+              normalized['name'] = _sanitizeModelName(rawName);
+            }
+            return normalized;
+          })
           .toList();
       if (parsed.isEmpty) return;
 
@@ -221,6 +213,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
     } catch (_) {}
   }
 
+  String _sanitizeModelName(String raw) {
+    // Strip decorative emoji/symbol characters so model labels stay plain text.
+    final withoutEmoji = raw.replaceAll(
+      RegExp(r'[\u{1F300}-\u{1FAFF}]', unicode: true),
+      '',
+    );
+    final withoutSymbols = withoutEmoji.replaceAll(
+      RegExp(r'^[\s\-•·*]+|[\s\-•·*]+$'),
+      '',
+    );
+    return withoutSymbols.trim().isEmpty ? 'Uruti AI' : withoutSymbols.trim();
+  }
+
   Map<String, dynamic> get _selectedModelConfig {
     for (final model in _models) {
       if (model['id']?.toString() == _selectedModel) return model;
@@ -230,10 +235,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   IconData _modelIcon(Map<String, dynamic> model) {
     final type = model['type']?.toString() ?? '';
-    final id = model['id']?.toString() ?? '';
     if (type == 'analysis') return Icons.analytics_outlined;
-    if (id.contains('gpt-4')) return Icons.psychology_outlined;
-    if (id.contains('gpt')) return Icons.psychology_alt_outlined;
     return Icons.smart_toy_outlined;
   }
 

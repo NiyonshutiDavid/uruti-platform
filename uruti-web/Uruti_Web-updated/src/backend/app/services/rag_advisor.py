@@ -218,6 +218,7 @@ class RwandaRagAdvisor:
         candidates = [
             self.workspace_root / "Notebooks" / "Domain-specific" / "data",
             self.workspace_root / "Notebooks" / "uruti-Chatbot" / "data",
+            self.workspace_root / "Models" / "Uruti chatbot" / "uruti_rag_corpus" / "pdfs",
         ]
 
         timestamp = datetime.now(timezone.utc).isoformat()
@@ -233,6 +234,8 @@ class RwandaRagAdvisor:
                         text = self._load_csv_text(path)
                     elif suffix in {".json", ".jsonl"}:
                         text = self._load_json_text(path)
+                    elif suffix == ".pdf":
+                        text = self._extract_text_from_pdf(path.read_bytes())
                     else:
                         continue
                 except Exception:

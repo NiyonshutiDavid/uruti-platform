@@ -45,6 +45,7 @@ export function AdminDashboardModule() {
   const [ventures, setVentures] = useState<any[]>([]);
   const [supportMessages, setSupportMessages] = useState<any[]>([]);
   const [modelPerformance, setModelPerformance] = useState<any | null>(null);
+  const [aiModels, setAiModels] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [activeTab, setActiveTab] = useState(initialTab);
 
@@ -115,6 +116,14 @@ export function AdminDashboardModule() {
       } catch (error) {
         console.log('Model performance metrics not available');
         setModelPerformance(null);
+      }
+
+      try {
+        const models = await apiClient.getAiModels();
+        setAiModels(Array.isArray(models) ? models : []);
+      } catch (error) {
+        console.log('AI model list not available');
+        setAiModels([]);
       }
 
       // Calculate stats
@@ -590,17 +599,17 @@ export function AdminDashboardModule() {
             <Card className="backdrop-blur-sm bg-[#76B947]/5 dark:bg-black/20 border-[#76B947]/30">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium text-muted-foreground" style={{ fontFamily: 'var(--font-heading)' }}>
-                  Model Name
+                  Model Registry
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-lg font-bold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                      {modelPerformance?.model_info?.model_name || 'Unavailable'}
+                      {aiModels.length}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: 'var(--font-body)' }}>
-                      Source: {modelPerformance?.model_info?.model_source || 'N/A'}
+                      Registered backend models
                     </p>
                   </div>
                   <BrainCircuit className="h-8 w-8 text-[#76B947]" />
@@ -676,7 +685,7 @@ export function AdminDashboardModule() {
             <CardHeader>
               <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>Model Details</CardTitle>
               <CardDescription style={{ fontFamily: 'var(--font-body)' }}>
-                Runtime metadata and score class distribution
+                Runtime metadata, available models, and score class distribution
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -710,6 +719,24 @@ export function AdminDashboardModule() {
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-lg bg-[#76B947]/10 backdrop-blur-sm">
+                <p className="text-xs text-muted-foreground mb-3" style={{ fontFamily: 'var(--font-body)' }}>
+                  Available models
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {aiModels.length === 0 && (
+                    <span className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                      No models discovered
+                    </span>
+                  )}
+                  {aiModels.map((model: any) => (
+                    <Badge key={model.id} variant="outline" className="bg-[#76B947]/20 text-[#76B947]">
+                      {model.name || model.id}
+                    </Badge>
+                  ))}
                 </div>
               </div>
             </CardContent>

@@ -12,7 +12,7 @@ import {
 import { LandingHeader } from './LandingHeader';
 import { LandingFooter } from './LandingFooter';
 import { LiveChatWidget } from '../LiveChatWidget';
-import davidImage from 'figma:asset/b38d5413c55bf04f2a0cb1c3d346a2a056ec152d.png';
+import davidImage from '../../assets/b38d5413c55bf04f2a0cb1c3d346a2a056ec152d.png';
 
 interface LandingAboutProps {
   onNavigate: (page: string) => void;

@@ -1,196 +1,240 @@
 # URUTI
 
-AI-Powered Ideation, Pitch Coaching & Investor Intelligence Platform
+AI-powered ideation, pitch coaching, and investor intelligence platform for early-stage founders.
 
-## 1. Project Description
+## Project Links
 
-Uruti is an AI-driven ideation and pre-acceleration platform designed to bridge the early-stage startup "Valley of Death" in Rwanda and emerging ecosystems.
+- Current development repo: https://github.com/NiyonshutiDavid/uruti-platform.git
+- Previous versions: https://github.com/NiyonshutiDavid/uruti_MLOP.git
 
-The platform supports founders from raw idea formation to investor readiness using:
+## Deployment And Deliverables
 
-- 🤖 AI-Guided Ideation & Advisory
-- 🎤 Reinforcement Learning–Based Pitch Coaching
-- 📊 Neural-Network Investor Scoring & Ranking
+- Deployed web app link: https://uruti.rw
+- APK files folder: https://drive.google.com/drive/folders/1uGmQXk1chvWdfEiGaUKAQ18qg1kYJv9c?usp=sharing
+- Demo video (5 minutes): https://drive.google.com/drive/folders/1vv6e5kCKp86Lr4L88cjQwTP7zW4s0TNE?usp=sharing
 
-Uruti is not a chatbot. It is a goal-driven, outcome-optimized system built specifically to:
+## Hugging Face Model Deployments
 
-- Improve idea validation quality
-- Increase pitch performance over time
-- Reduce investor screening costs
-- Standardize early-stage evaluation metrics
+The platform models are deployed on Hugging Face:
 
-The system complements, rather than competes with, accelerators such as Y Combinator, Techstars, Norrsken House Kigali, and Kigali Innovation City.
+- Pitch coach model: https://huggingface.co/NiyonshutiDavid/Uruti-pitch_coach
+- Investor ranker and analyzer model: https://huggingface.co/NiyonshutiDavid/uruti-ranker_and_analyser
+- Chatbot model (GGUF, CPU-friendly): https://huggingface.co/NiyonshutiDavid/uruti-qwen2_5-7b-instruct-q4_k_m-gguf
+- Chatbot model (Tensor/large variant): https://huggingface.co/NiyonshutiDavid/uruti-advisory-model-best
 
-## 2. Repository Links
+## Datasets Used
 
-- 🔗 **Current Development**: https://github.com/NiyonshutiDavid/uruti-platform.git
-- 🔗 **Previous Versions**: https://github.com/NiyonshutiDavid/uruti_MLOP.git
+Primary datasets and data assets used in this repository:
 
-## 3. Technology Stack
+- `Notebooks/Data/50_Startups.csv` (startup financial features)
+- `Notebooks/Data/investments_VC.csv` (VC/investment related records)
+- `Notebooks/Data/startup data.csv` (startup profile and outcome features)
+- `Notebooks/Data/alpaca_data_cleaned.json` (advisory/chat data)
+- `Notebooks/Data/chatbot-data.json` (chatbot/advisory training data)
+- `Notebooks/Data/MELD.Raw/` (speech/emotion-related raw data)
+- `Notebooks/uruti-Chatbot/data/train_data_generated.jsonl`
+- `Notebooks/uruti-Chatbot/data/val_data_generated.jsonl`
+- `Notebooks/uruti-Chatbot/data/test_data_generated.jsonl`
 
-### Frontend (Web)
-- React
-- Vite
-- TailwindCSS
-- Responsive layout architecture
-- Modular component design
+Supporting data archives in `Notebooks/Data/`:
 
-### Mobile App
-- Flutter
-- Designed in Figma
-- State-driven UI architecture
+- `50 startups.zip`
+- `Crunchbase Investment Data (Kaggle).zip`
+- `Startup Success Prediction.zip`
 
-### Backend (Planned / In Progress)
-- FastAPI (Python)
-- RESTful APIs
-- JWT Authentication
-- Model inference endpoints
+## Notebooks And What They Do
 
-### AI / ML Stack
-- Python
-- PyTorch / TensorFlow (MLP implementation)
-- Reinforcement Learning framework
-- Pandas / NumPy
-- Scikit-learn
+All core notebooks should run in Google Colab (recommended baseline environment) so results are reproducible even when local hardware is limited.
 
-## 4. System Architecture Overview
+- `Notebooks/uruti-MLP_models/ModelCreation.ipynb`
+    Main training notebook for the investor intelligence model: preprocessing, training, evaluation, and export.
 
-Uruti follows a modular service-oriented architecture:
+- `Notebooks/uruti-MLP_models/StartupAnalyzer_Demo.ipynb`
+    Inference/demo notebook for startup scoring, confidence estimation, and recommendation generation.
 
-- **Client Layer**: Web App (React), Mobile App (Flutter)
-- **API Gateway Layer**: Authentication, Request routing, Rate limiting
-- **AI Services Layer**: Reinforcement Learning Pitch Engine, MLP Scoring Engine, NLP Idea Structuring
-- **Data Layer**: PostgreSQL / MongoDB, Model artifacts storage, User performance logs
+- `Notebooks/uruti_rl/Uruti_pitch_coach.ipynb`
+    Pitch coach research notebook with multimodal feature extraction, training experiments, and quality checks.
 
-## 5. Frontend Development Demonstration
+- `Notebooks/uruti-Chatbot/uruti_benchmark.ipynb`
+    Advisory chatbot benchmark notebook covering data preparation, fine-tuning workflow, and model comparison.
 
-### UI/UX Design Process
+Colab run notes:
 
-**Design workflow:**
-- Wireframes
-- High-fidelity mockups (Figma)
-- Component system definition
-- Tailwind-based implementation
+- Prefer Google Colab GPU runtime for heavy training or fine-tuning cells.
+- Configure required secrets/tokens before running cells (`HF_TOKEN`, `KAGGLE_USERNAME`, `KAGGLE_KEY`).
+- Run cells from top to bottom to avoid missing setup state.
 
-**Design principles:**
-- Minimal cognitive load
-- Clear pitch progress tracking
-- Structured dashboard layouts
-- Mobile-first responsive design
+## Related Project Files
 
-### Figma Prototype
-https://www.figma.com/design/UDNIFsLGHMzDn5EFre4P1O/Uruti-UI-UX-designs?node-id=10213-130944&t=NniDCsG2ZnRrQ8fp-1
+- Web app: `uruti-web/Uruti_Web-updated/`
+    React + Vite frontend with founder/investor/admin dashboards.
+- Backend (FastAPI): `uruti-web/Uruti_Web-updated/src/backend/`
+    Core APIs, authentication, venture modules, and AI routing.
+- Mobile app (Flutter): `uruti-Mobile/uruti_app/`
+    Android/iOS app for mobile access to main platform workflows.
+- Model artifacts: `Models/`
+    Trained model bundles, metadata, and inference assets.
+- Notebook workspace: `Notebooks/`
+    Research, model training, evaluation, and demo notebooks.
 
-### Screenshots
-- Founder Dashboard
-<img width="1436" height="696" alt="Screenshot 2026-02-15 at 15 35 16" src="https://github.com/user-attachments/assets/c0814007-3486-41c4-8a26-31291846266c" />
+## Step-By-Step Installation And Run Instructions
 
+### 1. Clone Repository
 
-- Idea Refinement Interface
-<img width="908" height="643" alt="Screenshot 2026-02-15 at 15 35 57" src="https://github.com/user-attachments/assets/c80634ad-3f16-4b77-8b28-808b4e6c304e" />
-
-
-- Pitch Coaching Module
-<img width="1435" height="696" alt="Screenshot 2026-02-15 at 15 36 43" src="https://github.com/user-attachments/assets/bfb4efa2-a7cb-414d-9b1b-bd2c615b7fab" />
-
-
-- Investor Analytics Dashboard
-<img width="1440" height="688" alt="Screenshot 2026-02-15 at 15 38 20" src="https://github.com/user-attachments/assets/cc58b1fd-c003-477a-8b0f-502ecf507884" />
-
-
-- Leaderboard Page
-<img width="1436" height="697" alt="Screenshot 2026-02-15 at 15 37 11" src="https://github.com/user-attachments/assets/35b9ba2e-e918-4a6c-9e4e-9a5aaffb6055" />
-
-### Example Frontend Code
-```jsx
-export default function PitchScoreCard({ score }) {
-    return (
-        <div className="bg-white shadow-xl rounded-2xl p-6">
-            <h2 className="text-xl font-semibold">Pitch Readiness Score</h2>
-            <p className="text-4xl font-bold text-blue-600 mt-2">{score}%</p>
-        </div>
-    );
-}
-```
-
-## 6. Machine Learning Track Demonstration
-
-Documentation: `ModelCreation.ipynb`
-
-### 6.1 Data Engineering & Visualization
-- Dataset cleaning & feature engineering
-- Feature scaling & missing value handling
-- Visualizations: Feature importance, correlation heatmaps, training curves
-
-### 6.2 Model Current Performance
-
-**A. Reinforcement Learning Pitch Coach**
-<img width="850" height="547" alt="image" src="https://github.com/user-attachments/assets/527f24ac-d047-4b23-868e-4b485c595517" />
-
-
-**B. Multi-Layer Perceptron (MLP) – Investor Scoring Engine**
-<img width="1790" height="490" alt="image" src="https://github.com/user-attachments/assets/d20bef9c-62be-4dec-95d8-0b94d47e75b1" />
-
-
-## 7. Backend Development Demonstration
-
-### Example FastAPI Endpoint
-```python
-@app.post("/score-startup")
-def score_startup(data: StartupInput):
-        prediction = model.predict(data.features)
-        return {"investment_score": float(prediction)}
-```
-
-## 8. Database Schema
-
-### Users Table
-- `id`, `name`, `email`, `role` (founder/investor), `password_hash`
-
-### Projects Table
-- `id`, `founder_id`, `idea_text`, `validation_score`, `pitch_score`, `investor_score`
-
-### Pitch Sessions Table
-- `id`, `project_id`, `session_number`, `feedback`, `improvement_score`
-
-## 9. Deployment Plan
-
-**Phase 1 – MVP**: Frontend (Vercel), Backend (Render/Railway), Database (Supabase)
-
-**Phase 2 – AI Scaling**: Docker containerization, Separate inference server, GPU scaling
-
-**Phase 3 – Production**: CI/CD pipeline, Monitoring (Prometheus), Logging & performance tracking
-
-## 10. Development Environment Setup
-
-### Clone Repository
 ```bash
-git clone https://github.com/yourusername/uruti.git
-cd uruti
+git clone https://github.com/NiyonshutiDavid/uruti-platform.git
+cd uruti-platform
 ```
 
-### Frontend Setup
+### 2. Start Web Frontend
+
 ```bash
-cd frontend
+cd uruti-web/Uruti_Web-updated
 npm install
 npm run dev
 ```
-Runs on: `http://localhost:5173`
 
-### Backend Setup
+Frontend runs on `http://localhost:5173`.
+
+### 3. Start Backend Services (Core + AI Modules)
+
+Open a new terminal:
+
 ```bash
-cd backend
-python -m venv venv
-source venv/bin/activate
+cd uruti-web/Uruti_Web-updated/src/backend
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn main:app --reload
+cp .env.example .env
 ```
-Runs on: `http://localhost:8000` | Docs: `http://localhost:8000/docs`
 
-### ML Notebook
+Run core backend service:
+
 ```bash
-jupyter notebook ModelCreation.ipynb
+uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
 ```
-### Video recording
-Access the video recording from here:
-https://drive.google.com/drive/folders/1vv6e5kCKp86Lr4L88cjQwTP7zW4s0TNE?usp=sharing
+
+Open another terminal in the same backend folder and run AI modules service:
+
+```bash
+source .venv/bin/activate
+uvicorn app.chatbot_main:app --host 127.0.0.1 --port 8020 --reload
+```
+
+Health checks:
+
+- Core backend: `http://127.0.0.1:8010/health`
+- AI modules: `http://127.0.0.1:8020/health`
+
+### 4. Start Mobile App (Optional)
+
+```bash
+cd uruti-Mobile/uruti_app
+flutter pub get
+flutter run
+```
+
+### 5. Run Notebooks (Optional For ML Reproduction)
+
+```bash
+jupyter notebook
+```
+
+Then open notebooks from `Notebooks/`.
+
+Environment recommendation:
+
+- Recommended: Google Colab for reproducible setup and better GPU availability.
+- Local Jupyter is supported mainly for lightweight/demo runs.
+
+## Submission Guidelines Alignment
+
+This README is structured for Attempt 1 and Attempt 2 submission requirements.
+
+Attempt 1 should include:
+
+- Well-formatted README with install/run instructions
+- Related files and folders
+- A 5-minute demo video focusing on core functionality
+- Deployed app link or installable package link (APK)
+
+Attempt 2 should include:
+
+- Zip file of the repository submitted in Attempt 1
+
+## Testing Results (Screenshot Placeholders)
+
+Demonstration under different testing strategies:
+
+- `[SCREENSHOT PLACEHOLDER] Strategy 1: Functional testing result`
+- `[SCREENSHOT PLACEHOLDER] Strategy 2: Integration/API testing result`
+- `[SCREENSHOT PLACEHOLDER] Strategy 3: End-to-end user flow testing result`
+
+Demonstration with different data values:
+
+- `[SCREENSHOT PLACEHOLDER] Data Variant A: Low-input or edge case`
+- `[SCREENSHOT PLACEHOLDER] Data Variant B: Typical startup profile`
+- `[SCREENSHOT PLACEHOLDER] Data Variant C: High-growth startup profile`
+
+Performance on different hardware/software specifications:
+
+- `[SCREENSHOT PLACEHOLDER] Device/Spec 1 performance`
+- `[SCREENSHOT PLACEHOLDER] Device/Spec 2 performance`
+- `[SCREENSHOT PLACEHOLDER] Device/Spec 3 performance`
+
+## Analysis (To Complete With Supervisor)
+
+- `[ANALYSIS PLACEHOLDER] Detailed analysis of achieved vs missed objectives from the project proposal.`
+- `[ANALYSIS PLACEHOLDER] Interpretation of testing outcomes and performance trends.`
+
+## Discussion (To Complete With Supervisor)
+
+- `[DISCUSSION PLACEHOLDER] Importance of milestones completed.`
+- `[DISCUSSION PLACEHOLDER] Impact of results on founders, investors, and ecosystem adoption.`
+
+## Recommendations And Future Work (To Complete With Supervisor)
+
+- `[RECOMMENDATION PLACEHOLDER] Practical recommendations to the community.`
+
+Future improvement plan (including hardware constraints):
+
+- Hardware resilience:
+    Keep dual deployment paths: GGUF models for CPU/low-resource environments and Tensor/full models for GPU servers.
+
+- Inference efficiency:
+    Add batching, request queueing, and optimized quantization to reduce memory usage and response latency.
+
+- Training infrastructure:
+    Move heavy model training and large-scale experiments to Colab Pro/cloud GPU instances to avoid local hardware bottlenecks.
+
+- Model quality:
+    Increase domain-specific dataset size, improve label quality, and schedule periodic re-training with versioned evaluations.
+
+- Safer and more reliable outputs:
+    Strengthen RAG grounding, improve retrieval quality, and add hallucination checks for advisory responses.
+
+- Better evaluation coverage:
+    Track and publish metrics per module: accuracy/F1 (ranker), coaching score consistency (pitch coach), and factuality/latency (chatbot).
+
+- Model compression roadmap:
+    Distill larger advisory models into smaller student models to improve speed on limited hardware without large quality loss.
+
+- MLOps and deployment maturity:
+    Add automated model registry, staged rollout (canary), and drift monitoring in production.
+
+## Demo Screenshot Gallery (Add Images Here)
+
+- Core dashboard demo image:
+    `[INSERT IMAGE OR LINK HERE]`
+
+- Startup creation and management demo image:
+    `[INSERT IMAGE OR LINK HERE]`
+
+- Advisory/chatbot demo image:
+    `[INSERT IMAGE OR LINK HERE]`
+
+- Pitch coach demo image:
+    `[INSERT IMAGE OR LINK HERE]`
+
+- Investor intelligence/ranking demo image:
+    `[INSERT IMAGE OR LINK HERE]`

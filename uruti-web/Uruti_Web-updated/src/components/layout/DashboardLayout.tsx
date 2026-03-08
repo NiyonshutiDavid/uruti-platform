@@ -28,6 +28,7 @@ import { AdminAdvisoryTracksModule } from '../modules/AdminAdvisoryTracksModule'
 import { AdminDashboardModule } from '../modules/AdminDashboardModule';
 import { AdminUserManagementModule } from '../modules/AdminUserManagementModule';
 import { AdminCredentialsModule } from '../modules/AdminCredentialsModule';
+import { AdminModelPerformanceModule } from '../modules/AdminModelPerformanceModule';
 import { useCall } from '../../lib/call-context';
 import { Button } from '../ui/button';
 import { apiClient } from '../../lib/api-client';
@@ -344,6 +345,7 @@ export function DashboardLayout() {
 
             {/* Admin routes */}
             <Route path="admin-dashboard" element={user.role === 'admin' ? <AdminDashboardModule /> : <Navigate to="/dashboard" replace />} />
+            <Route path="model-performance" element={user.role === 'admin' ? <AdminModelPerformanceModule /> : <Navigate to="/dashboard" replace />} />
             <Route path="admin-advisory-tracks" element={user.role === 'admin' ? <AdminAdvisoryTracksModule /> : <Navigate to="/dashboard" replace />} />
             <Route path="user-management" element={user.role === 'admin' ? <AdminUserManagementModule /> : <Navigate to="/dashboard" replace />} />
 

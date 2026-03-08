@@ -21,6 +21,8 @@ import {
   Image as ImageIcon,
   FileText,
   X,
+  Pencil,
+  Check,
   Search,
   MessageSquare,
   Clock,
@@ -94,10 +96,13 @@ interface BackendAiModel {
   id: string;
   name: string;
   description: string;
-  type: 'chatbot' | 'analysis';
+  type: 'chatbot' | 'analysis' | 'coach';
   requires_venture_context: boolean;
   fixed_prompt?: string | null;
   is_default?: boolean;
+  available?: boolean;
+  status?: 'online' | 'offline' | 'initializing';
+  offline_reason?: string | null;
 }
 
 interface AIChatModuleProps {
@@ -142,9 +147,12 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
   const [availableModels, setAvailableModels] = useState<BackendAiModel[]>([]);
   const [selectedModel, setSelectedModel] = useState<BackendAiModel | null>(null);
   const [isLoadingModels, setIsLoadingModels] = useState(true);
+  const [modelsOfflineMessage, setModelsOfflineMessage] = useState<string | null>(null);
   const [modelSelectOpen, setModelSelectOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [chatToDelete, setChatToDelete] = useState<string | null>(null);
+  const [editingChatId, setEditingChatId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -190,18 +198,23 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
           id: String(model.id),
           name: String(model.name || model.id),
           description: String(model.description || ''),
-          type: model.type === 'analysis' ? 'analysis' : 'chatbot',
+          type: model.type === 'analysis' ? 'analysis' : model.type === 'coach' ? 'coach' : 'chatbot',
           requires_venture_context: Boolean(model.requires_venture_context),
           fixed_prompt: model.fixed_prompt ?? null,
           is_default: Boolean(model.is_default),
+          available: model.available !== false,
+          status: model.status || 'online',
+          offline_reason: model.offline_reason || null,
         }));
 
         setAvailableModels(models);
         const defaultModel = models.find((m) => m.is_default) || models.find((m) => m.type === 'chatbot') || models[0] || null;
         setSelectedModel(defaultModel);
+        setModelsOfflineMessage(null);
       } catch (error) {
         setAvailableModels([]);
         setSelectedModel(null);
+        setModelsOfflineMessage('Models are offline. Uruti AI Modules is still initializing or unreachable.');
       } finally {
         setIsLoadingModels(false);
       }
@@ -401,6 +414,19 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
   const handleSend = async (text?: string) => {
     if (!selectedModel) return;
 
+    if (selectedModel.available === false || selectedModel.status === 'offline' || selectedModel.status === 'initializing') {
+      const status = selectedModel.status || 'offline';
+      const reason = selectedModel.offline_reason || 'Model is unavailable at the moment.';
+      const blockedMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `Selected model is ${status}. ${reason}`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, blockedMessage]);
+      return;
+    }
+
     const typedText = (text || inputText.trim()).trim();
     const isAnalysisModel = selectedModel.type === 'analysis';
 
@@ -573,11 +599,13 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
     setMessages([]);
     setAttachments([]);
     setSelectedStartup(null);
+    setIsSidebarOpen(false);
   };
 
   const loadChatHistory = async (chatId: string) => {
     try {
       setCurrentChatId(chatId);
+      setIsSidebarOpen(false);
       const chat = chatHistories.find(c => c.id === chatId);
       if (chat?.startup) {
         const foundVenture = ventures.find(v => v.name === chat.startup?.name) || bookmarkedVentures.find(v => v.name === chat.startup?.name);
@@ -617,6 +645,29 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
     }
   };
 
+  const saveChatTitle = async (chatId: string) => {
+    const nextTitle = editingTitle.trim();
+    if (!nextTitle) return;
+
+    try {
+      await apiClient.renameAiSessionHistory(chatId, nextTitle);
+      setChatHistories((prev) =>
+        prev.map((chat) =>
+          chat.id === chatId
+            ? {
+                ...chat,
+                title: nextTitle,
+              }
+            : chat,
+        ),
+      );
+      setEditingChatId(null);
+      setEditingTitle('');
+    } catch (error) {
+      console.error('Error renaming chat:', error);
+    }
+  };
+
   const filteredHistories = chatHistories.filter(chat =>
     chat.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     chat.lastMessage.toLowerCase().includes(searchTerm.toLowerCase())
@@ -645,7 +696,15 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
   const isAnalysisSelected = selectedModel?.type === 'analysis';
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="relative flex h-full min-h-0 overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      {isSidebarOpen && (
+        <div
+          className="absolute inset-0 z-30 bg-black/40 backdrop-blur-[1px] md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="glass-card border-purple-200 dark:border-purple-500/30">
@@ -667,11 +726,10 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Chat History Sidebar */}
+      {/* Chat History Sidebar (Right Drawer) */}
+      {isSidebarOpen && (
       <aside
-        className={`w-80 shrink-0 border-r border-slate-200/80 bg-white/90 dark:border-slate-800 dark:bg-slate-900/70 flex h-full min-h-0 flex-col overflow-hidden backdrop-blur supports-[backdrop-filter]:bg-white/80 supports-[backdrop-filter]:dark:bg-slate-900/70 ${
-          isSidebarOpen ? 'flex' : 'hidden md:flex'
-        }`}
+        className="absolute inset-y-0 right-0 z-40 w-80 shrink-0 border-l border-slate-200/80 bg-white/95 dark:border-slate-800 dark:bg-slate-900/85 flex min-h-0 flex-col overflow-hidden backdrop-blur supports-[backdrop-filter]:bg-white/85 supports-[backdrop-filter]:dark:bg-slate-900/75"
       >
         <div className="p-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center justify-between mb-4">
@@ -681,18 +739,20 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
               </div>
               <div>
                 <h2 className="font-semibold text-black dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                  Uruti AI
+                  History
                 </h2>
-                <p className="text-xs text-muted-foreground">{userType === 'founder' ? 'Advisory' : 'Investment'} Assistant</p>
+                <p className="text-xs text-muted-foreground">Past conversations</p>
               </div>
             </div>
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setIsSidebarOpen(false)}
-              className="h-8 w-8 hover:bg-[#76B947] hover:text-white transition-all md:hidden"
+              type="button"
+              aria-label="Close history panel"
+              className="h-8 w-8 hover:bg-[#76B947] hover:text-white transition-all"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
           
@@ -731,35 +791,101 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
               {filteredHistories.map((chat) => (
                 <div key={chat.id} className="rounded-xl">
                   <Card
+                    onClick={() => {
+                      if (editingChatId !== chat.id) {
+                        void loadChatHistory(chat.id);
+                      }
+                    }}
                     className={`glass-card cursor-pointer transition-all hover:scale-[1.02] hover:bg-[#76B947]/10 dark:hover:bg-[#76B947]/20 border-gray-200 dark:border-gray-700 ${
                       currentChatId === chat.id ? 'bg-purple-100/50 dark:bg-purple-900/30 border-purple-400 dark:border-purple-500' : ''
                     }`}
                   >
                   <CardContent className="p-3">
                     <div className="flex items-start justify-between mb-1">
-                      <div 
-                        className="flex items-center space-x-2 flex-1 min-w-0"
-                        onClick={() => loadChatHistory(chat.id)}
-                      >
+                      <div className="flex items-center space-x-2 flex-1 min-w-0">
                         <MessageSquare className="h-4 w-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-                        <h3 className="text-sm font-medium text-black dark:text-white truncate" style={{ fontFamily: 'var(--font-heading)' }}>
-                          {chat.title}
-                        </h3>
+                        {editingChatId === chat.id ? (
+                          <Input
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                void saveChatTitle(chat.id);
+                              }
+                              if (e.key === 'Escape') {
+                                setEditingChatId(null);
+                                setEditingTitle('');
+                              }
+                            }}
+                            className="h-7 text-xs"
+                            autoFocus
+                          />
+                        ) : (
+                          <h3 className="text-sm font-medium text-black dark:text-white truncate" style={{ fontFamily: 'var(--font-heading)' }}>
+                            {chat.title}
+                          </h3>
+                        )}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                          e.stopPropagation();
-                          setChatToDelete(chat.id);
-                          setDeleteDialogOpen(true);
-                        }}
-                        className="h-6 w-6 hover:bg-red-100 dark:hover:bg-red-900/30 flex-shrink-0"
-                      >
-                        <Trash2 className="h-3 w-3 text-red-600" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        {editingChatId === chat.id ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                e.stopPropagation();
+                                void saveChatTitle(chat.id);
+                              }}
+                              className="h-6 w-6 hover:bg-green-100 dark:hover:bg-green-900/30 flex-shrink-0"
+                            >
+                              <Check className="h-3 w-3 text-green-600" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                e.stopPropagation();
+                                setEditingChatId(null);
+                                setEditingTitle('');
+                              }}
+                              className="h-6 w-6 hover:bg-slate-100 dark:hover:bg-slate-800 flex-shrink-0"
+                            >
+                              <X className="h-3 w-3 text-slate-600 dark:text-slate-300" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                e.stopPropagation();
+                                setEditingChatId(chat.id);
+                                setEditingTitle(chat.title);
+                              }}
+                              className="h-6 w-6 hover:bg-[#76B947]/20 dark:hover:bg-[#76B947]/25 flex-shrink-0"
+                            >
+                              <Pencil className="h-3 w-3 text-[#76B947]" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                e.stopPropagation();
+                                setChatToDelete(chat.id);
+                                setDeleteDialogOpen(true);
+                              }}
+                              className="h-6 w-6 hover:bg-red-100 dark:hover:bg-red-900/30 flex-shrink-0"
+                            >
+                              <Trash2 className="h-3 w-3 text-red-600" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div onClick={() => loadChatHistory(chat.id)}>
+                    <div>
                       <p className="text-xs text-muted-foreground truncate mb-2">
                         {chat.lastMessage}
                       </p>
@@ -783,22 +909,15 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
           )}
         </ScrollArea>
       </aside>
+      )}
 
       {/* Main Chat Area */}
       <div className="flex-1 flex min-h-0 flex-col overflow-hidden">
         
-        {/* Chat Header - Fixed at top */}
-        <div className="sticky top-0 z-10 flex-shrink-0 border-b border-slate-200 dark:border-slate-800 p-4 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur">
+        {/* Chat Header - Always pinned */}
+        <div className="sticky top-0 z-20 flex-shrink-0 border-b border-slate-200 dark:border-slate-800 p-4 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center space-x-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsSidebarOpen(true)}
-                className="h-8 w-8 hover:bg-[#76B947] hover:text-white transition-all md:hidden"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">
                 <Sparkles className="h-6 w-6 text-white" />
               </div>
@@ -809,19 +928,38 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                 <p className="text-sm text-muted-foreground">Always here to help you succeed</p>
               </div>
             </div>
-            {selectedStartup && (
-              <Badge className="bg-gradient-to-r from-purple-600 to-purple-800 text-white px-4 py-2 max-w-[250px] truncate">
-                <Lightbulb className="mr-2 h-4 w-4 flex-shrink-0" />
-                <span className="truncate">
-                  {selectedStartup.name} • {selectedStartup.sector}
-                  {selectedStartup.uruti_score && ` • Score: ${selectedStartup.uruti_score}`}
-                </span>
-              </Badge>
-            )}
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              {selectedStartup && (
+                <Badge className="bg-gradient-to-r from-purple-600 to-purple-800 text-white px-4 py-2 max-w-[250px] truncate">
+                  <Lightbulb className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">
+                    {selectedStartup.name} • {selectedStartup.sector}
+                    {selectedStartup.uruti_score && ` • Score: ${selectedStartup.uruti_score}`}
+                  </span>
+                </Badge>
+              )}
+              <Button
+                size="sm"
+                onClick={startNewChat}
+                className="bg-gradient-to-r from-purple-600 to-purple-800 text-white hover:from-purple-700 hover:to-purple-900"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                New Chat
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-purple-200 text-purple-700 hover:bg-purple-50 dark:border-purple-500/40 dark:text-purple-200 dark:hover:bg-purple-500/10"
+                onClick={() => setIsSidebarOpen(true)}
+              >
+                <Clock className="mr-2 h-4 w-4" />
+                History
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Messages Area - Scrollable */}
+        {/* Messages Area - Only scrollable region */}
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain" ref={scrollRef}>
             <div className="max-w-4xl mx-auto p-6 w-full">
               {/* Welcome Message when no messages */}
@@ -950,10 +1088,15 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                         </AvatarFallback>
                       </Avatar>
                       <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 border border-purple-200 dark:border-purple-700 rounded-2xl px-5 py-4 glass-card">
-                        <div className="flex space-x-2">
-                          <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-purple-700 dark:text-purple-200" style={{ fontFamily: 'var(--font-body)' }}>
+                            Thinking
+                          </span>
+                          <div className="flex space-x-1.5">
+                            <div className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <div className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <div className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -963,7 +1106,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
             </div>
         </div>
 
-        {/* Input Area - Fixed at bottom */}
+        {/* Input Area - Always pinned at bottom */}
         <div className="sticky bottom-0 z-20 flex-shrink-0 border-t border-slate-200 dark:border-slate-800 bg-slate-50/95 dark:bg-slate-950/95 p-4 backdrop-blur">
           <div className="max-w-4xl mx-auto">
             <div className="relative border border-purple-300 dark:border-purple-600 rounded-3xl overflow-hidden bg-white dark:bg-gray-800 shadow-lg">
@@ -1091,6 +1234,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                           <Button
                             key={model.id}
                               variant={selectedModel?.id === model.id ? 'default' : 'outline'}
+                              disabled={model.available === false}
                             className={
                                 selectedModel?.id === model.id
                                   ? 'w-full justify-start items-start transition-all bg-gradient-to-r from-purple-600 to-purple-800 text-white h-auto min-h-[5.75rem] py-4 px-3 sm:px-4 rounded-xl'
@@ -1102,8 +1246,15 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                             }}
                           >
                             <div className="flex-1 text-left min-w-0">
-                              <div className="font-semibold text-sm sm:text-base mb-1 truncate" style={{ fontFamily: 'var(--font-heading)' }}>
-                                {model.name}
+                              <div className="flex items-center gap-2 mb-1">
+                                <div className="font-semibold text-sm sm:text-base truncate" style={{ fontFamily: 'var(--font-heading)' }}>
+                                  {model.name}
+                                </div>
+                                {model.status && (
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${model.status === 'online' ? 'bg-green-600 text-white' : model.status === 'initializing' ? 'bg-amber-600 text-white' : 'bg-red-600 text-white'}`}>
+                                    {model.status}
+                                  </span>
+                                )}
                               </div>
                               <div
                                 className="text-xs opacity-90 whitespace-normal break-words overflow-hidden"
@@ -1114,6 +1265,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                                 }}
                               >
                                 {shortenModelDescription(model.description)}
+                                {model.offline_reason ? ` - ${model.offline_reason}` : ''}
                               </div>
                             </div>
                             {selectedModel?.id === model.id && (
@@ -1122,7 +1274,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                           </Button>
                         ))}
                         {!isLoadingModels && availableModels.length === 0 && (
-                          <p className="text-sm text-muted-foreground">No models available from backend.</p>
+                          <p className="text-sm text-muted-foreground">{modelsOfflineMessage || 'No models available from backend.'}</p>
                         )}
                       </div>
                     </DialogContent>
