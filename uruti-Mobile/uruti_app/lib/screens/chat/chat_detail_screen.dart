@@ -483,7 +483,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     try {
       final micPermission = await Permission.microphone.request();
-      final allowed = micPermission.isGranted || await _audioRecorder.hasPermission();
+      final allowed =
+          micPermission.isGranted || await _audioRecorder.hasPermission();
       if (!allowed) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(

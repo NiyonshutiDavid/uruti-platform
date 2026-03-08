@@ -310,6 +310,7 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
         final market = venture['target_market'] as String? ?? '';
         final score = (venture['uruti_score'] as num?)?.toDouble() ?? 0.0;
         final pitchDeckUrl = venture['pitch_deck_url'] as String?;
+        final demoVideoUrl = venture['demo_video_url'] as String?;
         final iconLogoUrl = _ventureMediaUrl(venture['logo_url'] as String?);
         final bannerUrl = _ventureMediaUrl(venture['banner_url'] as String?);
         final status = _stageToStatus(stage, context);
@@ -449,7 +450,7 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
               ],
               const SizedBox(height: 12),
               Text(
-                'Pitch Deck',
+                'Pitch Assets',
                 style: TextStyle(
                   color: ctx.colors.textPrimary,
                   fontWeight: FontWeight.w700,
@@ -487,6 +488,42 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
               else
                 Text(
                   'Pitch deck not available',
+                  style: TextStyle(
+                    color: ctx.colors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              const SizedBox(height: 8),
+              if ((demoVideoUrl ?? '').trim().isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final uri = _externalUri(demoVideoUrl);
+                    if (uri != null && await canLaunchUrl(uri)) {
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
+                      return;
+                    }
+                    if (!ctx.mounted) return;
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                        content: Text('Unable to open demo video link'),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.play_circle_outline_rounded, size: 16),
+                  label: const Text('View Demo Video'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: context.colors.accent,
+                    side: BorderSide(
+                      color: context.colors.accent.withValues(alpha: 0.35),
+                    ),
+                  ),
+                )
+              else
+                Text(
+                  'Demo video not available',
                   style: TextStyle(
                     color: ctx.colors.textSecondary,
                     fontSize: 13,
