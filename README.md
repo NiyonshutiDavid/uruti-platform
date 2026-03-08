@@ -147,54 +147,22 @@ Environment recommendation:
 - Recommended: Google Colab for reproducible setup and better GPU availability.
 - Local Jupyter is supported mainly for lightweight/demo runs.
 
-## Submission Guidelines Alignment
 
-This README is structured for Attempt 1 and Attempt 2 submission requirements.
 
-Attempt 1 should include:
+## Testing Results 
 
-- Well-formatted README with install/run instructions
-- Related files and folders
-- A 5-minute demo video focusing on core functionality
-- Deployed app link or installable package link (APK)
 
-Attempt 2 should include:
 
-- Zip file of the repository submitted in Attempt 1
+## Analysis 
 
-## Testing Results (Screenshot Placeholders)
 
-Demonstration under different testing strategies:
 
-- `[SCREENSHOT PLACEHOLDER] Strategy 1: Functional testing result`
-- `[SCREENSHOT PLACEHOLDER] Strategy 2: Integration/API testing result`
-- `[SCREENSHOT PLACEHOLDER] Strategy 3: End-to-end user flow testing result`
+## Discussion 
 
-Demonstration with different data values:
 
-- `[SCREENSHOT PLACEHOLDER] Data Variant A: Low-input or edge case`
-- `[SCREENSHOT PLACEHOLDER] Data Variant B: Typical startup profile`
-- `[SCREENSHOT PLACEHOLDER] Data Variant C: High-growth startup profile`
 
-Performance on different hardware/software specifications:
+## Recommendations And Future Work 
 
-- `[SCREENSHOT PLACEHOLDER] Device/Spec 1 performance`
-- `[SCREENSHOT PLACEHOLDER] Device/Spec 2 performance`
-- `[SCREENSHOT PLACEHOLDER] Device/Spec 3 performance`
-
-## Analysis (To Complete With Supervisor)
-
-- `[ANALYSIS PLACEHOLDER] Detailed analysis of achieved vs missed objectives from the project proposal.`
-- `[ANALYSIS PLACEHOLDER] Interpretation of testing outcomes and performance trends.`
-
-## Discussion (To Complete With Supervisor)
-
-- `[DISCUSSION PLACEHOLDER] Importance of milestones completed.`
-- `[DISCUSSION PLACEHOLDER] Impact of results on founders, investors, and ecosystem adoption.`
-
-## Recommendations And Future Work (To Complete With Supervisor)
-
-- `[RECOMMENDATION PLACEHOLDER] Practical recommendations to the community.`
 
 Future improvement plan (including hardware constraints):
 
@@ -222,7 +190,7 @@ Future improvement plan (including hardware constraints):
 - MLOps and deployment maturity:
     Add automated model registry, staged rollout (canary), and drift monitoring in production.
 
-## Demo Screenshot Gallery (Add Images Here)
+## Demo Screenshots
 
 - Core dashboard demo image:
     `[INSERT IMAGE OR LINK HERE]`
