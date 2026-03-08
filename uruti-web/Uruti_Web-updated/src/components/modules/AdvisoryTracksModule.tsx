@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type MouseEvent, type ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -25,6 +25,7 @@ interface Material {
   description: string;
   content: string;
   completed?: boolean;
+  source?: string;
 }
 
 interface AdvisoryTrack {
@@ -1096,7 +1097,6 @@ export function AdvisoryTracksModule() {
   const [selectedMaterialIndex, setSelectedMaterialIndex] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [completedMaterials, setCompletedMaterials] = useState<Set<string>>(new Set());
   const [userProgress, setUserProgress] = useState<Record<string, any>>({});
 
   // Fetch tracks from backend on mount
@@ -1200,13 +1200,13 @@ export function AdvisoryTracksModule() {
     );
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status?: AdvisoryTrack['status']) => {
     const statusConfig = {
       'not-started': { label: 'Not Started', className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300' },
       'in-progress': { label: 'In Progress', className: 'bg-[#76B947]/20 text-[#76B947]' },
       'completed': { label: 'Completed', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' }
     };
-    const config = statusConfig[status as keyof typeof statusConfig];
+    const config = status ? statusConfig[status] : statusConfig['not-started'];
     return <Badge className={config.className}>{config.label}</Badge>;
   };
 
@@ -1255,6 +1255,9 @@ export function AdvisoryTracksModule() {
 
   const completedTracks = tracks.filter(t => t.status === 'completed').length;
   const inProgressTracks = tracks.filter(t => t.status === 'in-progress').length;
+  const avgProgress = tracks.length
+    ? Math.round(tracks.reduce((acc, t) => acc + (t.progress ?? 0), 0) / tracks.length)
+    : 0;
 
   const handleTrackClick = (track: AdvisoryTrack) => {
     setSelectedTrack(track);
@@ -1278,97 +1281,41 @@ export function AdvisoryTracksModule() {
     setSelectedMaterialIndex(null);
   };
 
-  const handleBackToOverview = () => {
-    setViewMode('overview');
-    setSelectedMaterial(null);
-    setSelectedMaterialIndex(null);
-  };
+  
 
-  // Generate unique key for material
-  const getMaterialKey = (trackId: string, materialName: string) => {
-    return `${trackId}-${materialName}`;
-  };
+    const handleBackToOverview = () => {
 
-  // Check if material is completed
-  const isMaterialCompleted = (trackId: string, materialName: string) => {
-    return completedMaterials.has(getMaterialKey(trackId, materialName));
-  };
+      setViewMode('overview');
 
-  // Mark material as complete and update track progress
-  const handleMarkAsComplete = (trackId: string, materialName: string) => {
-    const materialKey = getMaterialKey(trackId, materialName);
-    const newCompletedMaterials = new Set(completedMaterials);
-    
-    if (completedMaterials.has(materialKey)) {
-      // Unmark as complete
-      newCompletedMaterials.delete(materialKey);
-    } else {
-      // Mark as complete
-      newCompletedMaterials.add(materialKey);
-    }
-    
-    setCompletedMaterials(newCompletedMaterials);
-    
-    // Update track progress
-    setTracks(prevTracks => prevTracks.map(track => {
-      if (track.id === trackId) {
-        const completedCount = track.materials.filter(m => 
-          newCompletedMaterials.has(getMaterialKey(trackId, m.name))
-        ).length;
-        const newProgress = Math.round((completedCount / track.materials.length) * 100);
-        
-        let newStatus: 'not-started' | 'in-progress' | 'completed';
-        if (newProgress === 0) {
-          newStatus = 'not-started';
-        } else if (newProgress === 100) {
-          newStatus = 'completed';
-        } else {
-          newStatus = 'in-progress';
-        }
-        
-        return {
-          ...track,
-          progress: newProgress,
-          status: newStatus
-        };
-      }
-      return track;
-    }));
-    
-    // Update selectedTrack if it's the current one
-    if (selectedTrack && selectedTrack.id === trackId) {
-      const track = tracks.find(t => t.id === trackId);
-      if (track) {
-        const completedCount = track.materials.filter(m => 
-          newCompletedMaterials.has(getMaterialKey(trackId, m.name))
-        ).length;
-        const newProgress = Math.round((completedCount / track.materials.length) * 100);
-        
-        let newStatus: 'not-started' | 'in-progress' | 'completed';
-        if (newProgress === 0) {
-          newStatus = 'not-started';
-        } else if (newProgress === 100) {
-          newStatus = 'completed';
-        } else {
-          newStatus = 'in-progress';
-        }
-        
-        setSelectedTrack({
-          ...track,
-          progress: newProgress,
-          status: newStatus
-        });
-      }
-    }
-  };
+      setSelectedMaterial(null);
 
-  // Function to format content with proper HTML structure
-  const formatContent = (content: string) => {
-    if (!content) {
+      setSelectedMaterialIndex(null);
+
+    };
+
+  
+
+    // Check if material is completed
+
+    const isMaterialCompleted = (track: AdvisoryTrack | null, materialIndex: number | undefined) => {
+
+      if (!track || materialIndex === undefined || materialIndex === null) return false;
+
+      return track.completed_materials?.includes(materialIndex) ?? false;
+
+    };
+
+  
+
+    // Function to format content with proper HTML structure
+
+    const formatContent = (content: string) => {
+
+      if (!content) {
       return [];
     }
     const lines = content.split('\n');
-    const formatted: JSX.Element[] = [];
+    const formatted: ReactNode[] = [];
     let listItems: string[] = [];
     let listType: 'ul' | 'ol' | null = null;
     let key = 0;
@@ -1622,7 +1569,7 @@ export function AdvisoryTracksModule() {
                       size="sm"
                       variant="outline"
                       className="w-full hover:bg-[#76B947]/10 hover:border-[#76B947]"
-                      onClick={(e) => {
+                      onClick={(e: MouseEvent<HTMLButtonElement>) => {
                         e.stopPropagation();
                         if ((material as any)?.content) {
                           generatePDF(material, selectedTrack.title);
@@ -1652,13 +1599,13 @@ export function AdvisoryTracksModule() {
                     Track your progress
                   </p>
                   <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                    {isMaterialCompleted(selectedTrack.id, selectedMaterial.name) 
+                    {isMaterialCompleted(selectedTrack, selectedMaterialIndex ?? effectiveMaterialId) 
                       ? 'This material is marked as complete' 
                       : 'Mark this material as complete to update your learning progress'}
                   </p>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
-                  {isMaterialCompleted(selectedTrack.id, selectedMaterial.name) ? (
+                  {isMaterialCompleted(selectedTrack, selectedMaterialIndex ?? effectiveMaterialId) ? (
                     <>
                       <Button
                         disabled
@@ -1790,7 +1737,7 @@ export function AdvisoryTracksModule() {
             <CardContent>
               <div className="space-y-2">
                 {selectedTrack.materials.map((material, index) => {
-                  const isCompleted = isMaterialCompleted(selectedTrack.id, material.name);
+                  const isCompleted = isMaterialCompleted(selectedTrack, index);
                   return (
                     <div key={index} className="space-y-2">
                       <div className="flex items-start justify-between p-3 rounded-lg border border-black/5 dark:border-white/10 hover:bg-[#76B947]/5 transition-colors">
@@ -1818,6 +1765,16 @@ export function AdvisoryTracksModule() {
                         <BookOpen className="mr-2 h-4 w-4" />
                         {isCompleted ? 'Review Material' : 'Continue Reading'}
                       </Button>
+                      {material.url && (
+                        <Button
+                          asChild
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-[#76B947] hover:bg-[#76B947]/10"
+                        >
+                          <a href={material.url} target="_blank" rel="noreferrer">Open Source Material</a>
+                        </Button>
+                      )}
                     </div>
                   );
                 })}
@@ -1931,9 +1888,9 @@ export function AdvisoryTracksModule() {
             <div>
               <p className="text-xs sm:text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>Avg Progress</p>
               <p className="text-2xl sm:text-3xl mt-1" style={{ fontFamily: 'var(--font-heading)' }}>
-                {Math.round(tracks.reduce((acc, t) => acc + t.progress, 0) / tracks.length)}%
+                {avgProgress}%
               </p>
-              <Progress value={Math.round(tracks.reduce((acc, t) => acc + t.progress, 0) / tracks.length)} className="mt-2 h-2" />
+              <Progress value={avgProgress} className="mt-2 h-2" />
             </div>
           </CardContent>
         </Card>

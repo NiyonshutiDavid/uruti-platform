@@ -175,6 +175,16 @@ export function OnboardingTour() {
     }
   }, [user?.id, user?.email]);
 
+  useEffect(() => {
+    const handleStartTour = () => {
+      setCurrentStep(0);
+      setIsActive(true);
+    };
+
+    window.addEventListener('start-onboarding-tour', handleStartTour);
+    return () => window.removeEventListener('start-onboarding-tour', handleStartTour);
+  }, []);
+
   // Update position when step changes
   useEffect(() => {
     if (!isActive) return;

@@ -411,9 +411,11 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>Active Tracks</p>
+                <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>Avg Uruti Score</p>
                 <p className="text-3xl mt-1" style={{ fontFamily: 'var(--font-heading)' }}>
-                  {new Set(startups.map(s => s.developmentTrack)).size}
+                  {startups.length > 0
+                    ? Math.round(startups.reduce((sum, s) => sum + (s.urutiScore || 0), 0) / startups.length)
+                    : 0}
                 </p>
               </div>
             </div>
@@ -487,7 +489,6 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
                 <TableRow>
                   <TableHead style={{ fontFamily: 'var(--font-heading)' }}>Venture Name</TableHead>
                   <TableHead style={{ fontFamily: 'var(--font-heading)' }}>Sector</TableHead>
-                  <TableHead style={{ fontFamily: 'var(--font-heading)' }}>Development Track</TableHead>
                   <TableHead style={{ fontFamily: 'var(--font-heading)' }}>Status</TableHead>
                   <TableHead style={{ fontFamily: 'var(--font-heading)' }}>Actions</TableHead>
                 </TableRow>
@@ -505,9 +506,6 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="bg-black/5">{startup.sector}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <p className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>{startup.developmentTrack}</p>
                     </TableCell>
                     <TableCell>{getStatusBadge(startup.status)}</TableCell>
                     <TableCell>

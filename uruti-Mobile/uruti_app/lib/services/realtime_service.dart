@@ -17,13 +17,15 @@ class RealtimeService {
   Timer? _heartbeatTimer;
   String? _token;
   bool _connecting = false;
+  bool _socketReady = false;
+  int _reconnectAttempts = 0;
 
   final StreamController<Map<String, dynamic>> _eventsCtrl =
       StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Map<String, dynamic>> get events => _eventsCtrl.stream;
 
-  bool get isConnected => _channel != null;
+  bool get isConnected => _socketReady;
 
   Future<void> connect(String token) async {
     if (token.trim().isEmpty) return;
@@ -42,6 +44,8 @@ class RealtimeService {
       final notificationsChannel = WebSocketChannel.connect(notificationsUri);
       _channel = channel;
       _notificationsChannel = notificationsChannel;
+      _socketReady = true;
+      _reconnectAttempts = 0;
 
       _socketSub = channel.stream.listen(
         (raw) {
@@ -76,9 +80,10 @@ class RealtimeService {
 
       // Start periodic heartbeat to keep presence alive (updates last_login on server)
       _heartbeatTimer?.cancel();
-      _heartbeatTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
         try {
           _channel?.sink.add(jsonEncode({'event': 'ping'}));
+          _notificationsChannel?.sink.add(jsonEncode({'event': 'ping'}));
         } catch (_) {}
       });
     } catch (_) {
@@ -90,6 +95,8 @@ class RealtimeService {
 
   Future<void> disconnect() async {
     _token = null;
+    _socketReady = false;
+    _reconnectAttempts = 0;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _heartbeatTimer?.cancel();
@@ -134,13 +141,19 @@ class RealtimeService {
     } catch (_) {}
     _channel = null;
     _notificationsChannel = null;
+    _socketReady = false;
   }
 
   void _scheduleReconnect() {
     if (_token == null || _token!.isEmpty) return;
     if (_reconnectTimer?.isActive == true) return;
+    _socketReady = false;
+    _reconnectAttempts += 1;
+    final delaySeconds = _reconnectAttempts <= 5
+        ? _reconnectAttempts
+        : 5 + ((_reconnectAttempts - 5) ~/ 2);
 
-    _reconnectTimer = Timer(const Duration(seconds: 2), () {
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
       final token = _token;
       if (token != null && token.isNotEmpty) {
         connect(token);

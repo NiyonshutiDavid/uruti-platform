@@ -76,7 +76,7 @@ export function FounderSnapshotModule() {
       setNotifications(recentNotifications);
 
       // Fetch calendar events for upcoming milestones
-      const events = await apiClient.getCalendarEvents();
+      const events = await apiClient.getMeetings();
       const upcomingEvents = events
         .filter((event: any) => new Date(event.date) > new Date())
         .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -88,10 +88,15 @@ export function FounderSnapshotModule() {
         }));
       setUpcomingMilestones(upcomingEvents);
 
-      // For pitch performance, we'll use mock data for now
-      // TODO: Add pitch performance tracking backend endpoint
-      setPitchPerformanceData([]);
-      setPitchSessionsCount(0);
+      // Fetch pitch sessions from backend analyses endpoint
+      const pitchSessions = await apiClient.getPitchAnalyses().catch(() => []);
+      setPitchSessionsCount((pitchSessions || []).length);
+      setPitchPerformanceData(
+        (pitchSessions || [])
+          .slice()
+          .reverse()
+          .map((s: any, idx: number) => ({ week: `S${idx + 1}`, score: Number(s.overallScore || 0) })),
+      );
 
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -181,14 +186,14 @@ export function FounderSnapshotModule() {
         <Card className="glass-card border-black/5">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm" style={{ fontFamily: 'var(--font-heading)' }}>Active Pitch Sessions</CardTitle>
+              <CardTitle className="text-sm" style={{ fontFamily: 'var(--font-heading)' }}>Recorded Pitch Sessions</CardTitle>
               <TrendingUp className="h-5 w-5 text-[#76B947]" />
             </div>
           </CardHeader>
           <CardContent>
             <div className="text-3xl mb-1" style={{ fontFamily: 'var(--font-heading)' }}>{loading ? '...' : pitchSessionsCount}</div>
             <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-              {pitchSessionsCount === 0 ? 'No active sessions yet' : `${pitchSessionsCount} session${pitchSessionsCount > 1 ? 's' : ''} active`}
+              {pitchSessionsCount === 0 ? 'No sessions recorded yet' : `${pitchSessionsCount} session${pitchSessionsCount > 1 ? 's' : ''} recorded`}
             </p>
           </CardContent>
         </Card>
@@ -344,14 +349,14 @@ export function FounderSnapshotModule() {
             <div className="space-y-3">
               {notifications.length > 0 ? (
                 notifications.map((notification) => (
-                  <div key={notification.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-[#76B947]/5 transition-colors">
+                  <div key={notification.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-[#76B947]/5 dark:hover:bg-gray-800 transition-colors">
                     <div className={`w-2 h-2 rounded-full mt-2 ${
                       notification.type === 'success' ? 'bg-[#76B947]' : 
                       notification.type === 'warning' ? 'bg-yellow-500' : 
                       'bg-blue-500'
                     }`}></div>
                     <div className="flex-1">
-                      <p className="text-sm text-black" style={{ fontFamily: 'var(--font-body)' }}>{notification.message}</p>
+                      <p className="text-sm text-foreground" style={{ fontFamily: 'var(--font-body)' }}>{notification.message}</p>
                       <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: 'var(--font-body)' }}>{notification.time}</p>
                     </div>
                   </div>
@@ -404,7 +409,7 @@ export function FounderSnapshotModule() {
       </div>
 
       {/* Capture Idea Dialog */}
-      <EnhancedCaptureIdeaDialog open={captureDialogOpen} onClose={() => setCaptureDialogOpen(false)} />
+      <EnhancedCaptureIdeaDialog open={captureDialogOpen} onOpenChange={setCaptureDialogOpen} />
     </div>
   );
 }

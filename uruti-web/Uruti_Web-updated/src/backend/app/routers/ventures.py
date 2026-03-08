@@ -4,6 +4,7 @@ from sqlalchemy import desc, or_
 from typing import List, Optional
 from pathlib import Path
 import shutil
+import subprocess
 import uuid
 from ..database import get_db
 from ..models import User, Venture, PitchSession, Connection, Bookmark, NotificationType, UserRole
@@ -489,6 +490,7 @@ async def upload_pitch_video(
     pitch_type: str = Form("Investor Pitch"),
     duration: int = Form(0),
     target_duration: int = Form(0),
+    notes: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -511,6 +513,36 @@ async def upload_pitch_video(
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
+        # Normalize uploaded video to MP4 when ffmpeg is available so playback
+        # works consistently across platforms/devices.
+        if file_path.suffix.lower() != ".mp4" and shutil.which("ffmpeg"):
+            mp4_filename = f"pitch_{venture_id}_{uuid.uuid4().hex}.mp4"
+            mp4_path = UPLOAD_DIR / mp4_filename
+            conversion = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(file_path),
+                    "-c:v",
+                    "libx264",
+                    "-preset",
+                    "veryfast",
+                    "-movflags",
+                    "+faststart",
+                    "-c:a",
+                    "aac",
+                    str(mp4_path),
+                ],
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            if conversion.returncode == 0 and mp4_path.exists():
+                file_path.unlink(missing_ok=True)
+                filename = mp4_filename
+                file_path = mp4_path
+
         target = target_duration if target_duration > 0 else max(duration, 1)
         ratio = min(max(float(duration) / float(target), 0.0), 1.0)
         pacing_score = round(60 + ratio * 40, 2)
@@ -522,6 +554,7 @@ async def upload_pitch_video(
             "pitch_type": pitch_type,
             "target_duration": target_duration,
             "duration": duration,
+            "notes": notes,
             "tips": [
                 "Open with the strongest traction point in the first 20 seconds.",
                 "Keep each section focused on one key message.",
@@ -540,6 +573,9 @@ async def upload_pitch_video(
             overall_score=overall_score,
             ai_feedback=ai_feedback,
         )
+
+        # Keep venture-level demo video in sync so Startup Hub details show latest recording.
+        venture.demo_video_url = session.video_url
 
         db.add(session)
         db.commit()

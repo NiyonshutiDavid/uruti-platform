@@ -8,6 +8,7 @@ import '../models/models.dart';
 import '../services/api_service.dart';
 import '../services/message_notification_handler.dart';
 import '../services/notification_service.dart';
+import '../services/realtime_service.dart';
 
 enum AuthStatus { initial, loading, authenticated, unauthenticated }
 
@@ -84,6 +85,10 @@ class AuthProvider extends ChangeNotifier {
             platform: devInfo['platform'],
             os: devInfo['os'],
           );
+          if (_token != null && _token!.trim().isNotEmpty) {
+            await RealtimeService.instance.connect(_token!);
+            MessageNotificationHandler.instance.start(this);
+          }
         }
       } catch (_) {
         await _clearSession();
@@ -126,6 +131,7 @@ class AuthProvider extends ChangeNotifier {
 
       // Start listening for message notifications at OS level
       MessageNotificationHandler.instance.start(this);
+      await RealtimeService.instance.connect(token);
 
       _status = AuthStatus.authenticated;
       notifyListeners();
@@ -177,6 +183,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> logout() async {
     MessageNotificationHandler.instance.stop();
+    await RealtimeService.instance.disconnect();
     try {
       await NotificationService.instance.unregisterCurrentToken();
     } catch (_) {}

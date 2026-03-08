@@ -23,6 +23,10 @@ class MessageNotificationHandler {
 
   void start(AuthProvider authProvider) {
     _authProvider = authProvider;
+    final token = (authProvider.token ?? '').trim();
+    if (token.isNotEmpty) {
+      RealtimeService.instance.connect(token);
+    }
     _sub?.cancel();
     _sub = RealtimeService.instance.events.listen(_onEvent);
   }
@@ -30,6 +34,7 @@ class MessageNotificationHandler {
   void stop() {
     _sub?.cancel();
     _sub = null;
+    RealtimeService.instance.disconnect();
     _authProvider = null;
     activeConversationUserId = null;
   }
@@ -53,6 +58,28 @@ class MessageNotificationHandler {
         break;
       case 'notification':
         _handleGenericNotification(payload);
+        break;
+      case 'notification_created':
+        _handleGenericNotification(payload);
+        break;
+      case 'meeting_created':
+      case 'meeting_updated':
+      case 'meeting_cancelled':
+      case 'meeting_request':
+        _handleMeetingReminder(payload);
+        break;
+      case 'connection_accepted':
+      case 'connection_added':
+        _handleConnectionAccepted(payload);
+        break;
+      case 'score_update':
+      case 'venture_updated':
+      case 'new_venture':
+      case 'advisory_update':
+        _handleActivityUpdate(payload);
+        break;
+      case 'call_event':
+        _handleCallEvent(payload);
         break;
     }
   }
@@ -116,5 +143,37 @@ class MessageNotificationHandler {
       title: title,
       body: body,
     );
+  }
+
+  void _handleConnectionAccepted(Map<String, dynamic> data) {
+    final name = (data['from_name'] ?? data['sender_name'] ?? 'Someone')
+        .toString();
+    NotificationService.instance.showLocalNotification(
+      title: 'Connection Update',
+      body: '$name is now connected with you',
+    );
+  }
+
+  void _handleActivityUpdate(Map<String, dynamic> data) {
+    final title = (data['title'] ?? 'Activity update').toString();
+    final body = (data['message'] ?? data['body'] ?? 'You have a new update')
+        .toString();
+    NotificationService.instance.showLocalNotification(
+      title: title,
+      body: body,
+    );
+  }
+
+  void _handleCallEvent(Map<String, dynamic> data) {
+    final action = (data['action'] ?? '').toString().toLowerCase();
+    if (action == 'invite') return;
+
+    final caller = (data['caller_name'] ?? 'Call').toString();
+    if (action == 'missed' || action == 'decline' || action == 'end') {
+      NotificationService.instance.showLocalNotification(
+        title: 'Call update',
+        body: '$caller call ended',
+      );
+    }
   }
 }

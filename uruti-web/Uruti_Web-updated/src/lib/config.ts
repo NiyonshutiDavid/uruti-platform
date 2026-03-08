@@ -2,8 +2,8 @@
 // Centralized URL management for the application
 
 export const config = {
-  // Backend API URL - defaults to localhost in development
-  apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  // Backend API URL - defaults to hosted API when env override is not provided
+  apiUrl: import.meta.env.VITE_API_URL || 'http://173.249.25.80:1199',
   
   // Other configuration options
   appName: 'Uruti Digital Ecosystem',

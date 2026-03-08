@@ -593,38 +593,6 @@ export function ProfileModule({
                 )
               )}
 
-              {/* Achievements */}
-              <Card className="glass-card border-black/5 dark:border-white/10">
-                <CardHeader>
-                  <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>
-                    <Award className="h-5 w-5 inline mr-2 text-[#76B947]" />
-                    Achievements
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {profile.achievements.length > 0 ? (
-                    profile.achievements.map((achievement, index) => (
-                      <div key={index} className="flex gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-[#76B947]/10 flex items-center justify-center flex-shrink-0">
-                          <Award className="h-5 w-5 text-[#76B947]" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                            {achievement.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {achievement.issuer} • {achievement.date}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No achievements added yet
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
             </div>
           </div>
         </TabsContent>

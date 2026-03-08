@@ -7,6 +7,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'api_service.dart';
+import 'call_service.dart';
+import '../models/call_session.dart';
 import '../firebase_options.dart';
 
 @pragma('vm:entry-point')
@@ -15,6 +17,12 @@ Future<void> firebaseBackgroundMessageHandler(RemoteMessage message) async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+  }
+
+  final callSession = _callSessionFromMessage(message);
+  if (callSession != null) {
+    await CallService.instance.showSystemIncomingCall(callSession);
+    return;
   }
 
   // Show a local notification so the user sees it at OS level even when
@@ -60,6 +68,8 @@ class NotificationService {
 
   bool _initialized = false;
   StreamSubscription<String>? _tokenRefreshSub;
+  StreamSubscription<RemoteMessage>? _onMessageSub;
+  StreamSubscription<RemoteMessage>? _onMessageOpenedSub;
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -99,7 +109,14 @@ class NotificationService {
         >()
         ?.createNotificationChannel(channel);
 
-    FirebaseMessaging.onMessage.listen((message) {
+    _onMessageSub?.cancel();
+    _onMessageSub = FirebaseMessaging.onMessage.listen((message) async {
+      final callSession = _callSessionFromMessage(message);
+      if (callSession != null) {
+        await CallService.instance.showSystemIncomingCall(callSession);
+        return;
+      }
+
       final title =
           message.notification?.title ?? message.data['title']?.toString();
       final body =
@@ -107,6 +124,20 @@ class NotificationService {
       if (title == null || title.trim().isEmpty) return;
       _showLocal(title, body ?? '');
     });
+
+    _onMessageOpenedSub?.cancel();
+    _onMessageOpenedSub = FirebaseMessaging.onMessageOpenedApp.listen((_) {
+      // We intentionally keep behavior minimal here; navigation can be added
+      // once screen routing targets are finalized.
+    });
+
+    final initialMessage = await _messaging.getInitialMessage();
+    if (initialMessage != null) {
+      final callSession = _callSessionFromMessage(initialMessage);
+      if (callSession != null) {
+        await CallService.instance.showSystemIncomingCall(callSession);
+      }
+    }
 
     _tokenRefreshSub = _messaging.onTokenRefresh.listen((token) {
       final platform = _platformName();
@@ -213,5 +244,37 @@ class NotificationService {
   Future<void> dispose() async {
     await _tokenRefreshSub?.cancel();
     _tokenRefreshSub = null;
+    await _onMessageSub?.cancel();
+    _onMessageSub = null;
+    await _onMessageOpenedSub?.cancel();
+    _onMessageOpenedSub = null;
   }
+}
+
+CallSession? _callSessionFromMessage(RemoteMessage message) {
+  final data = message.data;
+  final action = data['action']?.toString().toLowerCase() ?? '';
+  final event = data['event']?.toString().toLowerCase() ?? '';
+  final callId = data['call_id']?.toString() ?? '';
+  final callerId = data['caller_id']?.toString() ?? '';
+
+  final isInvite = action == 'invite' || event == 'incoming_call';
+  if (!isInvite || callId.isEmpty || callerId.isEmpty) return null;
+
+  final callerName =
+      (data['caller_name'] ?? message.notification?.title ?? 'Uruti Call')
+          .toString();
+  final handle = (data['handle'] ?? 'Uruti call').toString();
+  final isVideoRaw = data['is_video']?.toString().toLowerCase() ?? 'false';
+  final isVideo = isVideoRaw == 'true' || isVideoRaw == '1';
+
+  return CallSession(
+    id: callId,
+    callerId: callerId,
+    callerName: callerName,
+    callerAvatarUrl: data['caller_avatar_url']?.toString(),
+    handle: handle,
+    isVideo: isVideo,
+    createdAt: DateTime.now(),
+  );
 }

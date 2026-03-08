@@ -856,12 +856,24 @@ class ApiClient {
     return result;
   }
 
-  async uploadPitchVideo(ventureId: number, file: File, metadata: { pitch_type: string; duration: number; target_duration: number }) {
+  async uploadPitchVideo(
+    ventureId: number,
+    file: File,
+    metadata: {
+      pitch_type: string;
+      duration: number;
+      target_duration: number;
+      notes?: string;
+    },
+  ) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('pitch_type', metadata.pitch_type);
     formData.append('duration', metadata.duration.toString());
     formData.append('target_duration', metadata.target_duration.toString());
+    if (metadata.notes && metadata.notes.trim().length > 0) {
+      formData.append('notes', metadata.notes.trim());
+    }
 
     const token = this.getAuthToken();
     const response = await fetch(`${this.baseUrl}/api/v1/ventures/${ventureId}/pitch-video`, {

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../models/call_session.dart';
 import '../services/api_service.dart';
 import '../services/call_service.dart';
+import '../services/notification_service.dart';
 import '../services/realtime_service.dart';
 import '../services/webrtc_service.dart';
 
@@ -453,6 +454,8 @@ class CallProvider extends ChangeNotifier {
     }
 
     if (action == 'decline' || action == 'end') {
+      final incomingSession = _session;
+      final wasIncoming = _phase == CallPhase.incoming;
       if (isSecondary) {
         _secondarySession = null;
         _secondaryPhase = CallPhase.idle;
@@ -461,6 +464,12 @@ class CallProvider extends ChangeNotifier {
         _secondaryActiveDuration = Duration.zero;
         notifyListeners();
         return;
+      }
+      if (wasIncoming && incomingSession != null) {
+        NotificationService.instance.showLocalNotification(
+          title: 'Missed call',
+          body: '${incomingSession.callerName} tried to reach you',
+        );
       }
       unawaited(endCall(notifyPeer: false));
     }

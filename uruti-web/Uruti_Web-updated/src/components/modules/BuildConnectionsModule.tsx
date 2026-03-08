@@ -56,7 +56,7 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
   const [recipientName, setRecipientName] = useState('');
   const [directMessageDialog, setDirectMessageDialog] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
-  const [displayedCount, setDisplayedCount] = useState(10); // Pagination state
+  const [displayedCount, setDisplayedCount] = useState(8); // Pagination state
   
   // Call state
   const [callDialog, setCallDialog] = useState(false);
@@ -684,10 +684,10 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
               {displayedCount < directoryUsers.length && (
                 <div className="flex justify-center pt-4">
                   <Button
-                    onClick={() => setDisplayedCount(prev => Math.min(prev + 10, directoryUsers.length))}
+                    onClick={() => setDisplayedCount(prev => Math.min(prev + 8, directoryUsers.length))}
                     className="bg-[#76B947] hover:bg-[#5a8f35] text-white dark:bg-green-600 dark:hover:bg-green-700"
                   >
-                    Load More People ({directoryUsers.length - displayedCount} remaining)
+                    Load More People
                   </Button>
                 </div>
               )}
@@ -1163,7 +1163,7 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
               <Label htmlFor="all-keys">All LocalStorage Keys</Label>
               <Textarea
                 id="all-keys"
-                value={getLocalStorageData().allLocalStorageKeys.join('\n')}
+                value={(getLocalStorageData().allLocalStorageKeys || []).join('\n')}
                 readOnly
                 rows={5}
                 className="dark:bg-gray-800 dark:border-gray-700"

@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # e.g. CORS_ORIGINS=https://uruti.rw,https://www.uruti.rw
     BACKEND_CORS_ORIGINS: list[str] = Field(
         default=[
+        "https://uruti.rw",
+        "https://www.uruti.rw",
+        "http://173.249.25.80:1199",
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:8080",

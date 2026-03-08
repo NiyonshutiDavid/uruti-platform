@@ -23,7 +23,7 @@ import 'widgets/call_overlay_host.dart';
 //    Everything in the app reads from AppConstants.apiV1 which is set below.
 // ─────────────────────────────────────────────────────────────────────────────
 const String? kBackendUrlOverride =
-    null; // e.g. 'http://192.168.1.100:8000' or 'https://api.uruti.rw'
+    'http://173.249.25.80:1199'; // e.g. 'http://192.168.1.100:8000' or 'https://api.uruti.rw'
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Gets the host machine's local network IP by querying network interfaces.
@@ -53,49 +53,46 @@ Future<String> _resolveBackendUrl() async {
   }
 
   if (kIsWeb) {
-    return 'http://localhost:8000';
+    return 'http://173.249.25.80:1199';
   }
 
   if (Platform.isAndroid) {
-    // For physical devices we need the computer's actual LAN IP.
-    // For emulators, 10.0.2.2 is the host machine alias.
-    // We detect physical device by checking if we can find a LAN IP
-    // on the device — physical devices have Wi-Fi IPs, emulators have
-    // 10.0.2.x IPs.
     final deviceIp = await _getHostMachineIp();
     final isEmulator =
         deviceIp != null &&
         (deviceIp.startsWith('10.0.2.') || deviceIp.startsWith('10.0.3.'));
 
     if (isEmulator) {
-      return 'http://10.0.2.2:8000';
+      return 'http://173.249.25.80:1199';
     }
 
-    // Physical device — need the Mac's IP on the same network.
-    // Try common development machine discovery, or fall back to
-    // the hardcoded IP detected at build time.
-    // You can always override with kBackendUrlOverride above.
     if (kDebugMode) {
-      debugPrint('📱 Physical Android device detected (IP: $deviceIp)');
-      debugPrint('📡 Trying to reach backend on local network...');
+      debugPrint('Physical Android device detected (IP: $deviceIp)');
+      debugPrint('Trying to reach backend on local network...');
     }
-    // Use the device's gateway subnet to guess the host machine.
-    // Most reliable: specify kBackendUrlOverride in main.dart.
-    // Fallback: use the current Mac IP detected during development.
-    return 'http://10.110.13.242:8000';
+
+    final hostMachineIp = await _getHostMachineIp();
+
+    if (hostMachineIp != null && hostMachineIp.startsWith('192.168.')) {
+      return 'http://$hostMachineIp:8000';
+    }
+
+    return 'http://192.168.0.136:8000';
   }
 
-  // iOS simulator
-  return 'http://127.0.0.1:8000';
+  return 'http://173.249.25.80:1199';
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   AppConstants.configure(await _resolveBackendUrl());
+
   if (kDebugMode) {
     debugPrint('🌐 Backend URL: ${AppConstants.apiBaseUrl}');
   }
+
   await NotificationService.instance.initialize();
+
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
@@ -103,6 +100,7 @@ void main() async {
 
   final authProvider = AuthProvider();
   await authProvider.init();
+
   if (authProvider.isAuthenticated) {
     await NotificationService.instance.syncTokenWithBackend();
     MessageNotificationHandler.instance.start(authProvider);
@@ -129,6 +127,7 @@ class UrutiApp extends StatelessWidget {
         child: Builder(
           builder: (context) {
             final router = createRouter(authProvider);
+
             return Consumer<ThemeProvider>(
               builder: (context, themeProvider, _) => MaterialApp.router(
                 title: 'Uruti',
@@ -143,6 +142,7 @@ class UrutiApp extends StatelessWidget {
                       final app = !connectivity.isOnline
                           ? const NoInternetScreen()
                           : (child ?? const SizedBox.shrink());
+
                       return CallOverlayHost(child: app);
                     },
                   );

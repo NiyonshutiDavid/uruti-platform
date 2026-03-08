@@ -129,7 +129,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
   const [bookmarkedVentures, setBookmarkedVentures] = useState<Venture[]>([]);
   const [isLoadingVentures, setIsLoadingVentures] = useState(true);
   const [isLoadingChats, setIsLoadingChats] = useState(true);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -217,22 +217,6 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
       });
     }
   }, [messages, isTyping]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const mediaQuery = window.matchMedia('(max-width: 639px)');
-    const syncSidebarForViewport = () => {
-      setSidebarCollapsed(mediaQuery.matches);
-    };
-
-    syncSidebarForViewport();
-    mediaQuery.addEventListener('change', syncSidebarForViewport);
-
-    return () => {
-      mediaQuery.removeEventListener('change', syncSidebarForViewport);
-    };
-  }, []);
 
   // Load ventures from backend
   useEffect(() => {
@@ -598,7 +582,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
   const isAnalysisSelected = selectedModel?.type === 'analysis';
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-gradient-to-br from-purple-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900/20 relative">
+    <div className="flex h-full bg-white dark:bg-gray-900">
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="glass-card border-purple-200 dark:border-purple-500/30">
@@ -620,22 +604,13 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
         </AlertDialogContent>
       </AlertDialog>
 
-      {!sidebarCollapsed && (
-        <div
-          className="fixed inset-0 z-30 bg-black/40 sm:hidden"
-          onClick={() => setSidebarCollapsed(true)}
-        />
-      )}
-
       {/* Chat History Sidebar */}
       <aside 
-        className={`border-r border-purple-200/50 dark:border-purple-500/20 flex flex-col transition-all duration-300 h-full overflow-hidden bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm max-sm:fixed sm:relative max-sm:inset-y-0 max-sm:left-0 z-40 sm:z-auto max-sm:w-[86vw] max-sm:max-w-80 sm:max-w-none max-sm:transform sm:transform-none ${
-          sidebarCollapsed
-            ? 'max-sm:-translate-x-full sm:translate-x-0 sm:w-0 sm:opacity-0 sm:pointer-events-none'
-            : 'max-sm:translate-x-0 sm:w-80 sm:opacity-100'
+        className={`w-80 border-r border-gray-200 dark:border-gray-800 flex flex-col h-full ${
+          isSidebarOpen ? 'flex' : 'hidden md:flex'
         }`}
       >
-        <div className="p-4 border-b border-purple-200/50 dark:border-purple-500/20">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-800">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">
@@ -651,8 +626,8 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setSidebarCollapsed(true)}
-              className="h-8 w-8 hover:bg-[#76B947] hover:text-white transition-all"
+              onClick={() => setIsSidebarOpen(false)}
+              className="h-8 w-8 hover:bg-[#76B947] hover:text-white transition-all md:hidden"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -672,7 +647,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
               placeholder="Search conversations..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 dark:bg-gray-800 dark:border-gray-700 border-purple-200"
+              className="pl-10 dark:bg-gray-800 dark:border-gray-700 border-gray-200"
             />
           </div>
         </div>
@@ -693,7 +668,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
               {filteredHistories.map((chat) => (
                 <div key={chat.id} className="rounded-xl">
                   <Card
-                    className={`glass-card cursor-pointer transition-all hover:scale-[1.02] hover:bg-[#76B947]/10 dark:hover:bg-[#76B947]/20 border-purple-200/50 dark:border-purple-500/20 ${
+                    className={`glass-card cursor-pointer transition-all hover:scale-[1.02] hover:bg-[#76B947]/10 dark:hover:bg-[#76B947]/20 border-gray-200 dark:border-gray-700 ${
                       currentChatId === chat.id ? 'bg-purple-100/50 dark:bg-purple-900/30 border-purple-400 dark:border-purple-500' : ''
                     }`}
                   >
@@ -747,23 +722,20 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
       </aside>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
-        {/* Expand Button */}
-        {sidebarCollapsed && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarCollapsed(false)}
-            className="absolute left-4 top-4 z-50 glass-button bg-white/80 dark:bg-gray-800/80 hover:bg-[#76B947] hover:text-white transition-all duration-300"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </Button>
-        )}
-
+      <div className="flex-1 flex flex-col h-screen">
+        
         {/* Chat Header - Fixed at top */}
-        <div className="flex-shrink-0 glass-panel border-b border-purple-200/50 dark:border-purple-500/20 p-4 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg">
+        <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-800 p-4 bg-white dark:bg-gray-900">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center space-x-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsSidebarOpen(true)}
+                className="h-8 w-8 hover:bg-[#76B947] hover:text-white transition-all md:hidden"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">
                 <Sparkles className="h-6 w-6 text-white" />
               </div>
@@ -919,7 +891,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
         </div>
 
         {/* Input Area - Fixed at bottom */}
-        <div className="z-20 flex-shrink-0 border-t border-purple-200/50 dark:border-purple-500/20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg p-4">
+        <div className="z-20 flex-shrink-0 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
           <div className="max-w-4xl mx-auto">
             <div className="relative border border-purple-300 dark:border-purple-600 rounded-3xl overflow-hidden bg-white dark:bg-gray-800 shadow-lg">
               <div className="flex items-end p-2 gap-2">

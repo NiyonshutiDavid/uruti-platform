@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type MouseEvent } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -9,6 +9,7 @@ import { TrendingUp, Download, Play, Eye, Award, Target, X, Sparkles, ArrowLeft 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { toast } from 'sonner';
 import { apiClient } from '../../lib/api-client';
+import config from '../../lib/config';
 
 interface PitchSession {
   id: string;
@@ -127,7 +128,7 @@ export function PitchPerformanceModule() {
     }
   };
 
-  const handleViewVideo = (session: PitchSession, e: React.MouseEvent) => {
+  const handleViewVideo = (session: PitchSession, e: MouseEvent) => {
     e.stopPropagation();
     setVideoSession(session);
     setViewMode('video');
@@ -136,6 +137,27 @@ export function PitchPerformanceModule() {
   const handleBackToList = () => {
     setViewMode('list');
     setVideoSession(null);
+  };
+
+  const toAbsoluteUrl = (url?: string) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return `${config.apiUrl.replace(/\/+$/, '')}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
+
+  const downloadFromUrl = (url: string, filename: string) => {
+    if (!url) {
+      toast.error('No file available for download');
+      return;
+    }
+    const anchor = document.createElement('a');
+    anchor.href = toAbsoluteUrl(url);
+    anchor.download = filename;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
   };
 
   // Show video view as full page
@@ -167,16 +189,22 @@ export function PitchPerformanceModule() {
           {/* Video Section */}
           <Card className="glass-card border-black/5 dark:border-white/10">
             <CardContent className="p-0">
-              <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
-                <div className="text-center space-y-3 p-6">
-                  <Play className="h-20 w-20 text-white/60 mx-auto" />
-                  <p className="text-white/60" style={{ fontFamily: 'var(--font-body)' }}>
-                    Video player would display here
-                  </p>
-                  <p className="text-white/40 text-sm" style={{ fontFamily: 'var(--font-body)' }}>
-                    Recording: {videoSession.venture} • {videoSession.duration}
-                  </p>
-                </div>
+              <div className="aspect-video bg-black rounded-lg flex items-center justify-center overflow-hidden">
+                {videoSession.videoUrl ? (
+                  <video
+                    src={toAbsoluteUrl(videoSession.videoUrl)}
+                    controls
+                    preload="metadata"
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <div className="text-center space-y-3 p-6">
+                    <Play className="h-20 w-20 text-white/60 mx-auto" />
+                    <p className="text-white/60" style={{ fontFamily: 'var(--font-body)' }}>
+                      No recording available for this session
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -365,11 +393,18 @@ export function PitchPerformanceModule() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button className="w-full bg-[#76B947] text-white hover:bg-[#76B947]/90">
+              <Button
+                className="w-full bg-[#76B947] text-white hover:bg-[#76B947]/90"
+                onClick={() => downloadFromUrl(videoSession.videoUrl, `${videoSession.venture}-pitch-video.webm`)}
+              >
                 <Download className="mr-2 h-4 w-4" />
                 Download Video
               </Button>
-              <Button variant="outline" className="w-full hover:bg-[#76B947]/10 dark:border-white/20">
+              <Button
+                variant="outline"
+                className="w-full hover:bg-[#76B947]/10 dark:border-white/20"
+                onClick={() => downloadFromUrl(videoSession.transcriptUrl, `${videoSession.venture}-transcript.txt`)}
+              >
                 <Download className="mr-2 h-4 w-4" />
                 Download Transcript
               </Button>
@@ -609,10 +644,18 @@ export function PitchPerformanceModule() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
-                          <Button variant="ghost" size="sm" className="hover:bg-[#76B947]/10" onClick={(e) => handleViewVideo(session, e)}>
+                          <Button variant="ghost" size="sm" className="hover:bg-[#76B947]/10" onClick={(e: MouseEvent) => handleViewVideo(session, e)}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="hover:bg-[#76B947]/10">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-[#76B947]/10"
+                            onClick={(e: MouseEvent) => {
+                              e.stopPropagation();
+                              downloadFromUrl(session.videoUrl, `${session.venture}-pitch-video.webm`);
+                            }}
+                          >
                             <Download className="h-4 w-4" />
                           </Button>
                         </div>
@@ -660,11 +703,19 @@ export function PitchPerformanceModule() {
                 ))}
               </div>
               <div className="mt-4 space-y-2">
-                <Button variant="outline" className="w-full hover:bg-[#76B947]/10">
+                <Button
+                  variant="outline"
+                  className="w-full hover:bg-[#76B947]/10"
+                  onClick={() => downloadFromUrl(selectedSession.videoUrl, `${selectedSession.venture}-pitch-video.webm`)}
+                >
                   <Download className="mr-2 h-4 w-4" />
                   Download Video
                 </Button>
-                <Button variant="outline" className="w-full hover:bg-[#76B947]/10">
+                <Button
+                  variant="outline"
+                  className="w-full hover:bg-[#76B947]/10"
+                  onClick={() => downloadFromUrl(selectedSession.transcriptUrl, `${selectedSession.venture}-transcript.txt`)}
+                >
                   <Download className="mr-2 h-4 w-4" />
                   Download Transcript
                 </Button>

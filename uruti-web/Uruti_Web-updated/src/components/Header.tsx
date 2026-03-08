@@ -250,6 +250,15 @@ export function Header({ userType = 'founder', onNavigate, onToggleSidebar, onLo
                 <Settings className="mr-2 h-4 w-4" />
                 {userType === 'admin' ? 'Admin Credentials' : 'Account Settings'}
               </DropdownMenuItem>
+              {userType !== 'admin' && (
+                <DropdownMenuItem
+                  onClick={() => window.dispatchEvent(new CustomEvent('start-onboarding-tour'))}
+                  className="hover:bg-[#76B947]/10"
+                >
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Start Tutorial
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive hover:bg-destructive/10" onClick={handleLogoutClick}>
                 <LogOut className="mr-2 h-4 w-4" />
