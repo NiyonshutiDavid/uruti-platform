@@ -51,3 +51,9 @@ build/
 *.xlsx
 *.ppt
 *.pptx
+
+# Runtime artifacts (local only)
+uruti-web/Uruti_Web-updated/src/backend/uploads/
+
+# Optional local model mirrors (keep canonical model assets tracked separately)
+Models/Uruti-pitch_coach/

@@ -1296,9 +1296,22 @@ class _MessageBubble extends StatelessWidget {
     return '${AppConstants.apiBaseUrl}$url';
   }
 
+  bool _isAudioAttachment(String url) {
+    final lower = url.toLowerCase();
+    return lower.endsWith('.m4a') ||
+        lower.endsWith('.aac') ||
+        lower.endsWith('.mp3') ||
+        lower.endsWith('.wav') ||
+        lower.endsWith('.ogg') ||
+        lower.endsWith('.webm');
+  }
+
   Future<void> _openAttachment(BuildContext context, String url) async {
     final target = Uri.parse(_resolvedUrl(url));
-    final ok = await launchUrl(target, mode: LaunchMode.externalApplication);
+    final launchMode = _isAudioAttachment(url)
+        ? LaunchMode.inAppBrowserView
+        : LaunchMode.externalApplication;
+    final ok = await launchUrl(target, mode: launchMode);
     if (!ok && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to open attachment.')),
@@ -1314,6 +1327,8 @@ class _MessageBubble extends StatelessWidget {
     final time = _formatTime(msg['created_at'] as String?);
     final isRead = (msg['is_read'] as bool?) ?? false;
     final attachments = _attachmentUrls();
+    final hasAudioAttachment =
+        attachments.isNotEmpty && _isAudioAttachment(attachments.first);
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -1391,7 +1406,9 @@ class _MessageBubble extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          Icons.download_rounded,
+                          hasAudioAttachment
+                              ? Icons.play_circle_fill_rounded
+                              : Icons.download_rounded,
                           size: 14,
                           color: isMe
                               ? Colors.white
@@ -1399,7 +1416,9 @@ class _MessageBubble extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          'Download file',
+                          hasAudioAttachment
+                              ? 'Play audio message'
+                              : 'Download file',
                           style: TextStyle(
                             color: isMe
                                 ? Colors.white

@@ -911,14 +911,24 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                                     key={attachment.id}
                                     className="flex items-center space-x-2 p-2 rounded-lg bg-white/20 dark:bg-black/20"
                                   >
-                                    {attachment.type === 'image' ? (
-                                      <ImageIcon className="h-4 w-4" />
-                                    ) : attachment.type === 'audio' ? (
-                                      <Mic className="h-4 w-4" />
+                                    {attachment.type === 'audio' ? (
+                                      <div className="w-full space-y-1">
+                                        <div className="flex items-center gap-2">
+                                          <Mic className="h-4 w-4" />
+                                          <span className="text-xs">{attachment.name}</span>
+                                        </div>
+                                        <audio controls src={attachment.url} className="w-full" preload="metadata" />
+                                      </div>
                                     ) : (
-                                      <FileText className="h-4 w-4" />
+                                      <>
+                                        {attachment.type === 'image' ? (
+                                          <ImageIcon className="h-4 w-4" />
+                                        ) : (
+                                          <FileText className="h-4 w-4" />
+                                        )}
+                                        <span className="text-xs">{attachment.name}</span>
+                                      </>
                                     )}
-                                    <span className="text-xs">{attachment.name}</span>
                                   </div>
                                 ))}
                               </div>

@@ -532,10 +532,18 @@ class ApiClient {
 
   async sendCallSignal(data: {
     receiver_id: number;
-    action: 'invite' | 'accept' | 'decline' | 'end';
+    action:
+      | 'invite'
+      | 'accept'
+      | 'decline'
+      | 'end'
+      | 'webrtc_offer'
+      | 'webrtc_answer'
+      | 'webrtc_ice';
     call_id: string;
     is_video?: boolean;
     handle?: string;
+    webrtc_data?: Record<string, unknown>;
   }) {
     return this.request<any>('/api/v1/messages/call/signal', {
       method: 'POST',

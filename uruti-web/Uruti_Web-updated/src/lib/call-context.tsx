@@ -36,6 +36,22 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const { token, user } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const pendingOfferRef = useRef<Record<string, unknown> | null>(null);
+  const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const callStateRef = useRef<CallState>({
+    isOpen: false,
+    isRinging: false,
+    isIncoming: false,
+    type: 'voice',
+    contactName: '',
+    contactAvatar: undefined,
+    contactOnline: false,
+    callId: undefined,
+    counterpartId: undefined,
+  });
   const [callState, setCallState] = useState<CallState>({
     isOpen: false,
     isRinging: false,
@@ -59,6 +75,180 @@ export function CallProvider({ children }: { children: ReactNode }) {
       contactOnline: false,
       callId: undefined,
       counterpartId: undefined,
+    });
+  };
+
+  useEffect(() => {
+    callStateRef.current = callState;
+  }, [callState]);
+
+  const teardownWebRtc = () => {
+    pendingOfferRef.current = null;
+    pendingIceCandidatesRef.current = [];
+
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.onicecandidate = null;
+      peerConnectionRef.current.ontrack = null;
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+    }
+
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = null;
+    }
+  };
+
+  const getOrCreateLocalStream = async (type: 'voice' | 'video') => {
+    if (localStreamRef.current) {
+      return localStreamRef.current;
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: type === 'video',
+    });
+    localStreamRef.current = stream;
+    return stream;
+  };
+
+  const getOrCreatePeerConnection = async (
+    type: 'voice' | 'video',
+    receiverId: number,
+    callId: string,
+  ) => {
+    if (peerConnectionRef.current) {
+      return peerConnectionRef.current;
+    }
+
+    const connection = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+      ],
+    });
+
+    const stream = await getOrCreateLocalStream(type);
+    stream.getTracks().forEach((track) => {
+      connection.addTrack(track, stream);
+    });
+
+    connection.ontrack = (event) => {
+      const [remoteStream] = event.streams;
+      if (!remoteStream) return;
+
+      if (remoteAudioRef.current == null) {
+        const element = document.createElement('audio');
+        element.autoplay = true;
+        element.playsInline = true;
+        remoteAudioRef.current = element;
+      }
+
+      remoteAudioRef.current.srcObject = remoteStream;
+      void remoteAudioRef.current.play().catch(() => {
+        // Browser may block autoplay until user interaction; Accept/Start click usually enables it.
+      });
+    };
+
+    connection.onicecandidate = ({ candidate }) => {
+      if (!candidate) return;
+      void apiClient.sendCallSignal({
+        receiver_id: receiverId,
+        action: 'webrtc_ice',
+        call_id: callId,
+        is_video: type === 'video',
+        webrtc_data: {
+          candidate: candidate.candidate,
+          sdpMid: candidate.sdpMid,
+          sdpMLineIndex: candidate.sdpMLineIndex,
+        },
+      }).catch(() => {
+        // Ignore transient signaling failures; ICE can continue with later candidates.
+      });
+    };
+
+    peerConnectionRef.current = connection;
+    return connection;
+  };
+
+  const applyPendingIceCandidates = async () => {
+    if (!peerConnectionRef.current || pendingIceCandidatesRef.current.length === 0) {
+      return;
+    }
+
+    const candidates = [...pendingIceCandidatesRef.current];
+    pendingIceCandidatesRef.current = [];
+    for (const candidate of candidates) {
+      try {
+        await peerConnectionRef.current.addIceCandidate(candidate);
+      } catch {
+        // Ignore malformed candidates.
+      }
+    }
+  };
+
+  const createAndSendOffer = async (
+    type: 'voice' | 'video',
+    receiverId: number,
+    callId: string,
+  ) => {
+    const connection = await getOrCreatePeerConnection(type, receiverId, callId);
+    const offer = await connection.createOffer({
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: type === 'video',
+    });
+    await connection.setLocalDescription(offer);
+
+    await apiClient.sendCallSignal({
+      receiver_id: receiverId,
+      action: 'webrtc_offer',
+      call_id: callId,
+      is_video: type === 'video',
+      webrtc_data: {
+        type: offer.type,
+        sdp: offer.sdp,
+      },
+    });
+  };
+
+  const answerFromOffer = async (
+    type: 'voice' | 'video',
+    receiverId: number,
+    callId: string,
+    offer: Record<string, unknown>,
+  ) => {
+    const offerType = typeof offer.type === 'string' ? offer.type : null;
+    const offerSdp = typeof offer.sdp === 'string' ? offer.sdp : null;
+    if (!offerType || !offerSdp) return;
+
+    const connection = await getOrCreatePeerConnection(type, receiverId, callId);
+    await connection.setRemoteDescription(
+      new RTCSessionDescription({
+        type: offerType,
+        sdp: offerSdp,
+      }),
+    );
+    await applyPendingIceCandidates();
+
+    const answer = await connection.createAnswer({
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: type === 'video',
+    });
+    await connection.setLocalDescription(answer);
+
+    await apiClient.sendCallSignal({
+      receiver_id: receiverId,
+      action: 'webrtc_answer',
+      call_id: callId,
+      is_video: type === 'video',
+      webrtc_data: {
+        type: answer.type,
+        sdp: answer.sdp,
+      },
     });
   };
 
@@ -132,7 +322,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
           caller_avatar_url?: string;
           receiver_id?: number;
           is_video?: boolean;
+          webrtc_data?: Record<string, unknown>;
         };
+        const currentCall = callStateRef.current;
 
         const action = String(payload.action || '').toLowerCase();
         const callId = String(payload.call_id || '');
@@ -165,6 +357,83 @@ export function CallProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        if (action === 'webrtc_offer') {
+          if (!callId || callId !== currentCall.callId) {
+            return;
+          }
+
+          const offer = payload.webrtc_data;
+          if (!offer || typeof offer !== 'object') {
+            return;
+          }
+
+          pendingOfferRef.current = offer as Record<string, unknown>;
+          if (!currentCall.isIncoming && !currentCall.isRinging && currentCall.counterpartId) {
+            void answerFromOffer(
+              currentCall.type,
+              currentCall.counterpartId,
+              currentCall.callId || callId,
+              pendingOfferRef.current,
+            ).then(() => {
+              pendingOfferRef.current = null;
+            }).catch(() => {
+              // Keep pending offer so we can retry on next accept.
+            });
+          }
+          return;
+        }
+
+        if (action === 'webrtc_answer') {
+          if (!callId || callId !== currentCall.callId || !peerConnectionRef.current) {
+            return;
+          }
+          const answerData = payload.webrtc_data;
+          if (!answerData || typeof answerData !== 'object') {
+            return;
+          }
+
+          const answerType = typeof answerData.type === 'string' ? answerData.type : null;
+          const answerSdp = typeof answerData.sdp === 'string' ? answerData.sdp : null;
+          if (!answerType || !answerSdp) {
+            return;
+          }
+
+          void peerConnectionRef.current
+            .setRemoteDescription(new RTCSessionDescription({ type: answerType, sdp: answerSdp }))
+            .then(() => applyPendingIceCandidates())
+            .catch(() => {
+              // Ignore malformed remote answers.
+            });
+          return;
+        }
+
+        if (action === 'webrtc_ice') {
+          if (!callId || callId !== currentCall.callId) {
+            return;
+          }
+
+          const iceData = payload.webrtc_data;
+          if (!iceData || typeof iceData !== 'object' || typeof iceData.candidate !== 'string') {
+            return;
+          }
+
+          const candidate: RTCIceCandidateInit = {
+            candidate: iceData.candidate,
+            sdpMid: typeof iceData.sdpMid === 'string' ? iceData.sdpMid : null,
+            sdpMLineIndex:
+              typeof iceData.sdpMLineIndex === 'number' ? iceData.sdpMLineIndex : null,
+          };
+
+          if (peerConnectionRef.current?.remoteDescription) {
+            void peerConnectionRef.current.addIceCandidate(candidate).catch(() => {
+              // Ignore malformed ICE candidates.
+            });
+          } else {
+            pendingIceCandidatesRef.current.push(candidate);
+          }
+          return;
+        }
+
         const isMyOwnEvent = callerId === myUserId;
         if (isMyOwnEvent && action === 'invite') {
           return;
@@ -190,6 +459,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
           }
 
           if (action === 'decline' || action === 'end') {
+            teardownWebRtc();
             return {
               isOpen: false,
               isRinging: false,
@@ -248,6 +518,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         wsRef.current.close();
         wsRef.current = null;
       }
+      teardownWebRtc();
     };
   }, [token, user?.id]);
 
@@ -282,7 +553,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
         call_id: callId,
         is_video: type === 'video',
       });
+      await createAndSendOffer(type, receiverId, callId);
     } catch {
+      teardownWebRtc();
       setCallState((prev) => ({
         ...prev,
         isOpen: false,
@@ -307,6 +580,16 @@ export function CallProvider({ children }: { children: ReactNode }) {
         call_id: callState.callId,
         is_video: callState.type === 'video',
       });
+
+      if (pendingOfferRef.current) {
+        await answerFromOffer(
+          callState.type,
+          callState.counterpartId,
+          callState.callId,
+          pendingOfferRef.current,
+        );
+        pendingOfferRef.current = null;
+      }
     } catch {
       // keep call open locally even if signal fails transiently
     }
@@ -326,6 +609,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    teardownWebRtc();
     clearCallState();
   };
 
@@ -343,6 +627,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       });
     }
 
+    teardownWebRtc();
     clearCallState();
   };
 

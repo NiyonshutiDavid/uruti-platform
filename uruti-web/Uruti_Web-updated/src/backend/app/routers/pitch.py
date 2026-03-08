@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 from ..auth import get_current_active_user
 from ..database import get_db
 from ..models import User, Venture, PitchSession
+from ..services.pitch_coach_engine import pitch_coach_engine
 
 
 router = APIRouter(prefix="/pitch", tags=["Pitch"])
@@ -82,6 +83,12 @@ def create_pitch_analysis(
     if not venture or venture.founder_id != current_user.id:
         return {"message": "Invalid venture_id"}
 
+    payload_feedback = payload.get("feedback")
+    feedback = payload_feedback if isinstance(payload_feedback, list) and payload_feedback else None
+    if not feedback:
+        source_text = str(payload.get("notes") or payload.get("transcript") or payload.get("title") or "")
+        feedback = pitch_coach_engine.generate_feedback(source_text)
+
     session = PitchSession(
         venture_id=venture_id,
         title=payload.get("title") or "Pitch Session",
@@ -91,7 +98,7 @@ def create_pitch_analysis(
         pacing_score=float(payload.get("pacing") or 0),
         clarity_score=float(payload.get("clarity") or 0),
         overall_score=float(payload.get("overallScore") or payload.get("overall_score") or 0),
-        ai_feedback={"tips": payload.get("feedback") or []},
+        ai_feedback={"tips": feedback},
     )
     db.add(session)
     db.commit()

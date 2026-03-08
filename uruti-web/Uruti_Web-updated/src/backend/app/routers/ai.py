@@ -20,12 +20,13 @@ from ..schemas import (
 from ..auth import get_current_user
 from ..config import settings
 from ..services.venture_scorer import venture_scorer
+from ..services.chatbot_engine import chatbot_engine
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 # ─── Available models ────────────────────────────────────────────────────────
 ANALYSIS_MODEL_ID = "venture-mlop"
-CHATBOT_MODEL_ID = os.getenv("URUTI_BEST_MODEL_ID", "uruti-ai")
+CHATBOT_MODEL_ID = settings.URUTI_BEST_MODEL_ID
 
 
 def _available_models() -> list[dict]:
@@ -371,7 +372,11 @@ async def chat(
             ai_text = _fallback_response(payload.message, ctx, history)
             resolved_model = CHATBOT_MODEL_ID
     else:
-        ai_text = _fallback_response(payload.message, ctx, history)
+        llama_messages = history + [{"role": "user", "content": user_content}]
+        try:
+            ai_text = chatbot_engine.chat(_SYSTEM_PROMPT + ctx_text, llama_messages)
+        except Exception:
+            ai_text = _fallback_response(payload.message, ctx, history)
         resolved_model = CHATBOT_MODEL_ID
 
     if not ai_text:

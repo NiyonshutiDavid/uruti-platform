@@ -67,6 +67,19 @@ class Settings(BaseSettings):
     
     # AI Settings (for future AI integration)
     OPENAI_API_KEY: Optional[str] = None
+    HF_TOKEN: Optional[str] = None
+    HUGGINGFACE_TOKEN: Optional[str] = None
+    HUGGINGFACE_API_TOKEN: Optional[str] = None
+    HUGGINGFACEHUB_API_TOKEN: Optional[str] = None
+
+    URUTI_BEST_MODEL_ID: str = "uruti-ai"
+    URUTI_CHATBOT_REPO_ID: str = "NiyonshutiDavid/uruti-qwen2_5-7b-instruct-q4_k_m-gguf"
+    URUTI_CHATBOT_GGUF_FILENAME: str = "qwen2_5-7b-instruct-q4_k_m.gguf"
+    URUTI_CHATBOT_LOCAL_GGUF_PATH: Optional[str] = None
+    URUTI_CHATBOT_CTX: int = 4096
+    URUTI_CHATBOT_MAX_TOKENS: int = 512
+    URUTI_CHATBOT_TEMPERATURE: float = 0.2
+    PITCH_COACH_MODEL_ID: Optional[str] = None
 
     # Push Notifications (Firebase Cloud Messaging)
     FCM_SERVICE_ACCOUNT_PATH: Optional[str] = os.getenv("FCM_SERVICE_ACCOUNT_PATH")
