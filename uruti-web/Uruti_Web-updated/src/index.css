@@ -6663,17 +6663,20 @@
 
   .glass-panel {
     background: rgba(255, 255, 255, var(--glass-bg-opacity));
+    backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
     border: 1px solid var(--glass-border);
     box-shadow: inset 2px 2px 4px var(--glass-shadow-light), inset -2px -2px 4px var(--glass-shadow-dark), 0 8px 32px #0000001a;
   }
 
   .dark .glass-panel {
+    backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     background: #1a1a1ae6;
   }
 
   .glass-button {
+    backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     background: #76b94726;
     border: 1px solid #76b9474d;
@@ -6689,6 +6692,7 @@
   }
 
   .glass-card {
+    backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     background: #fffffff2;
     border: 1px solid #0000000d;
@@ -6696,10 +6700,23 @@
   }
 
   .dark .glass-card {
+    backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     background: #1a1a1ad9;
     border: 1px solid #76b94733;
     box-shadow: 0 4px 16px #0006, inset 0 1px #76b9471a;
+  }
+
+  /* Keep blur visuals consistent across all backdrop-blur utility variants. */
+  .backdrop-blur,
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  .backdrop-blur-lg,
+  .backdrop-blur-xl,
+  .backdrop-blur-2xl,
+  .backdrop-blur-3xl {
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) !important;
   }
 
   .bio-gradient {

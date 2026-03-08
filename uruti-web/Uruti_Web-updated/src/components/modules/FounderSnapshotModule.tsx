@@ -37,7 +37,7 @@ export function FounderSnapshotModule() {
     setLoading(true);
     try {
       // Fetch ventures
-      const ventures = await apiClient.getVentures();
+      const ventures = await apiClient.getMyVentures();
       setVenturesCount(ventures.length);
 
       // Calculate startup readiness data from ventures

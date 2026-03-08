@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { useAuth } from './auth-context';
 import { apiClient } from './api-client';
+import { resolveMediaUrl } from './media-url';
 import { toast } from 'sonner';
 
 interface CallState {
@@ -34,6 +35,7 @@ const CallContext = createContext<CallContextType | undefined>(undefined);
 export function CallProvider({ children }: { children: ReactNode }) {
   const { token, user } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimerRef = useRef<number | null>(null);
   const [callState, setCallState] = useState<CallState>({
     isOpen: false,
     isRinging: false,
@@ -93,6 +95,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    if (reconnectTimerRef.current) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+
     if (!token) {
       if (wsRef.current) {
         wsRef.current.close();
@@ -101,10 +108,16 @@ export function CallProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const socket = apiClient.createNotificationsWebSocket(token);
-    wsRef.current = socket;
+    let cancelled = false;
+    let pingTimer: number | null = null;
 
-    socket.onmessage = (event) => {
+    const connect = () => {
+      if (cancelled) return;
+
+      const socket = apiClient.createMessagesWebSocket(token);
+      wsRef.current = socket;
+
+      socket.onmessage = (event) => {
       try {
         const parsed = JSON.parse(event.data);
         if (parsed?.event !== 'call_event' || !parsed?.data) {
@@ -146,7 +159,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
             counterpartId: callerId,
             type: payload.is_video ? 'video' : 'voice',
             contactName: payload.caller_name || 'Incoming call',
-            contactAvatar: payload.caller_avatar_url,
+            contactAvatar: resolveMediaUrl(payload.caller_avatar_url),
             contactOnline: true,
           });
           return;
@@ -195,20 +208,46 @@ export function CallProvider({ children }: { children: ReactNode }) {
       } catch {
         // ignore malformed events
       }
+      };
+
+      socket.onopen = () => {
+        if (pingTimer) {
+          window.clearInterval(pingTimer);
+        }
+        pingTimer = window.setInterval(() => {
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ event: 'ping' }));
+          }
+        }, 15000);
+      };
+
+      socket.onclose = () => {
+        if (pingTimer) {
+          window.clearInterval(pingTimer);
+          pingTimer = null;
+        }
+        if (cancelled) return;
+        reconnectTimerRef.current = window.setTimeout(() => {
+          connect();
+        }, 2000);
+      };
     };
 
-    const ping = window.setInterval(() => {
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ event: 'ping' }));
-      }
-    }, 15000);
+    connect();
 
     return () => {
-      window.clearInterval(ping);
-      if (wsRef.current === socket) {
+      cancelled = true;
+      if (reconnectTimerRef.current) {
+        window.clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (pingTimer) {
+        window.clearInterval(pingTimer);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
         wsRef.current = null;
       }
-      socket.close();
     };
   }, [token, user?.id]);
 
@@ -232,7 +271,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       counterpartId: receiverId,
       type,
       contactName,
-      contactAvatar,
+      contactAvatar: resolveMediaUrl(contactAvatar),
       contactOnline,
     });
 

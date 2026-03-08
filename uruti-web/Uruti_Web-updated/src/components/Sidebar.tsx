@@ -1,4 +1,4 @@
-import { LayoutDashboard, Lightbulb, TrendingUp, GraduationCap, Users, Calendar, Video, BarChart3, Briefcase, DollarSign, Home, BookOpen, Mic, Target, Sparkles, MessageSquare, User, X, Clock, Shield, Headphones } from 'lucide-react';
+import { LayoutDashboard, Lightbulb, TrendingUp, GraduationCap, Users, Calendar, Video, Briefcase, DollarSign, Home, BookOpen, Mic, Target, Sparkles, MessageSquare, User, X, Clock, Shield, Headphones } from 'lucide-react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Input } from './ui/input';
@@ -9,7 +9,6 @@ import { Badge } from './ui/badge';
 import { EnhancedCaptureIdeaDialog } from './EnhancedCaptureIdeaDialog';
 import { useState, useEffect } from 'react';
 import { UserRole } from '../lib/auth-context';
-import { apiClient } from '../lib/api-client';
 import { useSupport } from '../lib/support-context';
 
 interface SidebarProps {
@@ -73,8 +72,6 @@ export function Sidebar({ activeModule, onModuleChange, userType = 'founder', is
 
   const navigationItems = getNavigationItems();
   const [captureDialogOpen, setCaptureDialogOpen] = useState(false);
-  const [startupCount, setStartupCount] = useState(0);
-  const [investmentReady, setInvestmentReady] = useState(0);
   const [newIdea, setNewIdea] = useState({
     name: '',
     sector: '',
@@ -83,25 +80,6 @@ export function Sidebar({ activeModule, onModuleChange, userType = 'founder', is
     targetMarket: ''
   });
 
-  // Fetch real startup count from backend
-  useEffect(() => {
-    const fetchStartupData = async () => {
-      try {
-        const ventures = await apiClient.getVentures(0, 100);
-        setStartupCount(ventures.length);
-        
-        // Calculate investment ready percentage (ventures with high readiness scores)
-        // This is a simplified calculation - adjust based on your actual readiness criteria
-        const readyCount = ventures.filter((v: any) => v.investment_readiness_score >= 70).length;
-        setInvestmentReady(ventures.length > 0 ? Math.round((readyCount / ventures.length) * 100) : 0);
-      } catch (error) {
-        // Silently handle error - keep default values of 0
-        console.log('Ventures not yet loaded from backend');
-      }
-    };
-
-    fetchStartupData();
-  }, []);
 
   const handleCaptureIdea = () => {
     // Save the new idea (in a real app, this would save to a database)
@@ -208,27 +186,6 @@ export function Sidebar({ activeModule, onModuleChange, userType = 'founder', is
             );
           })}
         </nav>
-        
-        <div className="mt-8 p-4 glass-card dark:bg-transparent dark:border dark:border-white/20 rounded-lg">
-          <div className="flex items-center space-x-2 mb-2">
-            <BarChart3 className="h-5 w-5 text-[#76B947]" />
-            <span className="text-sm text-black dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-              {userType === 'founder' ? 'Innovation Network' : 'Deal Flow'}
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-            {userType === 'founder' ? `${startupCount} active startups` : `${startupCount} opportunities`}
-          </p>
-          <div className="mt-3 w-full bg-[#76B947]/20 rounded-full h-2">
-            <div 
-              className="bg-[#76B947] h-2 rounded-full transition-all duration-300"
-              style={{ width: `${investmentReady}%` }}
-            ></div>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2" style={{ fontFamily: 'var(--font-body)' }}>
-            {userType === 'founder' ? `${investmentReady}% Investment Ready` : `${investmentReady}% Evaluated`}
-          </p>
-        </div>
         
         {userType === 'founder' && (
           <>

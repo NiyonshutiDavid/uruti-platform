@@ -298,33 +298,33 @@ export function AdminUserManagementModule() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card className="glass-card border-black/10 dark:border-white/10">
-          <CardContent className="p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+        <Card className="glass-card border-black/10 dark:border-white/10 h-full">
+          <CardContent className="p-6 h-full flex flex-col justify-between">
             <p className="text-sm text-muted-foreground">Total</p>
             <p className="text-2xl font-bold dark:text-white">{filteredStats.total}</p>
           </CardContent>
         </Card>
-        <Card className="glass-card border-black/10 dark:border-white/10">
-          <CardContent className="p-6">
+        <Card className="glass-card border-black/10 dark:border-white/10 h-full">
+          <CardContent className="p-6 h-full flex flex-col justify-between">
             <p className="text-sm text-muted-foreground">Founders</p>
             <p className="text-2xl font-bold dark:text-white">{filteredStats.founders}</p>
           </CardContent>
         </Card>
-        <Card className="glass-card border-black/10 dark:border-white/10">
-          <CardContent className="p-6">
+        <Card className="glass-card border-black/10 dark:border-white/10 h-full">
+          <CardContent className="p-6 h-full flex flex-col justify-between">
             <p className="text-sm text-muted-foreground">Investors</p>
             <p className="text-2xl font-bold dark:text-white">{filteredStats.investors}</p>
           </CardContent>
         </Card>
-        <Card className="glass-card border-black/10 dark:border-white/10">
-          <CardContent className="p-6">
+        <Card className="glass-card border-black/10 dark:border-white/10 h-full">
+          <CardContent className="p-6 h-full flex flex-col justify-between">
             <p className="text-sm text-muted-foreground">Admins</p>
             <p className="text-2xl font-bold dark:text-white">{filteredStats.admins}</p>
           </CardContent>
         </Card>
-        <Card className="glass-card border-black/10 dark:border-white/10">
-          <CardContent className="p-6">
+        <Card className="glass-card border-black/10 dark:border-white/10 h-full">
+          <CardContent className="p-6 h-full flex flex-col justify-between">
             <div className="flex items-center gap-1.5">
               <Wifi className="h-4 w-4 text-green-500" />
               <p className="text-sm text-muted-foreground">Online Now</p>

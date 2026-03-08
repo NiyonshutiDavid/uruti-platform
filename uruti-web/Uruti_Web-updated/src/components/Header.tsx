@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { useTheme } from '../lib/theme-context';
 import { useAuth, UserRole } from '../lib/auth-context';
+import { resolveMediaUrl } from '../lib/media-url';
 import { useState, useEffect } from 'react';
 import { UrutiLogo } from './UrutiLogo';
 
@@ -19,8 +20,13 @@ interface HeaderProps {
 export function Header({ userType = 'founder', onNavigate, onToggleSidebar, onLogout }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
-  const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url);
+  const [avatarUrl, setAvatarUrl] = useState(resolveMediaUrl(user?.avatar_url));
   const [displayName, setDisplayName] = useState(user?.full_name || 'Demo User');
+
+  useEffect(() => {
+    setAvatarUrl(resolveMediaUrl(user?.avatar_url));
+    setDisplayName(user?.full_name || 'Demo User');
+  }, [user?.avatar_url, user?.full_name]);
   
   // Get user initials
   const getInitials = (name: string) => {
@@ -100,7 +106,7 @@ export function Header({ userType = 'founder', onNavigate, onToggleSidebar, onLo
 
     const handleProfileUpdated = (e: CustomEvent) => {
       if (e.detail.avatar) {
-        setAvatarUrl(e.detail.avatar);
+        setAvatarUrl(resolveMediaUrl(e.detail.avatar));
       }
       if (e.detail.name) {
         setDisplayName(e.detail.name);
@@ -131,7 +137,7 @@ export function Header({ userType = 'founder', onNavigate, onToggleSidebar, onLo
   }, []);
 
   return (
-    <header className="glass-panel border-b border-black/10 dark:border-white/10 px-3 sm:px-4 md:px-6 h-16 sticky top-0 z-50 overflow-hidden">
+    <header className="glass-panel bg-white/70 dark:bg-black/60 backdrop-blur-xl border-b border-black/10 dark:border-white/10 px-3 sm:px-4 md:px-6 h-16 sticky top-0 z-50 overflow-hidden">
       <div className="flex items-center justify-between h-full">
         <div className="flex items-center space-x-2 sm:space-x-4">
           {/* Mobile Menu Button */}
@@ -231,7 +237,7 @@ export function Header({ userType = 'founder', onNavigate, onToggleSidebar, onLo
                 data-header="profile"
               >
                 <Avatar className="w-8 h-8">
-                  <AvatarImage src={userData.avatar_url || userData.avatar || "/placeholder-avatar.jpg"} />
+                  <AvatarImage src={userData.avatar || "/placeholder-avatar.jpg"} />
                   <AvatarFallback className="bg-[#76B947]/20 text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>
                     {userData.initials}
                   </AvatarFallback>
