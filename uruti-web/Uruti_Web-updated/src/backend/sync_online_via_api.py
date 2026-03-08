@@ -37,6 +37,9 @@ REMOTE_BASE_URL = os.getenv("REMOTE_BASE_URL", "http://173.249.25.80:1199")
 ADMIN_EMAIL = os.getenv("SYNC_ADMIN_EMAIL", "")
 ADMIN_PASSWORD = os.getenv("SYNC_ADMIN_PASSWORD", "")
 SYNC_USER_PASSWORD = os.getenv("SYNC_USER_PASSWORD", "UrutiSync@2026")
+OVERWRITE_EXISTING_USER_PASSWORDS = os.getenv(
+    "SYNC_OVERWRITE_EXISTING_USER_PASSWORDS", "false"
+).strip().lower() in {"1", "true", "yes", "on"}
 REQUEST_TIMEOUT = int(os.getenv("SYNC_REQUEST_TIMEOUT", "25"))
 
 
@@ -183,7 +186,8 @@ def ensure_remote_users(admin: ApiClient, local_users: List[Dict[str, Any]]) -> 
                 "role": role,
                 "is_active": bool(lu.get("is_active", True)),
             }
-            if not is_sync_admin:
+            # Keep existing passwords unless explicitly asked to rotate them.
+            if not is_sync_admin and OVERWRITE_EXISTING_USER_PASSWORDS:
                 update["password"] = SYNC_USER_PASSWORD
             remote = admin.json("PUT", f"/api/v1/users/{remote['id']}", data=json.dumps(update))
             by_email[email] = remote
@@ -201,7 +205,11 @@ def login_synced_users(local_users: List[Dict[str, Any]], user_map: Dict[int, Di
         if not remote:
             continue
 
-        token = login(REMOTE_BASE_URL, lu["email"], SYNC_USER_PASSWORD)
+        try:
+            token = login(REMOTE_BASE_URL, lu["email"], SYNC_USER_PASSWORD)
+        except Exception:
+            # Existing users may keep their own password when overwrite is disabled.
+            continue
         c = ApiClient(REMOTE_BASE_URL, token)
 
         profile_payload = {
