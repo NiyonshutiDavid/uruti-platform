@@ -28,6 +28,7 @@ class _RecordingScreenState extends State<RecordingScreen>
   bool _uploading = false;
   bool _cameraReady = false;
   bool _fullscreen = false;
+  bool _hasShownFullscreenHint = false;
   bool _sessionComplete = false;
   String? _recordedFilePath;
   int _recordedDurationSeconds = 0;
@@ -47,6 +48,7 @@ class _RecordingScreenState extends State<RecordingScreen>
   String? _deckFileName;
   int _deckCurrentPage = 1;
   int _deckTotalPages = 1;
+  final List<Map<String, dynamic>> _slideTransitions = [];
 
   @override
   void initState() {
@@ -173,14 +175,21 @@ class _RecordingScreenState extends State<RecordingScreen>
 
   void _nextDeckPage() {
     if (_isPdfDeck && _deckCurrentPage < _deckTotalPages) {
+      _trackSlideTransition(_deckCurrentPage + 1);
       _pdfController.nextPage();
     }
   }
 
   void _previousDeckPage() {
     if (_isPdfDeck && _deckCurrentPage > 1) {
+      _trackSlideTransition(_deckCurrentPage - 1);
       _pdfController.previousPage();
     }
+  }
+
+  void _trackSlideTransition(int nextSlide) {
+    if (!_recording) return;
+    _slideTransitions.add({'slide': nextSlide, 'at_second': _seconds});
   }
 
   void _startTimer() {
@@ -220,10 +229,12 @@ class _RecordingScreenState extends State<RecordingScreen>
 
     try {
       _seconds = 0;
+      _slideTransitions.clear();
       await _cameraController!.startVideoRecording();
       setState(() => _recording = true);
       _startTimer();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to start recording: $e')));
@@ -262,6 +273,7 @@ class _RecordingScreenState extends State<RecordingScreen>
         pitchType: _pitchType,
         durationSeconds: _recordedDurationSeconds,
         targetDurationSeconds: _targetMinutes * 60,
+        notes: _buildUploadNotes(),
       );
 
       if (!mounted) return;
@@ -285,7 +297,52 @@ class _RecordingScreenState extends State<RecordingScreen>
       _recordedFilePath = null;
       _recordedDurationSeconds = 0;
       _seconds = 0;
+      _slideTransitions.clear();
     });
+  }
+
+  String _buildUploadNotes() {
+    final notes = <String>[
+      'Recorded on mobile pitch coach.',
+      if (_deckFileName != null) 'Deck: $_deckFileName',
+      if (_slideTransitions.isNotEmpty)
+        'Slide transitions: ${_slideTransitions.map((e) => '#${e['slide']}@${e['at_second']}s').join(', ')}',
+    ];
+    return notes.join('\n');
+  }
+
+  Future<void> _handleFullscreenTap() async {
+    if (!_fullscreen && !_hasShownFullscreenHint) {
+      final shouldEnter = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Best Fullscreen Experience'),
+          content: const Text(
+            'Fullscreen is recommended for better presenting. Your slides get more space while the portrait camera stays visible in a compact window.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Not now'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Go Fullscreen'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldEnter != true) return;
+
+      setState(() {
+        _hasShownFullscreenHint = true;
+        _fullscreen = true;
+      });
+      return;
+    }
+
+    setState(() => _fullscreen = !_fullscreen);
   }
 
   String get _time {
@@ -686,7 +743,7 @@ class _RecordingScreenState extends State<RecordingScreen>
                           : Icons.fullscreen_rounded,
                       label: _fullscreen ? 'Exit Full' : 'Fullscreen',
                       active: _fullscreen,
-                      onTap: () => setState(() => _fullscreen = !_fullscreen),
+                      onTap: _handleFullscreenTap,
                     ),
                   ],
                 ),
@@ -1006,6 +1063,23 @@ class _RecordingScreenState extends State<RecordingScreen>
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => context.go('/pitch-performance'),
+                icon: const Icon(Icons.play_circle_outline),
+                label: const Text('View Pitch Recording'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: context.colors.accent,
+                  side: BorderSide(color: context.colors.accent),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 30),
           ],
         ),
@@ -1124,9 +1198,49 @@ class _RecordingScreenState extends State<RecordingScreen>
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: _presentationStarted && _deckFilePath != null
-                ? _buildDeckPresentationView(context)
-                : _buildCameraView(context),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: _presentationStarted && _deckFilePath != null
+                      ? _buildDeckPresentationView(context)
+                      : _buildCameraView(context),
+                ),
+                if (_recording)
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    right: 10,
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: context.colors.accent.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Live AI Feedback',
+                            style: TextStyle(
+                              color: context.colors.accent,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Great energy. Keep eye contact with camera and slow down slightly during your financial explanation.',
+                            style: TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 8),
@@ -1190,6 +1304,7 @@ class _RecordingScreenState extends State<RecordingScreen>
                       },
                       onPageChanged: (details) {
                         if (!mounted) return;
+                        _trackSlideTransition(details.newPageNumber);
                         setState(
                           () => _deckCurrentPage = details.newPageNumber,
                         );

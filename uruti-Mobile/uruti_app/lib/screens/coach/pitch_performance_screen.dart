@@ -809,7 +809,7 @@ class _PitchPerformanceScreenState extends State<PitchPerformanceScreen> {
               child: ElevatedButton.icon(
                 onPressed: () => _openVideo(s),
                 icon: const Icon(Icons.play_circle_outline),
-                label: const Text('Watch Recording'),
+                label: const Text('View Pitch Recording'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: context.colors.accent,
                   foregroundColor: Colors.white,

@@ -710,6 +710,7 @@ class ApiService {
     required String pitchType,
     required int durationSeconds,
     required int targetDurationSeconds,
+    String? notes,
   }) async {
     final tok = await token;
     final request = http.MultipartRequest(
@@ -725,6 +726,9 @@ class ApiService {
     request.fields['pitch_type'] = pitchType;
     request.fields['duration'] = durationSeconds.toString();
     request.fields['target_duration'] = targetDurationSeconds.toString();
+    if (notes != null && notes.trim().isNotEmpty) {
+      request.fields['notes'] = notes.trim();
+    }
 
     final streamed = await request.send();
     final body = await streamed.stream.bytesToString();

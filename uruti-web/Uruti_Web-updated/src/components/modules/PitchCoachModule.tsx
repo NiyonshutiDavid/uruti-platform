@@ -31,6 +31,7 @@ export function PitchCoachModule() {
   const [totalSlides, setTotalSlides] = useState(10);
   const [slideTransitions, setSlideTransitions] = useState<SlideTransition[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hasShownFullscreenTip, setHasShownFullscreenTip] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [aiListening, setAiListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +54,7 @@ export function PitchCoachModule() {
   const [micSensitivity, setMicSensitivity] = useState([100]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const deckInputRef = useRef<HTMLInputElement>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -157,8 +159,6 @@ export function PitchCoachModule() {
           videoRef.current.play().catch((err) => {
             console.error('[VIDEO] play() error:', err);
           });
-        } else {
-          console.warn('[DEBUG] videoRef.current is null when setting srcObject');
         }
       }, 100);
 
@@ -251,6 +251,46 @@ export function PitchCoachModule() {
       mediaRecorderRef.current.resume();
     }
   }, [isPaused]);
+
+  useEffect(() => {
+    // Reattach stream whenever view mode changes (camera-only <-> deck PiP),
+    // otherwise the video element can remount without the previous srcObject.
+    if (!isVideoOn || !cameraStreamRef.current || !videoRef.current) return;
+    videoRef.current.srcObject = cameraStreamRef.current;
+    videoRef.current.play().catch((err) => {
+      console.error('[VIDEO] play() error:', err);
+    });
+  }, [deckUrl, isVideoOn]);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    if (isFullscreen) {
+      if (document.fullscreenElement !== stage && stage.requestFullscreen) {
+        stage.requestFullscreen().catch(() => {
+          // Keep CSS fullscreen fallback if requestFullscreen fails.
+        });
+      }
+      return;
+    }
+
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {
+        // No-op: CSS fallback still works.
+      });
+    }
+  }, [isFullscreen]);
+
+  const toggleFullscreen = () => {
+    if (!isFullscreen && !hasShownFullscreenTip) {
+      toast.info(
+        'Fullscreen is recommended: portrait camera feed stays visible in a compact window while your deck remains easy to read.',
+      );
+      setHasShownFullscreenTip(true);
+    }
+    setIsFullscreen((prev) => !prev);
+  };
 
   const toggleRecording = () => {
     if (!isRecording) {
@@ -554,7 +594,10 @@ export function PitchCoachModule() {
         <div className="lg:col-span-2 space-y-4">
           {/* Video Feed */}
           <Card className="glass-card border-black/5 overflow-hidden">
-            <div className={`relative bg-black ${isFullscreen ? 'fixed inset-0 z-50' : 'aspect-video'} flex items-center justify-center`}>
+            <div
+              ref={stageRef}
+              className={`relative bg-black ${isFullscreen ? 'fixed top-0 left-0 z-[9999] h-[100dvh] w-screen' : 'aspect-video'} flex items-center justify-center`}
+            >
               {/* Hidden file input for deck upload */}
               <input
                 ref={deckInputRef}
@@ -684,6 +727,23 @@ export function PitchCoachModule() {
                 </div>
               )}
 
+              {isFullscreen && isRecording && (
+                <div className="absolute top-16 right-4 w-72 rounded-xl bg-black/55 p-3 backdrop-blur-md">
+                  <p className="text-xs font-semibold text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>
+                    Live AI Feedback
+                  </p>
+                  <p className="mt-1 text-xs text-white" style={{ fontFamily: 'var(--font-body)' }}>
+                    {liveFeedback[0]?.message || 'Analyzing delivery, pacing, and confidence...'}
+                  </p>
+                  <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-gray-200" style={{ fontFamily: 'var(--font-body)' }}>
+                    <span>Pacing: {pitchMetrics.pacing}%</span>
+                    <span>Clarity: {pitchMetrics.clarity}%</span>
+                    <span>Confidence: {pitchMetrics.confidence}%</span>
+                    <span>Engagement: {pitchMetrics.engagement}%</span>
+                  </div>
+                </div>
+              )}
+
               {/* Recording Indicator */}
               {isRecording && (
                 <div className="absolute top-4 right-4">
@@ -748,7 +808,7 @@ export function PitchCoachModule() {
                     size="sm"
                     variant="default"
                     className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
-                    onClick={() => setIsFullscreen(!isFullscreen)}
+                    onClick={toggleFullscreen}
                   >
                     {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
                   </Button>
