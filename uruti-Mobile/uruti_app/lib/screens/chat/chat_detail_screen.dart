@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -83,6 +85,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     MessageNotificationHandler.instance.activeConversationUserId = null;
     _realtimeSub?.cancel();
     _onlineRefreshTimer?.cancel();
+    if (_isRecordingVoiceNote) {
+      try {
+        _audioRecorder.stop();
+      } catch (_) {}
+    }
     _ctrl.dispose();
     _scroll.dispose();
     _audioRecorder.dispose();
@@ -475,7 +482,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
 
     try {
-      final allowed = await _audioRecorder.hasPermission();
+      final micPermission = await Permission.microphone.request();
+      final allowed = micPermission.isGranted || await _audioRecorder.hasPermission();
       if (!allowed) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -484,8 +492,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         return;
       }
 
+      final tempDir = await getTemporaryDirectory();
       final outputPath =
-          '/tmp/uruti_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+          '${tempDir.path}/uruti_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
       await _audioRecorder.start(
         const RecordConfig(encoder: AudioEncoder.aacLc),
         path: outputPath,
@@ -494,7 +503,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       if (!mounted) return;
       setState(() => _isRecordingVoiceNote = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Recording voice note... tap mic again to stop.')),
+        const SnackBar(
+          content: Text('Recording voice note... tap mic again to stop.'),
+        ),
       );
     } catch (_) {
       if (!mounted) return;
@@ -540,7 +551,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     for (final msg in _messages) {
       final createdAtRaw = msg['created_at'] as String?;
       final createdAt = DateTime.tryParse(createdAtRaw ?? '')?.toLocal();
-      if (createdAt != null && (lastDate == null || !_isSameDay(lastDate, createdAt))) {
+      if (createdAt != null &&
+          (lastDate == null || !_isSameDay(lastDate, createdAt))) {
         widgets.add(
           Center(
             child: Container(
@@ -2486,9 +2498,7 @@ class _InputBar extends StatelessWidget {
                     visualDensity: VisualDensity.compact,
                   ),
                   GestureDetector(
-                    onTap: sending
-                        ? null
-                        : (canSend ? onSend : onRecordVoice),
+                    onTap: sending ? null : (canSend ? onSend : onRecordVoice),
                     child: Container(
                       width: 44,
                       height: 44,
