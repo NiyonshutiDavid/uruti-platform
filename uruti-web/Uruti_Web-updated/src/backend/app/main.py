@@ -71,7 +71,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|([a-z0-9-]+\.)?uruti\.rw)(:\d+)?$",
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|([a-z0-9-]+\.)?uruti\.rw|([a-z0-9-]+\.)?netlify\.app)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

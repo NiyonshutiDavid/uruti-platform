@@ -2,8 +2,15 @@
 // Centralized URL management for the application
 
 export const config = {
-  // Backend API URL - defaults to hosted API when env override is not provided
-  apiUrl: import.meta.env.VITE_API_URL || 'http://173.249.25.80:1199',
+  // Backend API URL - prefer explicit env, else use same-origin on production
+  // domains to avoid HTTPS->HTTP mixed-content failures in browsers.
+  apiUrl:
+    import.meta.env.VITE_API_URL ||
+    (typeof window !== 'undefined' &&
+            (window.location.hostname.endsWith('uruti.rw') ||
+             window.location.hostname.endsWith('netlify.app'))
+        ? window.location.origin
+        : 'http://173.249.25.80:1199'),
   
   // Other configuration options
   appName: 'Uruti Digital Ecosystem',
