@@ -167,7 +167,7 @@ class _AdvisoryTracksScreenState extends State<AdvisoryTracksScreen> {
             ),
             const SizedBox(width: 10),
             Text(
-              'AI Advisory Tracks',
+              'Advisory Tracks',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 16,

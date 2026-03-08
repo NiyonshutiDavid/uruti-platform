@@ -1104,6 +1104,17 @@ export function AdvisoryTracksModule() {
     fetchTracks();
   }, []);
 
+  const normalizeTrackCategory = (rawCategory?: string): AdvisoryTrack['category'] => {
+    const normalized = (rawCategory ?? '').toString().trim().toLowerCase();
+
+    if (['financial', 'finance', 'funding'].includes(normalized)) return 'financial';
+    if (['legal', 'compliance', 'regulatory'].includes(normalized)) return 'legal';
+    if (['market', 'marketing', 'go-to-market', 'gtm'].includes(normalized)) return 'market';
+    if (['pitch', 'presentation', 'investor-pitch'].includes(normalized)) return 'pitch';
+
+    return 'market';
+  };
+
   const fetchTracks = async () => {
     setLoading(true);
     try {
@@ -1111,6 +1122,7 @@ export function AdvisoryTracksModule() {
       
       // Calculate progress for each track based on completed materials
       const tracksWithProgress = data.map((track: AdvisoryTrack) => {
+        const normalizedCategory = normalizeTrackCategory(track.category as unknown as string);
         const completedCount = track.completed_materials?.length || 0;
         const totalMaterials = track.materials?.length || 0;
         const progress = totalMaterials > 0 ? Math.round((completedCount / totalMaterials) * 100) : 0;
@@ -1124,6 +1136,7 @@ export function AdvisoryTracksModule() {
 
         return {
           ...track,
+          category: normalizedCategory,
           progress,
           status
         };
@@ -1217,7 +1230,7 @@ export function AdvisoryTracksModule() {
       market: { icon: '📊', label: 'Market' },
       pitch: { icon: '🎯', label: 'Pitch' }
     };
-    return categoryConfig[category as keyof typeof categoryConfig];
+    return categoryConfig[normalizeTrackCategory(category)];
   };
 
   const getFileIcon = (type: string) => {
@@ -1812,7 +1825,7 @@ export function AdvisoryTracksModule() {
       <div className="glass-card rounded-2xl p-6 sm:p-8 border border-black/5 dark:border-white/10">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex-1">
-            <h1 className="text-3xl sm:text-4xl mb-2 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>AI Advisory Tracks            </h1>
+            <h1 className="text-3xl sm:text-4xl mb-2 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>Advisory Tracks</h1>
             <p className="text-base sm:text-lg text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
               AI-driven educational tracks to refine your business models
             </p>

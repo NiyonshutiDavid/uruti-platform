@@ -603,7 +603,7 @@ class _MainScaffoldState extends State<MainScaffold>
                             _item(
                               context,
                               Icons.menu_book_outlined,
-                              'AI Advisory Tracks',
+                              'Advisory Tracks',
                               '/advisory-tracks',
                               currentRoute,
                             ),

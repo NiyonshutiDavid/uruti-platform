@@ -7,7 +7,7 @@ export const founderRoutes = [
   { id: 'startups', path: '/dashboard/startups', label: 'Startup Hub' },
   { id: 'pitch-performance', path: '/dashboard/pitch-performance', label: 'Pitch Performance' },
   { id: 'ai-chat', path: '/dashboard/ai-chat', label: 'Uruti AI Chat' },
-  { id: 'advisory-tracks', path: '/dashboard/advisory-tracks', label: 'AI Advisory Tracks' },
+  { id: 'advisory-tracks', path: '/dashboard/advisory-tracks', label: 'Advisory Tracks' },
   { id: 'connections', path: '/dashboard/connections', label: 'Build Connections' },
   { id: 'calendar', path: '/dashboard/calendar', label: 'Readiness Calendar' },
   { id: 'availability', path: '/dashboard/availability', label: 'My Availability' },

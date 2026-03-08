@@ -25,7 +25,7 @@ const founderNavItems = [
   { id: 'startups', label: 'Startup Hub', icon: Lightbulb },
   { id: 'pitch-performance', label: 'Pitch Performance', icon: TrendingUp },
   { id: 'ai-chat', label: 'Uruti AI Chat', icon: Sparkles },
-  { id: 'advisory-tracks', label: 'AI Advisory Tracks', icon: BookOpen },
+  { id: 'advisory-tracks', label: 'Advisory Tracks', icon: BookOpen },
   { id: 'connections', label: 'Build Connections', icon: Users },
   { id: 'calendar', label: 'Readiness Calendar', icon: Calendar },
   { id: 'availability', label: 'My Availability', icon: Clock },

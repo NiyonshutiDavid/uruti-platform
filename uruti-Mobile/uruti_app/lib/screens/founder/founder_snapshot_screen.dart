@@ -413,7 +413,7 @@ class _ScoreCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'AI Readiness Score',
+                'Venture Readiness Score',
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 12,
