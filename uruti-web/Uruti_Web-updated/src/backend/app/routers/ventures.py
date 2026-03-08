@@ -56,6 +56,13 @@ ALLOWED_VIDEO_TYPES = {
     "video/quicktime",
 }
 
+VIDEO_EXTENSION_TO_TYPE = {
+    ".webm": "video/webm",
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".m4v": "video/mp4",
+}
+
 ALLOWED_IMAGE_TYPES = {
     "image/jpeg",
     "image/png",
@@ -502,10 +509,21 @@ async def upload_pitch_video(
     if venture.founder_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to upload for this venture")
 
-    if file.content_type not in ALLOWED_VIDEO_TYPES:
-        raise HTTPException(status_code=400, detail="Invalid video format")
+    normalized_content_type = (file.content_type or "").split(";")[0].strip().lower()
+    extension = Path(file.filename or "pitch.webm").suffix.lower() or ".webm"
+    inferred_type = VIDEO_EXTENSION_TO_TYPE.get(extension)
 
-    extension = Path(file.filename or "pitch.webm").suffix or ".webm"
+    # Some browsers include codec suffixes in content type (e.g. video/webm;codecs=vp9)
+    # and some mobile uploads may use a generic binary mime type; extension fallback keeps uploads usable.
+    if normalized_content_type not in ALLOWED_VIDEO_TYPES and inferred_type not in ALLOWED_VIDEO_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Invalid video format ({file.content_type or 'unknown'}). "
+                "Supported formats: webm, mp4, mov"
+            ),
+        )
+
     filename = f"pitch_{venture_id}_{uuid.uuid4().hex}{extension}"
     file_path = UPLOAD_DIR / filename
 
@@ -594,8 +612,10 @@ async def upload_pitch_video(
             },
         }
     except HTTPException:
+        db.rollback()
         raise
     except Exception as exc:
+        db.rollback()
         if file_path.exists():
             file_path.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"Failed to upload pitch video: {exc}")
