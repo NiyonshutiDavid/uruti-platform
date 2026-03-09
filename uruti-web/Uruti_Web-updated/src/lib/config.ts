@@ -3,7 +3,7 @@
 
 export const config = {
   // Shared production backend used by the live frontend deployment.
-  productionBackendUrl: 'http://173.249.25.80:1199',
+  productionBackendUrl: 'https://api.uruti.rw',
 
   // Backend API URL - prefer explicit env, else use same-origin on production
   // domains and localhost during development.
@@ -12,7 +12,7 @@ export const config = {
     (typeof window !== 'undefined' &&
             (window.location.hostname.endsWith('uruti.rw') ||
              window.location.hostname.endsWith('netlify.app'))
-        ? 'http://173.249.25.80:1199'
+      ? 'https://api.uruti.rw'
         : 'http://localhost:8010'),
 
   // Optional dedicated chatbot service URL. Falls back to apiUrl when unset.
@@ -22,7 +22,7 @@ export const config = {
     (typeof window !== 'undefined' &&
             (window.location.hostname.endsWith('uruti.rw') ||
              window.location.hostname.endsWith('netlify.app'))
-    ? 'http://173.249.25.80:1199'
+    ? 'https://api.uruti.rw'
         : 'http://localhost:8020'),
   
   // Other configuration options
