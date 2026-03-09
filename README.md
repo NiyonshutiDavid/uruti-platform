@@ -134,6 +134,21 @@ flutter pub get
 flutter run
 ```
 
+Mobile localhost testing notes (including Pitch Coach):
+
+- Android emulator uses `http://10.0.2.2:8010` (auto-handled in app).
+- iOS simulator uses `http://localhost:8010` (auto-handled in app).
+- Physical phone cannot use `localhost` to reach your laptop backend.
+    Use `--dart-define` with your laptop LAN IP:
+
+```bash
+flutter run \
+    --dart-define=BACKEND_URL=http://<YOUR-LAPTOP-LAN-IP>:8010 \
+    --dart-define=AI_BACKEND_URL=http://<YOUR-LAPTOP-LAN-IP>:8020
+```
+
+This is required to validate Pitch Coach and all other modules on a real device before deployment.
+
 ### 5. Run Notebooks (Optional For ML Reproduction)
 
 ```bash

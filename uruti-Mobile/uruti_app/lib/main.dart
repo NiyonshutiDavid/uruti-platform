@@ -24,6 +24,10 @@ import 'widgets/call_overlay_host.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 const String? kBackendUrlOverride =
     null; // e.g. 'http://192.168.1.100:8000' or 'https://api.uruti.rw'
+
+// Runtime overrides via flutter --dart-define for real-device testing.
+const String kBackendUrlFromEnv = String.fromEnvironment('BACKEND_URL');
+const String kAiBackendUrlFromEnv = String.fromEnvironment('AI_BACKEND_URL');
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Gets the host machine's local network IP by querying network interfaces.
@@ -48,6 +52,10 @@ Future<String?> _getHostMachineIp() async {
 }
 
 Future<String> _resolveBackendUrl() async {
+  if (kBackendUrlFromEnv.trim().isNotEmpty) {
+    return kBackendUrlFromEnv.trim();
+  }
+
   if (kBackendUrlOverride != null && kBackendUrlOverride!.trim().isNotEmpty) {
     return kBackendUrlOverride!.trim();
   }
@@ -74,7 +82,11 @@ Future<String> _resolveBackendUrl() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  AppConstants.configure(await _resolveBackendUrl());
+  final backendUrl = await _resolveBackendUrl();
+  final aiBackendUrl = kAiBackendUrlFromEnv.trim().isNotEmpty
+      ? kAiBackendUrlFromEnv.trim()
+      : null;
+  AppConstants.configure(backendUrl, aiBackendUrl: aiBackendUrl);
 
   if (kDebugMode) {
     debugPrint('🌐 Backend URL: ${AppConstants.apiBaseUrl}');
