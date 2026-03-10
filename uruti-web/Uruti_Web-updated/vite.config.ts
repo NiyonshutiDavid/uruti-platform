@@ -60,5 +60,15 @@
     server: {
       port: 3000,
       open: true,
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8010',
+          changeOrigin: true,
+        },
+        '/uploads': {
+          target: 'http://localhost:8010',
+          changeOrigin: true,
+        },
+      },
     },
   });
