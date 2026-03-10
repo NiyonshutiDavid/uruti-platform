@@ -51,6 +51,18 @@ class _RecordingScreenState extends State<RecordingScreen>
   int _deckTotalPages = 1;
   final List<Map<String, dynamic>> _slideTransitions = [];
 
+  Map<String, double> _liveMetrics = {
+    'pacing': 0,
+    'slide_sync': 0,
+    'confidence': 0,
+    'clarity': 0,
+    'engagement': 0,
+  };
+  String _liveTip = 'Live coaching will appear once analysis starts.';
+  String _liveBackend = 'loading';
+  bool _liveModelLoaded = false;
+  List<String> _sessionFindings = [];
+
   @override
   void initState() {
     super.initState();
@@ -166,7 +178,45 @@ class _RecordingScreenState extends State<RecordingScreen>
     }
 
     if (!mounted) return;
-    setState(() => _presentationStarted = !_presentationStarted);
+    if (_presentationStarted) {
+      setState(() => _presentationStarted = false);
+      return;
+    }
+
+    setState(() => _presentationStarted = true);
+    if (!_fullscreen) {
+      await _promptFullscreenForDeckPresentation();
+    }
+  }
+
+  Future<void> _promptFullscreenForDeckPresentation() async {
+    if (!mounted) return;
+    final shouldEnter = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Present In Fullscreen'),
+        content: const Text(
+          'For best presentation mode, switch to fullscreen. Your camera stays available while slides get more space.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Go Fullscreen'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldEnter == true && mounted) {
+      setState(() {
+        _fullscreen = true;
+        _hasShownFullscreenHint = true;
+      });
+    }
   }
 
   bool get _isPdfDeck {
@@ -199,7 +249,13 @@ class _RecordingScreenState extends State<RecordingScreen>
       if (!mounted) return;
       final next = _seconds + 1;
       final targetSeconds = (_targetMinutes <= 0 ? 1 : _targetMinutes) * 60;
-      setState(() => _seconds = next);
+      setState(() {
+        _seconds = next;
+      });
+
+      if (_recording && next % 5 == 0) {
+        unawaited(_fetchLiveCoaching());
+      }
 
       if (_recording && !_autoStopTriggered && next >= targetSeconds) {
         _autoStopTriggered = true;
@@ -239,9 +295,23 @@ class _RecordingScreenState extends State<RecordingScreen>
       _seconds = 0;
       _autoStopTriggered = false;
       _slideTransitions.clear();
+      _sessionFindings = [];
+      _liveMetrics = {
+        'pacing': 0,
+        'slide_sync': 0,
+        'confidence': 0,
+        'clarity': 0,
+        'engagement': 0,
+      };
+      _liveTip = 'Connecting to AI pitch coach...';
+      _liveBackend = 'loading';
+      _liveModelLoaded = false;
+
       await _cameraController!.startVideoRecording();
+
       setState(() => _recording = true);
       _startTimer();
+      unawaited(_fetchLiveCoaching(force: true));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -251,16 +321,24 @@ class _RecordingScreenState extends State<RecordingScreen>
   }
 
   Future<void> _stopRecording({bool autoStopped = false}) async {
-    if (_cameraController == null || !_recording) return;
+    if (!_recording) return;
     try {
+      if (_cameraController == null) return;
       final file = await _cameraController!.stopVideoRecording();
+      final recordedPath = file.path;
+
       _stopTimer();
+      if (recordedPath.isEmpty) {
+        throw Exception('No recording file was generated.');
+      }
+
       if (!mounted) return;
       setState(() {
         _recording = false;
         _sessionComplete = true;
-        _recordedFilePath = file.path;
+        _recordedFilePath = recordedPath;
         _recordedDurationSeconds = _seconds;
+        _sessionFindings = _buildSessionFindings();
       });
       if (autoStopped) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -316,17 +394,162 @@ class _RecordingScreenState extends State<RecordingScreen>
       _recordedDurationSeconds = 0;
       _seconds = 0;
       _slideTransitions.clear();
+      _sessionFindings = [];
+      _liveTip = 'Live coaching will appear once analysis starts.';
+      _liveBackend = 'loading';
+      _liveModelLoaded = false;
     });
   }
 
   String _buildUploadNotes() {
+    final findings = _sessionFindings.isNotEmpty
+        ? _sessionFindings
+        : _buildSessionFindings();
+
     final notes = <String>[
       'Recorded on mobile pitch coach.',
+      'Capture mode: camera-only',
       if (_deckFileName != null) 'Deck: $_deckFileName',
       if (_slideTransitions.isNotEmpty)
         'Slide transitions: ${_slideTransitions.map((e) => '#${e['slide']}@${e['at_second']}s').join(', ')}',
+      if (findings.isNotEmpty) 'Final findings: ${findings.join(' | ')}',
     ];
     return notes.join('\n');
+  }
+
+  double _normalizeMetric(dynamic raw) {
+    if (raw == null) return 0;
+    final n = (raw is num) ? raw.toDouble() : double.tryParse('$raw') ?? 0;
+    if (n <= 0) return 0;
+    if (n > 1) return (n / 100).clamp(0, 1).toDouble();
+    return n.clamp(0, 1).toDouble();
+  }
+
+  Future<void> _fetchLiveCoaching({bool force = false}) async {
+    if (!_recording || _selectedVentureId == null) return;
+    if (!force && _seconds == 0) return;
+
+    try {
+      final response = await ApiService.instance.getPitchLiveFeedback(
+        ventureId: _selectedVentureId!,
+        pitchType: _pitchType,
+        durationSeconds: _seconds,
+        targetDurationSeconds: (_targetMinutes <= 0 ? 1 : _targetMinutes) * 60,
+        currentSlide: _deckCurrentPage,
+        totalSlides: _deckTotalPages <= 0 ? 1 : _deckTotalPages,
+        slideTransitions: _slideTransitions
+            .map(
+              (entry) => {
+                'slide': entry['slide'],
+                'atSecond': entry['at_second'],
+              },
+            )
+            .toList(),
+      );
+
+      if (!mounted) return;
+
+      final metrics =
+          (response['metrics'] as Map?)?.cast<String, dynamic>() ??
+          <String, dynamic>{};
+      final tips = response['tips'];
+      final firstTip = tips is List && tips.isNotEmpty
+          ? '${tips.first}'.trim()
+          : '';
+
+      setState(() {
+        _liveBackend = '${response['model_backend'] ?? 'unknown'}';
+        _liveModelLoaded = response['model_loaded'] == true;
+        _liveMetrics = {
+          'pacing': _normalizeMetric(metrics['pacing']),
+          'slide_sync': _normalizeMetric(metrics['structure']),
+          'confidence': _normalizeMetric(metrics['confidence']),
+          'clarity': _normalizeMetric(metrics['clarity']),
+          'engagement': _normalizeMetric(metrics['engagement']),
+        };
+
+        final backend = _liveBackend.toLowerCase();
+        final nonAi =
+            backend == 'fallback' ||
+            backend == 'unavailable' ||
+            backend == 'offline' ||
+            !_liveModelLoaded;
+
+        if (nonAi) {
+          _liveTip =
+              'AI pitch coach is currently unavailable. Scores are running in non-AI fallback mode.';
+        } else if (firstTip.isNotEmpty) {
+          _liveTip = firstTip;
+        } else {
+          _liveTip =
+              'AI coach connected. Keep presenting to receive live tips.';
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _liveBackend = 'unavailable';
+        _liveModelLoaded = false;
+        _liveTip =
+            'AI pitch coach is currently unavailable. Scores are running in non-AI fallback mode.';
+      });
+    }
+  }
+
+  int _metricPercent(String key) => ((_liveMetrics[key] ?? 0) * 100).round();
+
+  int get _overallScore {
+    final scores = [
+      _metricPercent('pacing'),
+      _metricPercent('slide_sync'),
+      _metricPercent('confidence'),
+      _metricPercent('clarity'),
+      _metricPercent('engagement'),
+    ];
+    final total = scores.fold<int>(0, (sum, item) => sum + item);
+    return (total / scores.length).round();
+  }
+
+  String _metricStatus(String key) {
+    final score = _metricPercent(key);
+    if (score >= 80) return 'Strong';
+    if (score >= 65) return 'Good';
+    return 'Needs work';
+  }
+
+  List<String> _buildSessionFindings() {
+    final findings = <String>[];
+
+    if (_metricPercent('clarity') >= 75) {
+      findings.add('Clear explanation of the core value proposition.');
+    } else {
+      findings.add('Improve clarity by simplifying technical sections.');
+    }
+
+    if (_metricPercent('pacing') >= 72) {
+      findings.add('Pacing stayed mostly consistent across the session.');
+    } else {
+      findings.add('Slow down in key sections to improve pacing.');
+    }
+
+    if (_metricPercent('confidence') >= 70) {
+      findings.add('Strong vocal confidence throughout delivery.');
+    } else {
+      findings.add('Increase vocal projection and reduce filler words.');
+    }
+
+    if (_metricPercent('engagement') >= 70) {
+      findings.add('Audience engagement signals are trending positively.');
+    } else {
+      findings.add('Add concrete examples to improve engagement.');
+    }
+
+    final targetSeconds = (_targetMinutes <= 0 ? 1 : _targetMinutes) * 60;
+    if (_recordedDurationSeconds < (targetSeconds * 0.75).round()) {
+      findings.add('Session ended early; extend to match target duration.');
+    }
+
+    return findings;
   }
 
   Future<void> _handleFullscreenTap() async {
@@ -460,22 +683,22 @@ class _RecordingScreenState extends State<RecordingScreen>
                               children: [
                                 _AnalysisBar(
                                   'Pacing',
-                                  0.78,
-                                  'Optimal',
+                                  _liveMetrics['pacing'] ?? 0,
+                                  _metricStatus('pacing'),
                                   context.colors.accent,
                                 ),
                                 const SizedBox(height: 12),
                                 _AnalysisBar(
                                   'Slide Sync',
-                                  0.65,
-                                  'On Track',
+                                  _liveMetrics['slide_sync'] ?? 0,
+                                  _metricStatus('slide_sync'),
                                   context.colors.accent,
                                 ),
                                 const SizedBox(height: 12),
                                 _AnalysisBar(
                                   'Confidence',
-                                  0.55,
-                                  'Good',
+                                  _liveMetrics['confidence'] ?? 0,
+                                  _metricStatus('confidence'),
                                   const Color(0xFFFFB800),
                                 ),
                               ],
@@ -532,7 +755,7 @@ class _RecordingScreenState extends State<RecordingScreen>
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          "Great pacing! Try to slow down slightly when describing your revenue model.",
+                                          _liveTip,
                                           style: TextStyle(
                                             color: context.colors.textPrimary,
                                             fontSize: 13,
@@ -893,7 +1116,7 @@ class _RecordingScreenState extends State<RecordingScreen>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '82',
+                    '$_overallScore',
                     style: TextStyle(
                       color: context.colors.accent,
                       fontSize: 64,
@@ -912,8 +1135,11 @@ class _RecordingScreenState extends State<RecordingScreen>
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
                       _ScoreChip('Duration', duration),
-                      const _ScoreChip('Words/min', '142'),
-                      const _ScoreChip('Clarity', '91%'),
+                      _ScoreChip('Clarity', '${_metricPercent('clarity')}%'),
+                      _ScoreChip(
+                        'Confidence',
+                        '${_metricPercent('confidence')}%',
+                      ),
                     ],
                   ),
                 ],
@@ -926,11 +1152,27 @@ class _RecordingScreenState extends State<RecordingScreen>
             const SizedBox(height: 12),
 
             ...[
-              ('Pacing', 0.78, context.colors.accent),
-              ('Confidence', 0.72, const Color(0xFFFFB800)),
-              ('Clarity', 0.91, const Color(0xFF3B82F6)),
-              ('Content', 0.80, const Color(0xFFFF6B6B)),
-              ('Engagement', 0.68, const Color(0xFF8B5CF6)),
+              ('Pacing', (_liveMetrics['pacing'] ?? 0), context.colors.accent),
+              (
+                'Slide Sync',
+                (_liveMetrics['slide_sync'] ?? 0),
+                const Color(0xFF8B5CF6),
+              ),
+              (
+                'Confidence',
+                (_liveMetrics['confidence'] ?? 0),
+                const Color(0xFFFFB800),
+              ),
+              (
+                'Clarity',
+                (_liveMetrics['clarity'] ?? 0),
+                const Color(0xFF3B82F6),
+              ),
+              (
+                'Engagement',
+                (_liveMetrics['engagement'] ?? 0),
+                const Color(0xFFFF6B6B),
+              ),
             ].map(
               (e) => Padding(
                 padding: const EdgeInsets.only(bottom: 16),
@@ -977,53 +1219,51 @@ class _RecordingScreenState extends State<RecordingScreen>
             _sectionTitle(context, 'AI Feedback'),
             const SizedBox(height: 12),
 
-            ...[
-              (
-                Icons.check_circle,
-                context.colors.accent,
-                'Strong opening hook captured attention effectively.',
-              ),
-              (
-                Icons.check_circle,
-                context.colors.accent,
-                'Market size data was compelling and well-sourced.',
-              ),
-              (
-                Icons.warning_amber_rounded,
-                const Color(0xFFFFB800),
-                'Revenue projections could use more detail.',
-              ),
-              (
-                Icons.warning_amber_rounded,
-                const Color(0xFFFFB800),
-                'Consider slowing down in the technical section.',
-              ),
-            ].map(
-              (e) => Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: context.colors.card,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: context.colors.divider),
-                ),
-                child: Row(
-                  children: [
-                    Icon(e.$1, color: e.$2, size: 18),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        e.$3,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                        ),
-                      ),
+            ...(_sessionFindings.isNotEmpty
+                    ? _sessionFindings
+                    : _buildSessionFindings())
+                .map(
+                  (finding) => (
+                    (finding.toLowerCase().contains('improve') ||
+                            finding.toLowerCase().contains('slow down') ||
+                            finding.toLowerCase().contains('ended early'))
+                        ? Icons.warning_amber_rounded
+                        : Icons.check_circle,
+                    (finding.toLowerCase().contains('improve') ||
+                            finding.toLowerCase().contains('slow down') ||
+                            finding.toLowerCase().contains('ended early'))
+                        ? const Color(0xFFFFB800)
+                        : context.colors.accent,
+                    finding,
+                  ),
+                )
+                .toList()
+                .map(
+                  (e) => Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: context.colors.card,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: context.colors.divider),
                     ),
-                  ],
+                    child: Row(
+                      children: [
+                        Icon(e.$1, color: e.$2, size: 18),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            e.$3,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
 
             const SizedBox(height: 24),
 
@@ -1242,9 +1482,12 @@ class _RecordingScreenState extends State<RecordingScreen>
                             ),
                           ),
                           const SizedBox(height: 4),
-                          const Text(
-                            'Great energy. Keep eye contact with camera and slow down slightly during your financial explanation.',
-                            style: TextStyle(color: Colors.white, fontSize: 12),
+                          Text(
+                            _liveTip,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
@@ -1260,6 +1503,8 @@ class _RecordingScreenState extends State<RecordingScreen>
   }
 
   Widget _buildCameraView(BuildContext context) {
+    final cameraAvailable =
+        _cameraOn && _cameraReady && _cameraController != null;
     return Container(
       width: double.infinity,
       height: _fullscreen ? null : 220,
@@ -1269,7 +1514,7 @@ class _RecordingScreenState extends State<RecordingScreen>
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: context.colors.divider),
       ),
-      child: (!_cameraOn || !_cameraReady || _cameraController == null)
+      child: !cameraAvailable
           ? SizedBox(
               height: _fullscreen ? 300 : 220,
               child: Center(
@@ -1277,6 +1522,35 @@ class _RecordingScreenState extends State<RecordingScreen>
                   'Camera Off',
                   style: TextStyle(color: context.colors.textSecondary),
                 ),
+              ),
+            )
+          : !_fullscreen
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.videocam_rounded,
+                    color: context.colors.accent,
+                    size: 30,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Camera is on',
+                    style: TextStyle(
+                      color: context.colors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Camera preview appears in fullscreen.',
+                    style: TextStyle(
+                      color: context.colors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
             )
           : ClipRRect(
@@ -1366,30 +1640,34 @@ class _RecordingScreenState extends State<RecordingScreen>
               child: const Text('Change Deck'),
             ),
           ),
-          Positioned(
-            top: 10,
-            right: 10,
-            child: Container(
-              width: 96,
-              height: 132,
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-              ),
-              child: (!_cameraOn || !_cameraReady || _cameraController == null)
-                  ? Center(
-                      child: Icon(
-                        Icons.videocam_off,
-                        color: context.colors.textSecondary,
+          if (_fullscreen)
+            Positioned(
+              top: 10,
+              right: 10,
+              child: Container(
+                width: 96,
+                height: 132,
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.3),
+                  ),
+                ),
+                child:
+                    (!_cameraOn || !_cameraReady || _cameraController == null)
+                    ? Center(
+                        child: Icon(
+                          Icons.videocam_off,
+                          color: context.colors.textSecondary,
+                        ),
+                      )
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: CameraPreview(_cameraController!),
                       ),
-                    )
-                  : ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: CameraPreview(_cameraController!),
-                    ),
+              ),
             ),
-          ),
           Positioned(
             left: 12,
             right: 12,

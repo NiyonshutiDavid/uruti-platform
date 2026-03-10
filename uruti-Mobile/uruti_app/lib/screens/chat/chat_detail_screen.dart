@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -8,7 +9,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:provider/provider.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 import '../../core/app_constants.dart';
 import '../../core/app_colors.dart';
 import '../../providers/auth_provider.dart';
@@ -17,6 +20,7 @@ import '../../services/api_service.dart';
 import '../../services/message_notification_handler.dart';
 import '../../services/realtime_service.dart';
 import '../../widgets/book_session_sheet.dart';
+import '../../widgets/in_app_video_player_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final String userId;
@@ -102,12 +106,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   String? _safeAvatarUrl(dynamic raw) {
-    final text = _asText(raw);
-    if (text.isEmpty) return null;
-    final uri = Uri.tryParse(text);
+    final normalized = AppConstants.normalizeMediaUrl(_asText(raw));
+    if (normalized == null) return null;
+    final uri = Uri.tryParse(normalized);
     if (uri == null) return null;
     if (uri.hasScheme && (uri.path.isEmpty || uri.path == '/')) return null;
-    return text;
+    return normalized;
   }
 
   void _handleRealtimeEvent(Map<String, dynamic> event) {
@@ -831,35 +835,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final sharedMedia = <Map<String, dynamic>>[];
     for (final msg in _messages) {
       final attachments = msg['attachments'];
-      if (attachments is List) {
-        for (final att in attachments) {
-          final url = att.toString().trim();
-          if (url.isEmpty) continue;
-          final lower = url.toLowerCase();
-          final isImage =
-              lower.endsWith('.png') ||
-              lower.endsWith('.jpg') ||
-              lower.endsWith('.jpeg') ||
-              lower.endsWith('.gif') ||
-              lower.endsWith('.webp');
-          if (isImage) {
-            sharedMedia.add({
-              'url': url.startsWith('http')
-                  ? url
-                  : '${AppConstants.apiBaseUrl}$url',
-              'date': msg['created_at'] ?? '',
-            });
-          } else {
-            final fileName =
-                Uri.tryParse(url)?.pathSegments.lastOrNull ?? 'File';
-            sharedFiles.add({
-              'name': fileName,
-              'url': url.startsWith('http')
-                  ? url
-                  : '${AppConstants.apiBaseUrl}$url',
-              'date': msg['created_at'] ?? '',
-            });
-          }
+      final normalizedAttachments = _extractAttachmentItems(attachments);
+      for (final att in normalizedAttachments) {
+        if (att.url.isEmpty) continue;
+        if (_isImageAttachment(att.url, contentType: att.contentType)) {
+          sharedMedia.add({'url': att.url, 'date': msg['created_at'] ?? ''});
+        } else {
+          sharedFiles.add({
+            'name': att.name,
+            'url': att.url,
+            'date': msg['created_at'] ?? '',
+          });
         }
       }
       // Also pick up tagged file names
@@ -893,6 +879,75 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         userId: widget.userId,
       ),
     );
+  }
+
+  bool _isImageAttachment(String url, {String? contentType}) {
+    final lower = url.toLowerCase();
+    final mime = (contentType ?? '').toLowerCase();
+    return mime.startsWith('image/') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.bmp') ||
+        lower.endsWith('.svg');
+  }
+
+  List<_AttachmentItem> _extractAttachmentItems(dynamic raw) {
+    final items = <_AttachmentItem>[];
+
+    void addFromUrl(String url, {String? name, String? contentType}) {
+      final normalized = AppConstants.normalizeMediaUrl(url);
+      if (normalized == null || normalized.isEmpty) return;
+      final fallbackName =
+          Uri.tryParse(normalized)?.pathSegments.lastOrNull ?? 'Attachment';
+      items.add(
+        _AttachmentItem(
+          url: normalized,
+          name: (name ?? '').trim().isNotEmpty ? name!.trim() : fallbackName,
+          contentType: contentType,
+        ),
+      );
+    }
+
+    if (raw is List) {
+      for (final entry in raw) {
+        if (entry is String) {
+          addFromUrl(entry);
+          continue;
+        }
+        if (entry is Map) {
+          final url = (entry['url'] ?? entry['file_url'] ?? entry['path'] ?? '')
+              .toString();
+          final name = (entry['name'] ?? entry['filename'] ?? '').toString();
+          final contentType =
+              (entry['content_type'] ?? entry['contentType'] ?? '').toString();
+          if (url.trim().isNotEmpty) {
+            addFromUrl(url, name: name, contentType: contentType);
+          }
+        }
+      }
+      return items;
+    }
+
+    if (raw is Map) {
+      final url = (raw['url'] ?? raw['file_url'] ?? raw['path'] ?? '')
+          .toString();
+      final name = (raw['name'] ?? raw['filename'] ?? '').toString();
+      final contentType = (raw['content_type'] ?? raw['contentType'] ?? '')
+          .toString();
+      if (url.trim().isNotEmpty) {
+        addFromUrl(url, name: name, contentType: contentType);
+      }
+      return items;
+    }
+
+    if (raw is String) {
+      addFromUrl(raw);
+    }
+
+    return items;
   }
 
   Future<void> _send() async {
@@ -1278,27 +1333,66 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 
-  List<String> _attachmentUrls() {
+  List<_AttachmentItem> _attachments() {
+    final items = <_AttachmentItem>[];
     final raw = msg['attachments'];
+
+    void addFromUrl(String url, {String? name, String? contentType}) {
+      final normalized = AppConstants.normalizeMediaUrl(url);
+      if (normalized == null || normalized.isEmpty) return;
+      final fallbackName =
+          Uri.tryParse(normalized)?.pathSegments.lastOrNull ?? 'Attachment';
+      items.add(
+        _AttachmentItem(
+          url: normalized,
+          name: (name ?? '').trim().isNotEmpty ? name!.trim() : fallbackName,
+          contentType: contentType,
+        ),
+      );
+    }
+
     if (raw is List) {
-      return raw
-          .map((e) => e.toString().trim())
-          .where((e) => e.isNotEmpty)
-          .toList();
+      for (final entry in raw) {
+        if (entry is String) {
+          addFromUrl(entry);
+          continue;
+        }
+        if (entry is Map) {
+          final url = (entry['url'] ?? entry['file_url'] ?? entry['path'] ?? '')
+              .toString();
+          final name = (entry['name'] ?? entry['filename'] ?? '').toString();
+          final contentType =
+              (entry['content_type'] ?? entry['contentType'] ?? '').toString();
+          if (url.trim().isNotEmpty) {
+            addFromUrl(url, name: name, contentType: contentType);
+          }
+        }
+      }
+    } else if (raw is Map) {
+      final url = (raw['url'] ?? raw['file_url'] ?? raw['path'] ?? '')
+          .toString();
+      final name = (raw['name'] ?? raw['filename'] ?? '').toString();
+      final contentType = (raw['content_type'] ?? raw['contentType'] ?? '')
+          .toString();
+      if (url.trim().isNotEmpty) {
+        addFromUrl(url, name: name, contentType: contentType);
+      }
+    } else {
+      for (final key in const ['attachment_url', 'file_url', 'audio_url']) {
+        final rawUrl = (msg[key] ?? '').toString().trim();
+        if (rawUrl.isNotEmpty) {
+          addFromUrl(rawUrl);
+        }
+      }
     }
-    return const [];
+    return items;
   }
 
-  String _resolvedUrl(String url) {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
-    }
-    return '${AppConstants.apiBaseUrl}$url';
-  }
-
-  bool _isAudioAttachment(String url) {
+  bool _isAudioAttachment(String url, {String? contentType}) {
     final lower = url.toLowerCase();
-    return lower.endsWith('.m4a') ||
+    final mime = (contentType ?? '').toLowerCase();
+    return mime.startsWith('audio/') ||
+        lower.endsWith('.m4a') ||
         lower.endsWith('.aac') ||
         lower.endsWith('.mp3') ||
         lower.endsWith('.wav') ||
@@ -1306,10 +1400,33 @@ class _MessageBubble extends StatelessWidget {
         lower.endsWith('.webm');
   }
 
-  Future<void> _openAttachment(BuildContext context, String url) async {
-    final target = Uri.parse(_resolvedUrl(url));
-    final launchMode = _isAudioAttachment(url)
-        ? LaunchMode.inAppBrowserView
+  bool _isImageAttachment(String url, {String? contentType}) {
+    final lower = url.toLowerCase();
+    final mime = (contentType ?? '').toLowerCase();
+    return mime.startsWith('image/') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.bmp') ||
+        lower.endsWith('.svg');
+  }
+
+  bool _isPdfAttachment(String url, {String? contentType}) {
+    final lower = url.toLowerCase();
+    final mime = (contentType ?? '').toLowerCase();
+    return mime == 'application/pdf' || lower.endsWith('.pdf');
+  }
+
+  Future<void> _openAttachment(
+    BuildContext context,
+    _AttachmentItem item,
+  ) async {
+    final target = Uri.parse(item.url);
+    final launchMode =
+        _isAudioAttachment(item.url, contentType: item.contentType)
+        ? LaunchMode.externalApplication
         : LaunchMode.externalApplication;
     final ok = await launchUrl(target, mode: launchMode);
     if (!ok && context.mounted) {
@@ -1319,6 +1436,112 @@ class _MessageBubble extends StatelessWidget {
     }
   }
 
+  void _previewImage(BuildContext context, String url, String title) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => Dialog(
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              child: Image.network(
+                url,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const SizedBox(
+                  height: 220,
+                  child: Center(child: Text('Unable to load image preview.')),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded),
+                style: IconButton.styleFrom(backgroundColor: Colors.white70),
+              ),
+            ),
+            Positioned(
+              left: 12,
+              bottom: 12,
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  shadows: [Shadow(blurRadius: 4, color: Colors.black87)],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _previewPdf(BuildContext context, String url, String title) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SizedBox(
+        height: MediaQuery.of(context).size.height * 0.88,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        color: context.colors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: context.colors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: SfPdfViewer.network(
+                url,
+                canShowScrollHead: true,
+                canShowPaginationDialog: true,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _handleAttachmentTap(BuildContext context, _AttachmentItem item) {
+    if (_isImageAttachment(item.url, contentType: item.contentType)) {
+      _previewImage(context, item.url, item.name);
+      return;
+    }
+    if (_isPdfAttachment(item.url, contentType: item.contentType)) {
+      _previewPdf(context, item.url, item.name);
+      return;
+    }
+    _openAttachment(context, item);
+  }
+
   @override
   Widget build(BuildContext context) {
     final content =
@@ -1326,9 +1549,7 @@ class _MessageBubble extends StatelessWidget {
     final parsed = _parseBody(content);
     final time = _formatTime(msg['created_at'] as String?);
     final isRead = (msg['is_read'] as bool?) ?? false;
-    final attachments = _attachmentUrls();
-    final hasAudioAttachment =
-        attachments.isNotEmpty && _isAudioAttachment(attachments.first);
+    final attachments = _attachments();
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -1389,47 +1610,123 @@ class _MessageBubble extends StatelessWidget {
             if (attachments.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: GestureDetector(
-                  onTap: () => _openAttachment(context, attachments.first),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isMe
-                          ? Colors.white.withValues(alpha: 0.15)
-                          : context.colors.surface,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          hasAudioAttachment
-                              ? Icons.play_circle_fill_rounded
-                              : Icons.download_rounded,
-                          size: 14,
-                          color: isMe
-                              ? Colors.white
-                              : context.colors.textSecondary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          hasAudioAttachment
-                              ? 'Play audio message'
-                              : 'Download file',
-                          style: TextStyle(
-                            color: isMe
-                                ? Colors.white
-                                : context.colors.textPrimary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ...attachments
+                        .where(
+                          (att) => _isAudioAttachment(
+                            att.url,
+                            contentType: att.contentType,
+                          ),
+                        )
+                        .map(
+                          (att) => Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: _AudioMessageTile(url: att.url, isMe: isMe),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
+                    ...attachments
+                        .where(
+                          (att) => !_isAudioAttachment(
+                            att.url,
+                            contentType: att.contentType,
+                          ),
+                        )
+                        .map((att) {
+                          final isImage = _isImageAttachment(
+                            att.url,
+                            contentType: att.contentType,
+                          );
+                          final isPdf = _isPdfAttachment(
+                            att.url,
+                            contentType: att.contentType,
+                          );
+
+                          if (isImage) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: GestureDetector(
+                                onTap: () =>
+                                    _previewImage(context, att.url, att.name),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.network(
+                                    att.url,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      width: 180,
+                                      height: 120,
+                                      color: isMe
+                                          ? Colors.white.withValues(alpha: 0.15)
+                                          : context.colors.surface,
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        'Unable to preview image',
+                                        style: TextStyle(
+                                          color: isMe
+                                              ? Colors.white
+                                              : context.colors.textSecondary,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: GestureDetector(
+                              onTap: () => _handleAttachmentTap(context, att),
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isMe
+                                      ? Colors.white.withValues(alpha: 0.15)
+                                      : context.colors.surface,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      isPdf
+                                          ? Icons.picture_as_pdf_outlined
+                                          : Icons.insert_drive_file_outlined,
+                                      size: 14,
+                                      color: isMe
+                                          ? Colors.white
+                                          : context.colors.textSecondary,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        isPdf
+                                            ? 'Open PDF: ${att.name}'
+                                            : 'Open file: ${att.name}',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: isMe
+                                              ? Colors.white
+                                              : context.colors.textPrimary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                  ],
                 ),
               ),
             if (parsed.startupName != null)
@@ -1498,6 +1795,213 @@ class _ParsedBody {
   });
 }
 
+class _AttachmentItem {
+  final String url;
+  final String name;
+  final String? contentType;
+
+  const _AttachmentItem({
+    required this.url,
+    required this.name,
+    this.contentType,
+  });
+}
+
+class _AudioMessageTile extends StatefulWidget {
+  final String url;
+  final bool isMe;
+
+  const _AudioMessageTile({required this.url, required this.isMe});
+
+  @override
+  State<_AudioMessageTile> createState() => _AudioMessageTileState();
+}
+
+class _AudioMessageTileState extends State<_AudioMessageTile> {
+  VideoPlayerController? _controller;
+  bool _loading = true;
+  bool _failed = false;
+  static const int _waveBinCount = 24;
+  List<double> _waveformBins = List<double>.generate(
+    _waveBinCount,
+    (index) => 0.35 + ((index % 5) * 0.1),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _initAudio();
+  }
+
+  Future<void> _buildWaveformBins() async {
+    final uri = Uri.tryParse(widget.url);
+    if (uri == null) return;
+
+    HttpClient? client;
+    try {
+      client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+      final request = await client.getUrl(uri);
+      final response = await request.close();
+      if (response.statusCode < 200 || response.statusCode >= 300) return;
+
+      final bytes = <int>[];
+      await for (final chunk in response) {
+        bytes.addAll(chunk);
+      }
+      if (bytes.isEmpty) return;
+
+      final chunkSize = (bytes.length / _waveBinCount).ceil();
+      final bins = <double>[];
+
+      for (var i = 0; i < _waveBinCount; i++) {
+        final start = i * chunkSize;
+        if (start >= bytes.length) {
+          bins.add(0.15);
+          continue;
+        }
+        final end = ((i + 1) * chunkSize).clamp(0, bytes.length);
+        var total = 0.0;
+        var count = 0;
+        for (var j = start; j < end; j++) {
+          total += (bytes[j] - 128).abs() / 127.0;
+          count++;
+        }
+        final value = count > 0 ? (total / count) : 0.0;
+        bins.add(value);
+      }
+
+      final peak = bins.reduce((a, b) => a > b ? a : b);
+      final normalized = peak > 0
+          ? bins.map((v) => (v / peak).clamp(0.15, 1.0)).toList()
+          : List<double>.filled(_waveBinCount, 0.25);
+
+      if (!mounted) return;
+      setState(() {
+        _waveformBins = normalized;
+      });
+    } catch (_) {
+      // Keep default bars when waveform extraction fails.
+    } finally {
+      client?.close(force: true);
+    }
+  }
+
+  Future<void> _initAudio() async {
+    try {
+      final controller = VideoPlayerController.networkUrl(
+        Uri.parse(widget.url),
+      );
+      await controller.initialize();
+      controller.addListener(() {
+        if (mounted) setState(() {});
+      });
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+      setState(() {
+        _controller = controller;
+        _loading = false;
+      });
+      unawaited(_buildWaveformBins());
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _failed = true;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _togglePlay() async {
+    final controller = _controller;
+    if (controller == null) return;
+    if (controller.value.isPlaying) {
+      await controller.pause();
+    } else {
+      await controller.play();
+    }
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isMe = widget.isMe;
+    final ctrl = _controller;
+    final durationMs = (ctrl?.value.duration.inMilliseconds ?? 0);
+    final positionMs = (ctrl?.value.position.inMilliseconds ?? 0);
+    final progress = durationMs > 0
+        ? (positionMs / durationMs).clamp(0.0, 1.0)
+        : 0.0;
+
+    final baseColor = isMe ? Colors.white : context.colors.accent;
+    final mutedColor = isMe
+        ? Colors.white.withValues(alpha: 0.35)
+        : context.colors.textSecondary.withValues(alpha: 0.35);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: isMe
+            ? Colors.white.withValues(alpha: 0.15)
+            : context.colors.surface,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: (_loading || _failed) ? null : _togglePlay,
+            child: Icon(
+              _loading
+                  ? Icons.hourglass_empty_rounded
+                  : _failed
+                  ? Icons.error_outline_rounded
+                  : (ctrl?.value.isPlaying == true
+                        ? Icons.pause_circle_filled_rounded
+                        : Icons.play_circle_fill_rounded),
+              color: _failed ? Colors.redAccent : baseColor,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SizedBox(
+              height: 26,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: List.generate(_waveformBins.length, (index) {
+                  final normalized = index / (_waveformBins.length - 1);
+                  final barHeight = 4.0 + (_waveformBins[index] * 15.0);
+                  final active = normalized <= progress;
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 0.7),
+                      child: Container(
+                        height: barHeight.clamp(4.0, 20.0),
+                        decoration: BoxDecoration(
+                          color: active ? baseColor : mutedColor,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ─── Venture sharing card inside message bubbles ─────────────────
 class _VentureCard extends StatelessWidget {
   final String name;
@@ -1511,10 +2015,17 @@ class _VentureCard extends StatelessWidget {
   });
 
   String? _resolveLogoUrl(String? raw) {
+    return AppConstants.normalizeMediaUrl(raw);
+  }
+
+  static Uri? _externalUri(String? raw) {
     if (raw == null || raw.trim().isEmpty) return null;
-    final url = raw.trim();
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    return '${AppConstants.apiBaseUrl}$url';
+    final trimmed = raw.trim();
+    Uri? uri = Uri.tryParse(trimmed);
+    if (uri == null || uri.scheme.isEmpty) {
+      uri = Uri.tryParse('https://$trimmed');
+    }
+    return uri;
   }
 
   void _openVentureDetails(BuildContext context) async {
@@ -1547,12 +2058,11 @@ class _VentureCard extends StatelessWidget {
     final problem = (venture['problem_statement'] as String? ?? '').trim();
     final solution = (venture['solution'] as String? ?? '').trim();
     final market = (venture['target_market'] as String? ?? '').trim();
+    final pitchDeckUrl = (venture['pitch_deck_url'] as String? ?? '').trim();
+    final demoVideoUrl = (venture['demo_video_url'] as String? ?? '').trim();
     final logoUrl = (venture['logo_url'] as String? ?? '').trim();
-    final resolvedLogo = logoUrl.isNotEmpty
-        ? (logoUrl.startsWith('http')
-              ? logoUrl
-              : '${AppConstants.apiBaseUrl}$logoUrl')
-        : null;
+    final resolvedLogo = AppConstants.normalizeMediaUrl(logoUrl);
+    final resolvedDemoVideoUrl = AppConstants.normalizeMediaUrl(demoVideoUrl);
 
     showModalBottomSheet(
       context: context,
@@ -1684,6 +2194,45 @@ class _VentureCard extends StatelessWidget {
                   fontSize: 13,
                 ),
               ),
+            ],
+            if (pitchDeckUrl.isNotEmpty ||
+                (resolvedDemoVideoUrl ?? '').isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _sectionTitle(context, 'Pitch Assets'),
+              const SizedBox(height: 8),
+              if (pitchDeckUrl.isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final uri = _externalUri(pitchDeckUrl);
+                    if (uri == null || !await canLaunchUrl(uri)) {
+                      if (!ctx.mounted) return;
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(
+                          content: Text('Unable to open pitch deck link'),
+                        ),
+                      );
+                      return;
+                    }
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  },
+                  icon: const Icon(Icons.slideshow_rounded, size: 16),
+                  label: const Text('View Pitch Deck'),
+                ),
+              if ((resolvedDemoVideoUrl ?? '').isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await Navigator.of(ctx).push(
+                      MaterialPageRoute(
+                        builder: (_) => InAppVideoPlayerScreen(
+                          videoUrl: resolvedDemoVideoUrl!,
+                          title: '$name Demo Video',
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.play_circle_fill_rounded, size: 16),
+                  label: const Text('Play Demo Video'),
+                ),
             ],
           ],
         ),

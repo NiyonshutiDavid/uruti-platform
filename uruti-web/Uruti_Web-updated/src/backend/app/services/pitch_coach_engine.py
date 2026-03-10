@@ -24,7 +24,7 @@ class PitchCoachEngine:
         self._startup_init_started = False
         self._startup_init_completed = False
         self.model_id = settings.PITCH_COACH_MODEL_ID or os.getenv("PITCH_COACH_MODEL_ID", "")
-        self.enable_local_rl = os.getenv("PITCH_COACH_ENABLE_LOCAL_RL", "false").strip().lower() in {"1", "true", "yes", "on"}
+        self.enable_local_rl = settings.PITCH_COACH_ENABLE_LOCAL_RL
         self.local_model_dir = settings.PITCH_COACH_LOCAL_MODEL_DIR or self._default_local_model_dir()
         self._action_map = {
             0: "Increase Energy (Speak louder and with more passion).",

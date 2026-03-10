@@ -76,13 +76,22 @@ class Settings(BaseSettings):
     URUTI_CHATBOT_REPO_ID: str = "NiyonshutiDavid/uruti-qwen2_5-7b-instruct-q4_k_m-gguf"
     URUTI_CHATBOT_GGUF_FILENAME: str = "qwen2_5-7b-instruct-q4_k_m.gguf"
     URUTI_CHATBOT_LOCAL_GGUF_PATH: Optional[str] = None
-    URUTI_CHATBOT_CTX: int = 4096
-    URUTI_CHATBOT_MAX_TOKENS: int = 512
+    URUTI_CHATBOT_CTX: int = 3072
+    URUTI_CHATBOT_MAX_TOKENS: int = 256
     URUTI_CHATBOT_TEMPERATURE: float = 0.2
+    URUTI_CHATBOT_HISTORY_MESSAGES: int = 8
+    URUTI_CHATBOT_MAX_INPUT_CHARS: int = 1800
+    URUTI_CHATBOT_RESPONSE_TIMEOUT_SECONDS: float = 45.0
+    URUTI_CHATBOT_LOCAL_TIMEOUT_SECONDS: float = 20.0
     CHATBOT_SERVICE_URL: str = os.getenv("CHATBOT_SERVICE_URL", "http://127.0.0.1:8020")
-    CORE_SERVICE_URL: str = os.getenv("CORE_SERVICE_URL", "http://127.0.0.1:8010")
+    CHATBOT_HEALTH_PROBE_TIMEOUT_SECONDS: float = 5.0
+    CORE_SERVICE_URL: str = os.getenv("CORE_SERVICE_URL", "http://173.249.25.80:1199")
     PITCH_COACH_MODEL_ID: Optional[str] = None
+    PITCH_COACH_ENABLE_LOCAL_RL: bool = False
     PITCH_COACH_LOCAL_MODEL_DIR: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-3-flash-preview"
+    GEMINI_TIMEOUT_SECONDS: float = 12.0
 
     # Push Notifications (Firebase Cloud Messaging)
     FCM_SERVICE_ACCOUNT_PATH: Optional[str] = os.getenv("FCM_SERVICE_ACCOUNT_PATH")

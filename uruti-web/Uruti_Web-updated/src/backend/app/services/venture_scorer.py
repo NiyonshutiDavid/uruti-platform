@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import json
+import sys
 
 import joblib
 import pandas as pd
@@ -58,6 +59,19 @@ class VentureScorer:
             except Exception:
                 pass
 
+        # Some exported sklearn/joblib bundles reference numpy internals under
+        # the newer "numpy._core" module path. Provide compatibility aliases so
+        # loading works across numpy distributions.
+        try:
+            import numpy.core as _np_core  # type: ignore
+
+            if "numpy._core" not in sys.modules:
+                sys.modules["numpy._core"] = _np_core
+            if "numpy._core.numeric" not in sys.modules and hasattr(_np_core, "numeric"):
+                sys.modules["numpy._core.numeric"] = _np_core.numeric
+        except Exception:
+            pass
+
         loaded_obj = joblib.load(bundle_path)
         estimator = loaded_obj
 
@@ -66,10 +80,19 @@ class VentureScorer:
                 loaded_obj.get("model")
                 or loaded_obj.get("estimator")
                 or loaded_obj.get("pipeline")
+                or loaded_obj.get("model_pipeline")
                 or loaded_obj.get("clf")
                 or loaded_obj.get("classifier")
                 or loaded_obj
             )
+
+            # Fall back to the first object that behaves like an estimator.
+            if isinstance(estimator, dict):
+                for value in loaded_obj.values():
+                    if hasattr(value, "predict"):
+                        estimator = value
+                        break
+
             if not class_names:
                 raw_classes = loaded_obj.get("class_names") or loaded_obj.get("classes")
                 if isinstance(raw_classes, list):
@@ -289,8 +312,27 @@ class VentureScorer:
             frame = pd.DataFrame([row])
 
             estimator = bundle.estimator
-            predicted_raw = estimator.predict(frame)[0]
-            probabilities = estimator.predict_proba(frame)[0] if hasattr(estimator, "predict_proba") else None
+            try:
+                predicted_raw = estimator.predict(frame)[0]
+                probabilities = estimator.predict_proba(frame)[0] if hasattr(estimator, "predict_proba") else None
+            except AttributeError as exc:
+                # Compatibility path for older xgboost estimators under newer
+                # sklearn versions where Pipeline.predict can fail on tag checks.
+                if "__sklearn_tags__" not in str(exc) or not hasattr(estimator, "steps"):
+                    raise
+
+                transformed = frame
+                steps = list(getattr(estimator, "steps", []))
+                for _, step in steps[:-1]:
+                    transformed = step.transform(transformed)
+
+                last_step = steps[-1][1] if steps else estimator
+                predicted_raw = last_step.predict(transformed)[0]
+                probabilities = (
+                    last_step.predict_proba(transformed)[0]
+                    if hasattr(last_step, "predict_proba")
+                    else None
+                )
 
             classes = bundle.class_names
             if not classes and hasattr(estimator, "classes_"):
