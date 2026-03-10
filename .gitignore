@@ -57,3 +57,24 @@ uruti-web/Uruti_Web-updated/src/backend/uploads/
 
 # Optional local model mirrors (keep canonical model assets tracked separately)
 Models/Uruti-pitch_coach/
+
+# Track canonical pitch coach assets used by backend runtime.
+!Models/Uruti-pitch_coach/
+!Models/Uruti-pitch_coach/pitch_coach_complete (5)/
+!Models/Uruti-pitch_coach/pitch_coach_complete (5)/app.py
+!Models/Uruti-pitch_coach/pitch_coach_complete (5)/inference.py
+!Models/Uruti-pitch_coach/pitch_coach_complete (5)/requirements.txt
+!Models/Uruti-pitch_coach/pitch_coach_complete (5)/models/
+!Models/Uruti-pitch_coach/pitch_coach_complete (5)/models/best_model_name.txt
+!Models/Uruti-pitch_coach/pitch_coach_complete (5)/models/reward_model.pt
+!Models/Uruti-pitch_coach/pitch_coach_complete (5)/models/best_model/
+!Models/Uruti-pitch_coach/pitch_coach_complete (5)/models/best_model/_stable_baselines3_version
+!Models/Uruti-pitch_coach/pitch_coach_complete (5)/models/best_model/data
+!Models/Uruti-pitch_coach/pitch_coach_complete (5)/models/best_model/policy.optimizer.pth
+!Models/Uruti-pitch_coach/pitch_coach_complete (5)/models/best_model/policy.pth
+!Models/Uruti-pitch_coach/pitch_coach_complete (5)/models/best_model/pytorch_variables.pth
+!Models/Uruti-pitch_coach/pitch_coach_complete (5)/models/best_model/system_info.txt
+
+# Keep local artifacts out of git.
+Models/Uruti-pitch_coach/**/.DS_Store
+Models/Uruti-pitch_coach/**/__pycache__/
