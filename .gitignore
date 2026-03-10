@@ -52,6 +52,12 @@ build/
 *.ppt
 *.pptx
 
+# Publish RAG corpus PDFs used by chatbot retrieval while keeping other PDFs ignored.
+!Models/Uruti chatbot/
+!Models/Uruti chatbot/uruti_rag_corpus/
+!Models/Uruti chatbot/uruti_rag_corpus/pdfs/
+!Models/Uruti chatbot/uruti_rag_corpus/pdfs/*.pdf
+
 # Runtime artifacts (local only)
 uruti-web/Uruti_Web-updated/src/backend/uploads/
 
