@@ -15,6 +15,7 @@ import { EnhancedCaptureIdeaDialog } from '../EnhancedCaptureIdeaDialog';
 import { VentureDetailView } from '../VentureDetailView';
 import { EditVentureDialog } from '../EditVentureDialog';
 import { apiClient } from '../../lib/api-client';
+import { formatLocalDate } from '../../lib/datetime';
 import { toast } from 'sonner';
 
 interface Startup {
@@ -99,6 +100,25 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
     loadVentures();
   }, []);
 
+  useEffect(() => {
+    const handleVentureVideoUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ ventureId?: number; videoUrl?: string }>).detail;
+      const ventureId = Number(detail?.ventureId);
+      const videoUrl = detail?.videoUrl;
+      if (!ventureId || !videoUrl) return;
+
+      setViewingStartup((prev: any) => {
+        if (!prev || Number(prev.id) !== ventureId) return prev;
+        return { ...prev, pitchVideoUrl: videoUrl };
+      });
+    };
+
+    window.addEventListener('venture-video-updated', handleVentureVideoUpdated as EventListener);
+    return () => {
+      window.removeEventListener('venture-video-updated', handleVentureVideoUpdated as EventListener);
+    };
+  }, []);
+
   const handleViewUrutiScore = (startup: Startup) => {
     setSelectedStartup(startup);
     setToastMessage(`${startup.name} - Uruti Score: ${startup.urutiScore}/100 (Ranked #${5 - Math.floor((startup.urutiScore || 0) / 20)} publicly)`);
@@ -116,7 +136,7 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
       setStartups((prev) => prev.map((s) => (s.id === mapped.id ? mapped : s)));
       setSelectedStartup(mapped);
       setToastMessage(
-        `${mapped.name} - Updated Uruti Score: ${mapped.urutiScore}/100 (Re-analyzed on ${new Date().toLocaleDateString()})`,
+        `${mapped.name} - Updated Uruti Score: ${mapped.urutiScore}/100 (Re-analyzed on ${formatLocalDate(new Date())})`,
       );
       toast.success('Venture analyzed with MLP model.');
     } catch (error: any) {
@@ -531,7 +551,7 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
                       <div>
                         <p className="font-medium" style={{ fontFamily: 'var(--font-heading)' }}>{startup.name}</p>
                         <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                          Created {new Date(startup.createdDate).toLocaleDateString()}
+                          Created {formatLocalDate(startup.createdDate)}
                         </p>
                       </div>
                     </TableCell>

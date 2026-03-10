@@ -418,7 +418,7 @@ export function OnboardingTour() {
                 <h3 className="font-['Inter_Tight'] text-xl font-bold text-white mb-2">
                   {step.title}
                 </h3>
-                <p className="font-['Century_Gothic'] text-sm text-gray-300 leading-relaxed">
+                <p className="font-['Inter_Tight'] text-sm text-gray-300 leading-relaxed">
                   {step.description}
                 </p>
               </div>
@@ -485,7 +485,7 @@ export function OnboardingTour() {
 
             {/* Step counter */}
             <div className="mt-4 text-center">
-              <span className="text-xs text-gray-500 font-['Century_Gothic']">
+              <span className="text-xs text-gray-500 font-['Inter_Tight']">
                 Step {currentStep + 1} of {tourSteps.length}
               </span>
             </div>

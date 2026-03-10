@@ -2,17 +2,17 @@
 // Centralized URL management for the application
 
 export const config = {
-  // Local testing defaults. Use VITE_API_URL / VITE_CHATBOT_API_URL to override.
-  productionBackendUrl: 'http://localhost:8010',
+  // Deployed defaults. Use VITE_API_URL / VITE_CHATBOT_API_URL to override.
+  productionBackendUrl: 'http://173.249.25.80:1199',
 
-  // Route everything to localhost during end-to-end module testing.
-  apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:8010',
+  // Core API host.
+  apiUrl: import.meta.env.VITE_API_URL || 'http://173.249.25.80:1199',
 
-  // Dedicated AI service for local split-backend testing.
+  // AI routes are currently served on the same deployed host unless overridden.
   chatbotApiUrl:
     import.meta.env.VITE_CHATBOT_API_URL ||
     import.meta.env.VITE_API_URL ||
-    'http://localhost:8020',
+    'http://173.249.25.80:1199',
   
   // Other configuration options
   appName: 'Uruti Digital Ecosystem',

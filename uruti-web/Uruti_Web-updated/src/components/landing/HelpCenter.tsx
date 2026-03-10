@@ -446,7 +446,7 @@ export function HelpCenter({ onNavigate, onBack }: HelpCenterProps) {
             tips: ['Take notes as you go', 'Apply learnings immediately to your startup']
           },
           {
-            title: 'Get AI Recommendations',
+            title: 'get advisory tracksations',
             description: 'Receive personalized advice based on your responses and progress.',
             tips: ['Be honest in your responses', 'Review recommendations regularly']
           },

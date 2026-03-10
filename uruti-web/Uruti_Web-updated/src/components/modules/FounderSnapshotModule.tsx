@@ -8,6 +8,7 @@ import { Lightbulb, TrendingUp, FileText, Users, Calendar, ArrowRight, Sparkles,
 import { useAuth } from '../../lib/auth-context';
 import { EnhancedCaptureIdeaDialog } from '../EnhancedCaptureIdeaDialog';
 import { apiClient } from '../../lib/api-client';
+import { formatLocalDate, formatRelativeTime, parseServerDate, toEpochMs } from '../../lib/datetime';
 import { toast } from 'sonner';
 
 const COLORS = ['#76B947', '#9BCF6E', '#5A9435'];
@@ -70,7 +71,7 @@ export function FounderSnapshotModule() {
       const recentNotifications = allNotifications.slice(0, 5).map((notif: any) => ({
         id: notif.id,
         message: notif.message,
-        time: formatTimeAgo(new Date(notif.created_at)),
+        time: formatRelativeTime(notif.created_at),
         type: notif.type || 'info'
       }));
       setNotifications(recentNotifications);
@@ -78,13 +79,13 @@ export function FounderSnapshotModule() {
       // Fetch calendar events for upcoming milestones
       const events = await apiClient.getMeetings();
       const upcomingEvents = events
-        .filter((event: any) => new Date(event.date) > new Date())
-        .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .filter((event: any) => parseServerDate(event.date).getTime() > Date.now())
+        .sort((a: any, b: any) => toEpochMs(a.date) - toEpochMs(b.date))
         .slice(0, 5)
         .map((event: any) => ({
           id: event.id,
           event: event.title,
-          date: formatDate(new Date(event.date))
+          date: formatDate(event.date)
         }));
       setUpcomingMilestones(upcomingEvents);
 
@@ -106,21 +107,9 @@ export function FounderSnapshotModule() {
     }
   };
 
-  const formatTimeAgo = (date: Date): string => {
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
-  };
-
-  const formatDate = (date: Date): string => {
+  const formatDate = (date: string): string => {
     const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
-    return date.toLocaleDateString('en-US', options);
+    return formatLocalDate(date, options, '');
   };
 
   const quickActions = [

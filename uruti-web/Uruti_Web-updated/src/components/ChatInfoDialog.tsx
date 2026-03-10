@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
 import { FileText, Image as ImageIcon, Download, ExternalLink, Calendar, ArrowLeft, FileSpreadsheet, File } from 'lucide-react';
+import { formatLocalDate, toEpochMs } from '../lib/datetime';
 
 interface SharedAttachment {
   url: string;
@@ -80,8 +81,8 @@ export function ChatInfoDialog({ onClose, contactName, contactAvatar, contactRol
     });
 
     // Sort newest first
-    docs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    media.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    docs.sort((a, b) => toEpochMs(b.date) - toEpochMs(a.date));
+    media.sort((a, b) => toEpochMs(b.date) - toEpochMs(a.date));
 
     return { sharedDocuments: docs, sharedMedia: media };
   }, [messages]);
@@ -163,7 +164,7 @@ export function ChatInfoDialog({ onClose, contactName, contactAvatar, contactRol
                               {doc.name}
                             </p>
                             <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                              {doc.size} • {new Date(doc.date).toLocaleDateString()}
+                              {doc.size} • {formatLocalDate(doc.date)}
                             </p>
                           </div>
                         </div>
@@ -212,7 +213,7 @@ export function ChatInfoDialog({ onClose, contactName, contactAvatar, contactRol
                         </a>
                       </div>
                       <div className="absolute bottom-1 right-1 bg-black/70 backdrop-blur-sm px-2 py-1 rounded text-xs text-white">
-                        {new Date(media.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {formatLocalDate(media.date, { month: 'short', day: 'numeric' })}
                       </div>
                     </div>
                   ))}

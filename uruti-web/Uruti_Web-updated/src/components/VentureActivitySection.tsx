@@ -16,6 +16,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { parseServerDate } from '../lib/datetime';
 
 interface Activity {
   id: string;
@@ -112,7 +113,7 @@ export function VentureActivitySection({
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+    const date = parseServerDate(dateString);
     const now = new Date();
     const diffInMs = now.getTime() - date.getTime();
     const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));

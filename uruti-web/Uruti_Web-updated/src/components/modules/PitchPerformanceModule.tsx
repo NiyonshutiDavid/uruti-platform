@@ -9,12 +9,14 @@ import { TrendingUp, Download, Play, Eye, Award, Target, X, Sparkles, ArrowLeft,
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { toast } from 'sonner';
 import { apiClient } from '../../lib/api-client';
+import { formatLocalDate, parseServerDate, toEpochMs } from '../../lib/datetime';
 import config from '../../lib/config';
 
 interface PitchSession {
   id: string;
   date: string;
   venture: string;
+  pitchType?: string;
   duration: string;
   overallScore: number;
   pacing: number;
@@ -72,7 +74,7 @@ export function PitchPerformanceModule() {
 
   const handleDeleteSession = async (session: PitchSession, e: MouseEvent) => {
     e.stopPropagation();
-    const confirmed = window.confirm(`Delete recording for ${session.venture} from ${new Date(session.date).toLocaleDateString()}?`);
+    const confirmed = window.confirm(`Delete recording for ${session.venture} from ${formatLocalDate(session.date)}?`);
     if (!confirmed) {
       return;
     }
@@ -106,19 +108,53 @@ export function PitchPerformanceModule() {
     return `${config.apiUrl.replace(/\/+$/, '')}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
-  const downloadFromUrl = (url: string, filename: string) => {
+  const sanitizeFilenamePart = (value: string, fallback: string) => {
+    const cleaned = (value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    return cleaned || fallback;
+  };
+
+  const buildSessionVideoFilename = (session: PitchSession) => {
+    const sessionType = sanitizeFilenamePart(session.pitchType || 'pitch-session', 'pitch-session');
+    const ventureName = sanitizeFilenamePart(session.venture || 'venture', 'venture');
+    const parsedDate = parseServerDate(session.date);
+    const dateValue = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+    const datePart = [
+      dateValue.getFullYear(),
+      String(dateValue.getMonth() + 1).padStart(2, '0'),
+      String(dateValue.getDate()).padStart(2, '0'),
+    ].join('-');
+    return `${sessionType}-${ventureName}-${datePart}.mp4`;
+  };
+
+  const downloadFromUrl = async (url: string, filename: string) => {
     if (!url) {
       toast.error('No file available for download');
       return;
     }
-    const anchor = document.createElement('a');
-    anchor.href = toAbsoluteUrl(url);
-    anchor.download = filename;
-    anchor.target = '_blank';
-    anchor.rel = 'noopener noreferrer';
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
+    try {
+      const response = await fetch(toAbsoluteUrl(url));
+      if (!response.ok) {
+        throw new Error(`Download failed with status ${response.status}`);
+      }
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = blobUrl;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Failed to download file:', error);
+      toast.error('Unable to download file right now. Please try again.');
+    }
   };
 
   // Show video view as full page
@@ -140,7 +176,7 @@ export function PitchPerformanceModule() {
               {videoSession.venture} - Pitch Recording
             </h1>
             <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-              Recorded on {new Date(videoSession.date).toLocaleDateString()} • Duration: {videoSession.duration}
+              Recorded on {formatLocalDate(videoSession.date)} • Duration: {videoSession.duration}
             </p>
           </div>
         </div>
@@ -356,7 +392,7 @@ export function PitchPerformanceModule() {
             <CardContent className="space-y-3">
               <Button
                 className="w-full bg-[#76B947] text-white hover:bg-[#76B947]/90"
-                onClick={() => downloadFromUrl(videoSession.videoUrl, `${videoSession.venture}-pitch-video.webm`)}
+                onClick={() => downloadFromUrl(videoSession.videoUrl, buildSessionVideoFilename(videoSession))}
               >
                 <Download className="mr-2 h-4 w-4" />
                 Download Video
@@ -464,7 +500,7 @@ export function PitchPerformanceModule() {
     session: `Session ${index + 1}`,
     score: session.overallScore,
     date: session.date
-  })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  })).sort((a, b) => toEpochMs(a.date) - toEpochMs(b.date));
 
   return (
     <div className="space-y-6">
@@ -586,7 +622,7 @@ export function PitchPerformanceModule() {
                     >
                       <TableCell>
                         <p className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>
-                          {new Date(session.date).toLocaleDateString()}
+                          {formatLocalDate(session.date)}
                         </p>
                       </TableCell>
                       <TableCell>
@@ -614,7 +650,7 @@ export function PitchPerformanceModule() {
                             className="hover:bg-[#76B947]/10"
                             onClick={(e: MouseEvent) => {
                               e.stopPropagation();
-                              downloadFromUrl(session.videoUrl, `${session.venture}-pitch-video.webm`);
+                              downloadFromUrl(session.videoUrl, buildSessionVideoFilename(session));
                             }}
                           >
                             <Download className="h-4 w-4" />
@@ -644,7 +680,7 @@ export function PitchPerformanceModule() {
             <CardHeader>
               <CardTitle style={{ fontFamily: 'var(--font-heading)' }}>Performance Breakdown</CardTitle>
               <CardDescription style={{ fontFamily: 'var(--font-body)' }}>
-                {selectedSession.venture} - {new Date(selectedSession.date).toLocaleDateString()}
+                {selectedSession.venture} - {formatLocalDate(selectedSession.date)}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -676,7 +712,7 @@ export function PitchPerformanceModule() {
                 <Button
                   variant="outline"
                   className="w-full hover:bg-[#76B947]/10"
-                  onClick={() => downloadFromUrl(selectedSession.videoUrl, `${selectedSession.venture}-pitch-video.webm`)}
+                  onClick={() => downloadFromUrl(selectedSession.videoUrl, buildSessionVideoFilename(selectedSession))}
                 >
                   <Download className="mr-2 h-4 w-4" />
                   Download Video

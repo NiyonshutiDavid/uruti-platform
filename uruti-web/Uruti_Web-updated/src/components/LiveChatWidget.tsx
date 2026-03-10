@@ -12,6 +12,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { useSupport } from '../lib/support-context';
+import { formatLocalTime } from '../lib/datetime';
 import { ScrollArea } from './ui/scroll-area';
 import { toast } from 'sonner';
 
@@ -363,7 +364,7 @@ export function LiveChatWidget({ onNavigate }: LiveChatWidgetProps) {
                                   {msg.text}
                                 </p>
                                 <p className="text-xs opacity-70 mt-1" style={{ fontFamily: 'var(--font-body)' }}>
-                                  {new Date(msg.timestamp).toLocaleTimeString()}
+                                  {formatLocalTime(msg.timestamp)}
                                 </p>
                                 {msg.hasButton && (
                                   <Button

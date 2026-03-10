@@ -49,6 +49,25 @@ export function StartupDiscoveryModule() {
     loadBookmarks();
   }, []);
 
+  useEffect(() => {
+    const handleVentureVideoUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ ventureId?: number; videoUrl?: string }>).detail;
+      const ventureId = Number(detail?.ventureId);
+      const videoUrl = detail?.videoUrl;
+      if (!ventureId || !videoUrl) return;
+
+      setSelectedVenture((prev: any) => {
+        if (!prev || Number(prev.id) !== ventureId) return prev;
+        return { ...prev, pitchVideoUrl: videoUrl };
+      });
+    };
+
+    window.addEventListener('venture-video-updated', handleVentureVideoUpdated as EventListener);
+    return () => {
+      window.removeEventListener('venture-video-updated', handleVentureVideoUpdated as EventListener);
+    };
+  }, []);
+
   const loadVentures = async () => {
     setLoading(true);
     try {

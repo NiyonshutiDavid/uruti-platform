@@ -25,10 +25,10 @@ import 'widgets/call_overlay_host.dart';
 //    Everything in the app reads from AppConstants.apiV1 which is set below.
 // ─────────────────────────────────────────────────────────────────────────────
 const String kBackendUrlOverride =
-  'http://173.249.25.80:1199'; // e.g. 'http://192.168.1.100:8000' or 'https://api.uruti.rw'
+    'http://173.249.25.80:1199'; // e.g. 'http://192.168.1.100:8000' or 'https://api.uruti.rw'
 
 // Optional fixed AI backend (chatbot) endpoint when core backend points elsewhere.
-const String kAiBackendUrlOverride = 'http://10.110.13.242:8020';
+const String kAiBackendUrlOverride = 'http://173.249.25.80:1199';
 
 // Default LAN host used only on physical devices in local development.
 const String kPhysicalDeviceBackendUrl = 'http://10.110.13.242:8010';
@@ -182,8 +182,8 @@ void main() async {
   final backendUrl = await _resolveReachableBackendUrl(resolvedBackendUrl);
   final aiBackendUrl = kAiBackendUrlFromEnv.trim().isNotEmpty
       ? kAiBackendUrlFromEnv.trim()
-    : (kAiBackendUrlOverride.trim().isNotEmpty
-      ? kAiBackendUrlOverride.trim()
+      : (kAiBackendUrlOverride.trim().isNotEmpty
+            ? kAiBackendUrlOverride.trim()
             : null);
   AppConstants.configure(backendUrl, aiBackendUrl: aiBackendUrl);
 

@@ -137,6 +137,14 @@ export function AdminModelPerformanceModule() {
                 {engine?.loaded ? 'yes' : 'no'}
               </Badge>
             </div>
+            {engine?.inference_mode && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Inference Mode:</span>
+                <Badge className={engine.inference_mode === 'gemini' ? 'bg-blue-600 text-white' : engine.inference_mode === 'gguf-service' ? 'bg-purple-600 text-white' : 'bg-gray-500 text-white'}>
+                  {engine.inference_mode}
+                </Badge>
+              </div>
+            )}
             <div>Repo: <span className="text-muted-foreground">{engine?.repo_id || 'n/a'}</span></div>
             <div>File: <span className="text-muted-foreground">{engine?.filename || 'n/a'}</span></div>
             <div>Local Path Exists: <span className="text-muted-foreground">{String(engine?.local_path_exists ?? false)}</span></div>
@@ -161,8 +169,8 @@ export function AdminModelPerformanceModule() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">Dedicated Chatbot:</span>
-              <Badge className={chatbotService?.reachable ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}>
-                {chatbotService?.reachable ? 'reachable' : 'unreachable'}
+              <Badge className={chatbotService?.reachable ? 'bg-green-600 text-white' : engine?.gemini_available ? 'bg-blue-600 text-white' : 'bg-red-600 text-white'}>
+                {chatbotService?.reachable ? 'reachable' : engine?.gemini_available ? 'gemini (co-located)' : 'unreachable'}
               </Badge>
             </div>
             <div>Configured URL: <span className="text-muted-foreground">{chatbotService?.configured_url || 'n/a'}</span></div>

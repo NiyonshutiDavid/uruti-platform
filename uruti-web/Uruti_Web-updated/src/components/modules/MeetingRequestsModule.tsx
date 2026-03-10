@@ -7,6 +7,7 @@ import { Check, X, Clock, Video, Phone, Calendar, ExternalLink } from 'lucide-re
 import { toast } from 'sonner';
 import { apiClient } from '../../lib/api-client';
 import { useAuth } from '../../lib/auth-context';
+import { formatLocalDateTime } from '../../lib/datetime';
 
 interface Meeting {
   id: number;
@@ -92,19 +93,14 @@ export function MeetingRequestsModule() {
   };
 
   const formatDateTime = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      return dateString;
-    }
+    return formatLocalDateTime(dateString, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }, dateString);
   };
 
   const getMeetingTypeIcon = (type: string) => {

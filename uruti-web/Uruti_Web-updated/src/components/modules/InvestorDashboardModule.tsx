@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConfirmDialog } from '../ui/confirm-dialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
@@ -34,6 +34,25 @@ export function InvestorDashboardModule() {
   // Load all data from backend
   useEffect(() => {
     loadAllData();
+  }, []);
+
+  useEffect(() => {
+    const handleVentureVideoUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ ventureId?: number; videoUrl?: string }>).detail;
+      const ventureId = Number(detail?.ventureId);
+      const videoUrl = detail?.videoUrl;
+      if (!ventureId || !videoUrl) return;
+
+      setSelectedVenture((prev: any) => {
+        if (!prev || Number(prev.id) !== ventureId) return prev;
+        return { ...prev, pitchVideoUrl: videoUrl };
+      });
+    };
+
+    window.addEventListener('venture-video-updated', handleVentureVideoUpdated as EventListener);
+    return () => {
+      window.removeEventListener('venture-video-updated', handleVentureVideoUpdated as EventListener);
+    };
   }, []);
 
   const loadAllData = async () => {
@@ -181,6 +200,9 @@ export function InvestorDashboardModule() {
     ? Math.round(ventures.reduce((acc, v) => acc + (v.uruti_score || 0), 0) / ventures.length)
     : 0;
 
+  const dealFlowCount = bookmarkedVentures.length;
+  const investmentReadyInDealFlow = bookmarkedVentures.filter(v => (v.uruti_score || 0) >= 85).length;
+
   const growthReadyCount = ventures.filter(v => (v.uruti_score || 0) >= 85).length;
   const highPotentialCount = ventures.filter(v => (v.uruti_score || 0) >= 70 && (v.uruti_score || 0) < 85).length;
   const emergingCount = ventures.filter(v => (v.uruti_score || 0) < 70).length;
@@ -249,11 +271,11 @@ export function InvestorDashboardModule() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl mb-1" style={{ fontFamily: 'var(--font-heading)' }}>{ventures.length}</div>
+            <div className="text-3xl mb-1" style={{ fontFamily: 'var(--font-heading)' }}>{dealFlowCount}</div>
             <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-              <span className="text-[#76B947]">+{growthReadyCount}</span> investment ready
+              <span className="text-[#76B947]">+{investmentReadyInDealFlow}</span> investment ready
             </p>
-            <Progress value={ventures.length > 0 ? (growthReadyCount / ventures.length) * 100 : 0} className="mt-3 h-2" />
+            <Progress value={dealFlowCount > 0 ? (investmentReadyInDealFlow / dealFlowCount) * 100 : 0} className="mt-3 h-2" />
           </CardContent>
         </Card>
 
@@ -383,7 +405,7 @@ export function InvestorDashboardModule() {
                           size="sm"
                           variant="ghost"
                           className="text-xs"
-                          onClick={(e) => {
+                          onClick={(e: MouseEvent<HTMLButtonElement>) => {
                             e.stopPropagation();
                             toggleBookmark(venture.id);
                           }}
@@ -569,7 +591,7 @@ export function InvestorDashboardModule() {
                 ))}
               </TabsList>
             </Tabs>
-            <Tabs value={viewType} onValueChange={(v) => setViewType(v as 'leaderboard' | 'grid')}>
+            <Tabs value={viewType} onValueChange={(v: string) => setViewType(v as 'leaderboard' | 'grid')}>
               <TabsList>
                 <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
                 <TabsTrigger value="grid">Grid</TabsTrigger>

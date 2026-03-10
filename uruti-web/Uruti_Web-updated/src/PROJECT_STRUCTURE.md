@@ -302,7 +302,7 @@ Venture cards with empty state handling
 ## 🎨 Design System Integration
 
 All components use:
-- **Typography**: `var(--font-heading)` (Inter Tight), `var(--font-body)` (Century Gothic)
+- **Typography**: `var(--font-heading)` (Inter Tight), `var(--font-body)` (Inter Tight)
 - **Colors**: `#76B947` (primary green), `#000000` (background)
 - **Effects**: Glassmorphism with `backdrop-blur`
 - **Theme**: Dark mode support throughout

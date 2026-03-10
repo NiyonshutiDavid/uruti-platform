@@ -76,8 +76,19 @@ def get_user_availability(
 
     for slot in slots:
         slot_date = week_start_date + timedelta(days=slot.day_of_week)
-        slot_start = datetime.combine(slot_date, _parse_hhmm(slot.start_time))
-        slot_end = datetime.combine(slot_date, _parse_hhmm(slot.end_time))
+        try:
+            slot_start_time = _parse_hhmm(slot.start_time)
+            slot_end_time = _parse_hhmm(slot.end_time)
+        except Exception:
+            # Ignore malformed legacy slots rather than failing the whole response.
+            continue
+
+        if slot_end_time <= slot_start_time:
+            # Ignore logically invalid slots (end before start).
+            continue
+
+        slot_start = datetime.combine(slot_date, slot_start_time)
+        slot_end = datetime.combine(slot_date, slot_end_time)
 
         is_booked = any(slot_start < meeting_end and slot_end > meeting_start for meeting_start, meeting_end in meeting_windows)
         if not is_booked:
@@ -94,8 +105,14 @@ def create_availability_slot(
 ):
     """Create a new availability slot"""
     
-    # Validate time
-    if slot_data.end_time <= slot_data.start_time:
+    # Validate time using parsed values (string compare can be wrong for non-zero-padded hours).
+    try:
+        start_time = _parse_hhmm(slot_data.start_time)
+        end_time = _parse_hhmm(slot_data.end_time)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM")
+
+    if end_time <= start_time:
         raise HTTPException(status_code=400, detail="End time must be after start time")
     
     # Create slot

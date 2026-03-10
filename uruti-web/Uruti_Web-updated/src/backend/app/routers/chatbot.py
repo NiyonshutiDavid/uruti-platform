@@ -1,7 +1,8 @@
-"""Uruti AI Modules router for running all AI models on a separate backend process."""
+"""Uruti AI Modules router dedicated to chatbot conversations."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 import urllib.request
@@ -23,15 +24,15 @@ from ..schemas import (
     AiChatSessionTitleUpdate,
 )
 from ..services.chatbot_engine import chatbot_engine
-from ..services.pitch_coach_engine import pitch_coach_engine
-from ..services.venture_scorer import venture_scorer
 from ..services.venture_context import build_venture_context
 
 router = APIRouter(prefix="/ai", tags=["uruti-ai-modules"])
 
 CHATBOT_MODEL_ID = "uruti-ai"
-ANALYSIS_MODEL_ID = "venture-mlop"
-PITCH_MODEL_ID = "pitch-coach-ai"
+GEMINI_MODEL_ID = "gemini"
+_CHATBOT_INFERENCE_SEMAPHORE = asyncio.Semaphore(1)
+_CHATBOT_QUEUE_TIMEOUT_SECONDS = 2.0
+_GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
 _SYSTEM_PROMPT = (
     "You are the Uruti AI Advisor - an expert startup advisor specialised in "
@@ -40,6 +41,20 @@ _SYSTEM_PROMPT = (
     "and building investor-ready businesses. Be concrete, practical, and cite "
     "Rwanda / African context where relevant."
 )
+
+
+def _compact_history(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    # Keep only recent turns and truncate message bodies to reduce inference time.
+    max_messages = max(1, int(settings.URUTI_CHATBOT_HISTORY_MESSAGES))
+    max_chars = max(300, int(settings.URUTI_CHATBOT_MAX_INPUT_CHARS))
+    recent = messages[-max_messages:]
+    return [
+        {
+            "role": str(item.get("role") or "user"),
+            "content": str(item.get("content") or "")[:max_chars],
+        }
+        for item in recent
+    ]
 
 
 def _probe_health(base_url: str) -> dict:
@@ -60,7 +75,10 @@ def _probe_health(base_url: str) -> dict:
 
     try:
         request = urllib.request.Request(health_url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(request, timeout=2.5) as response:
+        with urllib.request.urlopen(
+            request,
+            timeout=settings.CHATBOT_HEALTH_PROBE_TIMEOUT_SECONDS,
+        ) as response:
             body = response.read().decode("utf-8", errors="ignore")
             payload = json.loads(body) if body else None
             latency_ms = round((time.perf_counter() - start) * 1000, 2)
@@ -109,6 +127,105 @@ def _fallback_response(user_text: str, context: dict | None, history: list[dict]
     )
 
 
+def _build_gemini_prompt(user_text: str, context: dict | None, history: list[dict]) -> str:
+    history_lines: list[str] = []
+    for turn in history[-6:]:
+        role = str(turn.get("role") or "user").strip().lower()
+        content = str(turn.get("content") or "").strip()
+        if not content:
+            continue
+        speaker = "User" if role == "user" else "Assistant"
+        history_lines.append(f"{speaker}: {content}")
+
+    context_text = ""
+    if context:
+        context_text = (
+            "Startup context:\n"
+            f"- Name: {context.get('name', '')}\n"
+            f"- Stage: {context.get('stage', '')}\n"
+            f"- Industry: {context.get('industry', '')}\n"
+            f"- Problem: {context.get('problem_statement', '')}\n"
+            f"- Solution: {context.get('solution', '')}\n"
+            f"- Target market: {context.get('target_market', '')}\n"
+            f"- Business model: {context.get('business_model', '')}\n"
+        )
+
+    history_text = "\n".join(history_lines)
+    return (
+        f"{_SYSTEM_PROMPT}\n\n"
+        "Respond with concise, practical startup advice and clear next steps. "
+        "Prioritize East African market realities when relevant.\n\n"
+        f"{context_text}\n"
+        f"Conversation so far:\n{history_text}\n\n"
+        f"User: {user_text}\n"
+    )
+
+
+def _extract_gemini_text(payload: dict) -> str:
+    candidates = payload.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        return ""
+    first = candidates[0] if isinstance(candidates[0], dict) else {}
+    content = first.get("content") if isinstance(first, dict) else {}
+    parts = content.get("parts") if isinstance(content, dict) else None
+    if not isinstance(parts, list):
+        return ""
+    chunks: list[str] = []
+    for part in parts:
+        if isinstance(part, dict):
+            text = part.get("text")
+            if isinstance(text, str) and text.strip():
+                chunks.append(text.strip())
+    return "\n".join(chunks).strip()
+
+
+def _gemini_response(user_text: str, context: dict | None, history: list[dict]) -> tuple[str | None, str | None]:
+    api_key = (settings.GEMINI_API_KEY or "").strip()
+    if not api_key:
+        return None, "GEMINI_API_KEY not configured"
+
+    model = (settings.GEMINI_MODEL or "gemini-1.5-flash").strip() or "gemini-1.5-flash"
+    prompt = _build_gemini_prompt(user_text, context, history)
+    sdk_error: str | None = None
+    try:
+        from google import genai  # type: ignore
+
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(model=model, contents=prompt)
+        text = str(getattr(response, "text", "") or "").strip()
+        if text:
+            return text, None
+        sdk_error = "Gemini SDK returned an empty response"
+    except Exception as exc:
+        sdk_error = f"Gemini SDK error: {exc}"
+
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+    }
+    url = f"{_GEMINI_API_BASE}/{model}:generateContent?key={api_key}"
+    try:
+        request = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(
+            request,
+            timeout=max(3.0, float(settings.GEMINI_TIMEOUT_SECONDS)),
+        ) as response:
+            raw = response.read().decode("utf-8", errors="ignore")
+            body = json.loads(raw) if raw else {}
+            text = _extract_gemini_text(body)
+            if text:
+                return text, None
+            return None, sdk_error or "Gemini returned an empty response"
+    except Exception as exc:
+        if sdk_error:
+            return None, f"{sdk_error}; REST fallback error: {exc}"
+        return None, str(exc)
+
+
 @router.get("/models")
 async def get_chatbot_models(
     current_user: User = Depends(get_current_user),
@@ -117,22 +234,24 @@ async def get_chatbot_models(
     if role not in {"founder", "investor", "admin"}:
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
-    analysis_name = "Uruti-Investor_Intelligence_and_Ranker"
-    try:
-        model_info = venture_scorer.get_model_info()
-        analysis_name = str(model_info.get("model_folder") or model_info.get("model_name") or analysis_name)
-    except Exception:
-        pass
-
     chatbot_status = chatbot_engine.status()
-    pitch_status = pitch_coach_engine.status()
+    gemini_available = bool((settings.GEMINI_API_KEY or "").strip())
     chatbot_available = bool(chatbot_status.get("loaded"))
     chatbot_initializing = bool(chatbot_status.get("startup_init_started")) and not bool(chatbot_status.get("startup_init_completed"))
 
-    pitch_available = bool(pitch_status.get("loaded")) and pitch_status.get("backend") != "fallback"
-    pitch_initializing = bool(pitch_status.get("startup_init_started")) and not bool(pitch_status.get("startup_init_completed"))
-
     return [
+        {
+            "id": GEMINI_MODEL_ID,
+            "name": "Gemini",
+            "description": "Fast cloud chatbot responses via Google Gemini",
+            "type": "chatbot",
+            "requires_venture_context": False,
+            "fixed_prompt": None,
+            "is_default": True,
+            "available": gemini_available,
+            "status": "online" if gemini_available else "offline",
+            "offline_reason": None if gemini_available else "GEMINI_API_KEY is not configured",
+        },
         {
             "id": CHATBOT_MODEL_ID,
             "name": "Uruti AI Modules - Chatbot",
@@ -140,34 +259,11 @@ async def get_chatbot_models(
             "type": "chatbot",
             "requires_venture_context": False,
             "fixed_prompt": None,
-            "is_default": True,
+            "is_default": False,
             "available": chatbot_available,
             "status": "initializing" if chatbot_initializing else ("online" if chatbot_available else "offline"),
             "offline_reason": chatbot_status.get("load_error"),
         },
-        {
-            "id": ANALYSIS_MODEL_ID,
-            "name": analysis_name,
-            "description": "Analyze ventures with required venture context",
-            "type": "analysis",
-            "requires_venture_context": True,
-            "fixed_prompt": "analyse my venture",
-            "is_default": False,
-            "available": True,
-            "status": "online",
-        },
-        {
-            "id": PITCH_MODEL_ID,
-            "name": "Uruti AI Modules - Pitch Coach",
-            "description": "Pitch coaching tips powered by Uruti models",
-            "type": "coach",
-            "requires_venture_context": False,
-            "fixed_prompt": None,
-            "is_default": False,
-            "available": pitch_available,
-            "status": "initializing" if pitch_initializing else ("online" if pitch_available else "offline"),
-            "offline_reason": pitch_status.get("load_error") or ("Pitch coach fallback mode" if pitch_status.get("backend") == "fallback" else None),
-        }
     ]
 
 
@@ -181,7 +277,7 @@ async def chat(
     available_models = await get_chatbot_models(current_user)
     available_ids = {m["id"] for m in available_models}
     model_map = {m["id"]: m for m in available_models}
-    model = payload.model if payload.model in available_ids else CHATBOT_MODEL_ID
+    model = payload.model if payload.model in available_ids else GEMINI_MODEL_ID
 
     selected_model = model_map.get(model, {})
     if selected_model and not selected_model.get("available", True):
@@ -234,7 +330,9 @@ async def chat(
 
     user_content = payload.message
     if payload.file_content:
-        user_content += f"\n\n[Attached file - {payload.file_name or 'file'}]:\n{payload.file_content[:4000]}"
+        file_excerpt = payload.file_content[: settings.URUTI_CHATBOT_MAX_INPUT_CHARS]
+        user_content += f"\n\n[Attached file - {payload.file_name or 'file'}]:\n{file_excerpt}"
+    user_content = user_content[: settings.URUTI_CHATBOT_MAX_INPUT_CHARS]
 
     prev = (
         db.query(AiChatMessage)
@@ -245,7 +343,7 @@ async def chat(
         .order_by(AiChatMessage.created_at)
         .all()
     )
-    history = [{"role": m.role, "content": m.content} for m in prev]
+    history = _compact_history([{"role": m.role, "content": m.content} for m in prev])
 
     meta = (
         db.query(AiChatSession)
@@ -280,50 +378,81 @@ async def chat(
     inference_backend = "unknown"
     inference_error = None
 
-    if model == ANALYSIS_MODEL_ID:
-        if user_role not in {"founder", "investor"}:
-            raise HTTPException(status_code=403, detail="Analysis model is only available for founders and investors")
-
-        normalized = (payload.message or "").strip().lower()
-        if normalized not in {"analyse my venture", "analyze my venture"}:
-            raise HTTPException(status_code=400, detail="Analysis model only accepts: analyse my venture")
-
-        venture_id = payload.startup_context.venture_id if payload.startup_context else None
-        if not venture_id:
-            raise HTTPException(status_code=400, detail="Analysis model requires venture context with venture_id")
-
-        venture = authorized_venture or db.query(Venture).filter(Venture.id == venture_id).first()
-        if not venture:
-            raise HTTPException(status_code=404, detail="Venture not found")
-
-        analysis = venture_scorer.score_venture(venture)
-        score = float(analysis.get("uruti_score") or 0.0)
-        predicted_class = str(analysis.get("predicted_class") or "unknown")
-
-        ai_text = (
-            f"Venture Analysis - {venture.name}\n\n"
-            f"Uruti Score: {round(score, 2)}/100\n"
-            f"Readiness Class: {predicted_class}\n"
-            f"Summary: This score is generated by the {analysis.get('model_name', 'Uruti-Investor_Intelligence_and_Ranker')} ranking model."
+    if model == GEMINI_MODEL_ID:
+        ai_text, gemini_error = await asyncio.to_thread(
+            _gemini_response,
+            payload.message,
+            ctx,
+            history + [{"role": "user", "content": user_content}],
         )
-        inference_backend = "venture-ranker"
-    elif model == PITCH_MODEL_ID:
-        tips = pitch_coach_engine.generate_feedback(payload.message)
-        pitch_status = pitch_coach_engine.status()
-        ai_text = "Pitch Coach Feedback\n\n" + "\n".join([f"- {tip}" for tip in tips])
-        inference_backend = str(pitch_status.get("backend") or "pitch-coach")
-        fallback_used = not bool(pitch_status.get("loaded"))
-        if pitch_status.get("load_error"):
-            inference_error = str(pitch_status.get("load_error"))
-    else:
-        try:
-            ai_text = chatbot_engine.chat(_SYSTEM_PROMPT + ctx_text, history + [{"role": "user", "content": user_content}])
-            inference_backend = "llama-cpp"
-        except Exception as exc:
+        if ai_text:
+            inference_backend = "gemini"
+        else:
             ai_text = _fallback_response(payload.message, ctx, history)
             fallback_used = True
             inference_backend = "rule-fallback"
-            inference_error = str(exc)
+            inference_error = gemini_error
+    else:
+        acquired = False
+        try:
+            await asyncio.wait_for(
+                _CHATBOT_INFERENCE_SEMAPHORE.acquire(),
+                timeout=_CHATBOT_QUEUE_TIMEOUT_SECONDS,
+            )
+            acquired = True
+            ai_text = await asyncio.wait_for(
+                asyncio.to_thread(
+                    chatbot_engine.chat,
+                    _SYSTEM_PROMPT + ctx_text,
+                    history + [{"role": "user", "content": user_content}],
+                ),
+                timeout=settings.URUTI_CHATBOT_LOCAL_TIMEOUT_SECONDS,
+            )
+            inference_backend = "llama-cpp"
+        except asyncio.TimeoutError as exc:
+            gemini_text, gemini_error = await asyncio.to_thread(
+                _gemini_response,
+                payload.message,
+                ctx,
+                history + [{"role": "user", "content": user_content}],
+            )
+            if gemini_text:
+                ai_text = gemini_text
+                fallback_used = True
+                inference_backend = "gemini-fallback"
+                inference_error = None
+            else:
+                ai_text = _fallback_response(payload.message, ctx, history)
+                fallback_used = True
+                inference_backend = "rule-fallback"
+                if not acquired:
+                    inference_error = gemini_error or (
+                        f"chatbot busy: queued more than {_CHATBOT_QUEUE_TIMEOUT_SECONDS}s"
+                    )
+                else:
+                    inference_error = gemini_error or (
+                        f"chatbot timeout after {settings.URUTI_CHATBOT_LOCAL_TIMEOUT_SECONDS}s"
+                    )
+        except Exception as exc:
+            gemini_text, gemini_error = await asyncio.to_thread(
+                _gemini_response,
+                payload.message,
+                ctx,
+                history + [{"role": "user", "content": user_content}],
+            )
+            if gemini_text:
+                ai_text = gemini_text
+                fallback_used = True
+                inference_backend = "gemini-fallback"
+                inference_error = None
+            else:
+                ai_text = _fallback_response(payload.message, ctx, history)
+                fallback_used = True
+                inference_backend = "rule-fallback"
+                inference_error = gemini_error or str(exc)
+        finally:
+            if acquired:
+                _CHATBOT_INFERENCE_SEMAPHORE.release()
 
     if not ai_text:
         ai_text = "I'm sorry, I couldn't generate a response. Please try again."
@@ -496,10 +625,6 @@ async def get_chatbot_runtime_status(
     return {
         "chatbot_model_id": CHATBOT_MODEL_ID,
         "chatbot_engine": chatbot_engine.status(),
-        "analysis_model_id": ANALYSIS_MODEL_ID,
-        "analysis_engine": venture_scorer.get_model_info(),
-        "pitch_model_id": PITCH_MODEL_ID,
-        "pitch_coach_engine": pitch_coach_engine.status(),
         "service": "uruti-ai-modules",
         "core_service": {
             "service": "core-backend",

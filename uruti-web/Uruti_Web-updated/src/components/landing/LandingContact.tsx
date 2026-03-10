@@ -24,6 +24,7 @@ import { LandingHeader } from './LandingHeader';
 import { LandingFooter } from './LandingFooter';
 import { LiveChatWidget } from '../LiveChatWidget';
 import { useSupport } from '../../lib/support-context';
+import { formatLocalTime } from '../../lib/datetime';
 import { ScrollArea } from '../ui/scroll-area';
 import {
   Select,
@@ -692,7 +693,7 @@ export function LandingContact({ onNavigate }: LandingContactProps) {
                                   {msg.text}
                                 </p>
                                 <p className="text-xs opacity-70 mt-1" style={{ fontFamily: 'var(--font-body)' }}>
-                                  {new Date(msg.timestamp).toLocaleTimeString()}
+                                  {formatLocalTime(msg.timestamp)}
                                 </p>
                                 {msg.hasButton && (
                                   <Button

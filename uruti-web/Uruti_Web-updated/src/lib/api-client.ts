@@ -790,6 +790,35 @@ class ApiClient {
     });
   }
 
+  async getPitchLiveFeedback(data: {
+    venture_id: number;
+    pitch_type: string;
+    duration_seconds: number;
+    target_duration_seconds: number;
+    current_slide: number;
+    total_slides: number;
+    slide_transitions: Array<{ slide: number; atSecond: number }>;
+    transcript?: string;
+  }) {
+    return this.request<{
+      tips: string[];
+      metrics: {
+        pacing: number;
+        clarity: number;
+        confidence: number;
+        engagement: number;
+        structure: number;
+      };
+      model_backend?: string;
+      model_loaded?: boolean;
+      model_error?: string | null;
+    }>('/api/v1/pitch/live-feedback', {
+      method: 'POST',
+      requiresAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
   async deletePitchAnalysis(sessionId: string | number) {
     return this.request<void>(`/api/v1/pitch/analyses/${sessionId}`, {
       method: 'DELETE',
@@ -1300,13 +1329,15 @@ class ApiClient {
   }
 
   async getAiModels() {
-    return this.requestAgainstBase<any[]>(this.chatbotBaseUrl, '/api/v1/ai/models', {
+    // /api/v1/ai/models is in ai.py registered on the core backend, not the chatbot service.
+    return this.request<any[]>('/api/v1/ai/models', {
       requiresAuth: true,
     });
   }
 
   async getAdminAiRuntimeStatus() {
-    return this.requestAgainstBase<any>(this.chatbotBaseUrl, '/api/v1/ai/admin/runtime-status', {
+    // /api/v1/ai/admin/runtime-status is in ai.py on the core backend.
+    return this.request<any>('/api/v1/ai/admin/runtime-status', {
       requiresAuth: true,
     });
   }

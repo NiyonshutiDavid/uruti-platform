@@ -18,7 +18,6 @@ from ..schemas import (
 from ..auth import get_current_user
 from ..config import settings
 from ..services.venture_scorer import venture_scorer
-from ..services.chatbot_engine import chatbot_engine
 from ..services.pitch_coach_engine import pitch_coach_engine
 from ..services.venture_context import build_venture_context
 
@@ -26,8 +25,9 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 
 # ─── Available models ────────────────────────────────────────────────────────
 ANALYSIS_MODEL_ID = "venture-mlop"
-CHATBOT_MODEL_ID = settings.URUTI_BEST_MODEL_ID
+GEMINI_MODEL_ID = "gemini"
 PITCH_MODEL_ID = "pitch-coach-ai"
+_GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
 def _probe_chatbot_service(base_url: str) -> dict:
@@ -47,7 +47,10 @@ def _probe_chatbot_service(base_url: str) -> dict:
 
     try:
         request = urllib.request.Request(health_url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(request, timeout=2.5) as response:
+        with urllib.request.urlopen(
+            request,
+            timeout=settings.CHATBOT_HEALTH_PROBE_TIMEOUT_SECONDS,
+        ) as response:
             raw = response.read().decode("utf-8", errors="ignore")
             payload = json.loads(raw) if raw else None
             latency_ms = round((time.perf_counter() - start) * 1000, 2)
@@ -82,9 +85,9 @@ def _available_models() -> list[dict]:
 
     models = [
         {
-            "id": CHATBOT_MODEL_ID,
-            "name": "Uruti Chatbot",
-            "description": "General startup guidance and advisory conversations",
+            "id": GEMINI_MODEL_ID,
+            "name": "Gemini",
+            "description": "Fast cloud chatbot responses via Google Gemini",
             "type": "chatbot",
             "requires_venture_context": False,
             "fixed_prompt": None,
@@ -99,15 +102,6 @@ def _available_models() -> list[dict]:
             "fixed_prompt": "analyse my venture",
             "is_default": False,
         },
-        {
-            "id": PITCH_MODEL_ID,
-            "name": "Uruti Pitch Coach",
-            "description": "Pitch coaching tips powered by Uruti pitch models",
-            "type": "coach",
-            "requires_venture_context": False,
-            "fixed_prompt": None,
-            "is_default": False,
-        },
     ]
     return models
 
@@ -120,6 +114,20 @@ _SYSTEM_PROMPT = (
     "and building investor-ready businesses. Be concrete, practical, and cite "
     "Rwanda / African context where relevant."
 )
+
+
+def _compact_history(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    # Keep only recent turns and truncate message bodies to reduce inference time.
+    max_messages = max(1, int(settings.URUTI_CHATBOT_HISTORY_MESSAGES))
+    max_chars = max(300, int(settings.URUTI_CHATBOT_MAX_INPUT_CHARS))
+    recent = messages[-max_messages:]
+    return [
+        {
+            "role": str(item.get("role") or "user"),
+            "content": str(item.get("content") or "")[:max_chars],
+        }
+        for item in recent
+    ]
 
 def _fallback_response(user_text: str, context: dict | None, history: list[dict]) -> str:
     """Rule-based fallback when primary chatbot runtime is unavailable."""
@@ -240,6 +248,105 @@ def _fallback_response(user_text: str, context: dict | None, history: list[dict]
     )
 
 
+def _build_gemini_prompt(user_text: str, context: dict | None, history: list[dict]) -> str:
+    history_lines: list[str] = []
+    for turn in history[-6:]:
+        role = str(turn.get("role") or "user").strip().lower()
+        content = str(turn.get("content") or "").strip()
+        if not content:
+            continue
+        speaker = "User" if role == "user" else "Assistant"
+        history_lines.append(f"{speaker}: {content}")
+
+    context_text = ""
+    if context:
+        context_text = (
+            "Startup context:\n"
+            f"- Name: {context.get('name', '')}\n"
+            f"- Stage: {context.get('stage', '')}\n"
+            f"- Industry: {context.get('industry', '')}\n"
+            f"- Problem: {context.get('problem_statement', '')}\n"
+            f"- Solution: {context.get('solution', '')}\n"
+            f"- Target market: {context.get('target_market', '')}\n"
+            f"- Business model: {context.get('business_model', '')}\n"
+        )
+
+    history_text = "\n".join(history_lines)
+    return (
+        f"{_SYSTEM_PROMPT}\n\n"
+        "Respond with concise, practical startup advice and clear next steps. "
+        "Prioritize East African market realities when relevant.\n\n"
+        f"{context_text}\n"
+        f"Conversation so far:\n{history_text}\n\n"
+        f"User: {user_text}\n"
+    )
+
+
+def _extract_gemini_text(payload: dict) -> str:
+    candidates = payload.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        return ""
+    first = candidates[0] if isinstance(candidates[0], dict) else {}
+    content = first.get("content") if isinstance(first, dict) else {}
+    parts = content.get("parts") if isinstance(content, dict) else None
+    if not isinstance(parts, list):
+        return ""
+    chunks: list[str] = []
+    for part in parts:
+        if isinstance(part, dict):
+            text = part.get("text")
+            if isinstance(text, str) and text.strip():
+                chunks.append(text.strip())
+    return "\n".join(chunks).strip()
+
+
+def _gemini_fallback_response(user_text: str, context: dict | None, history: list[dict]) -> tuple[str | None, str | None]:
+    api_key = (settings.GEMINI_API_KEY or "").strip()
+    if not api_key:
+        return None, "GEMINI_API_KEY not configured"
+
+    model = (settings.GEMINI_MODEL or "gemini-1.5-flash").strip() or "gemini-1.5-flash"
+    prompt = _build_gemini_prompt(user_text, context, history)
+    sdk_error: str | None = None
+    try:
+        from google import genai  # type: ignore
+
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(model=model, contents=prompt)
+        text = str(getattr(response, "text", "") or "").strip()
+        if text:
+            return text, None
+        sdk_error = "Gemini SDK returned an empty response"
+    except Exception as exc:
+        sdk_error = f"Gemini SDK error: {exc}"
+
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+    }
+    url = f"{_GEMINI_API_BASE}/{model}:generateContent?key={api_key}"
+    try:
+        request = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(
+            request,
+            timeout=max(3.0, float(settings.GEMINI_TIMEOUT_SECONDS)),
+        ) as response:
+            raw = response.read().decode("utf-8", errors="ignore")
+            body = json.loads(raw) if raw else {}
+            text = _extract_gemini_text(body)
+            if text:
+                return text, None
+            return None, sdk_error or "Gemini returned an empty response"
+    except Exception as exc:
+        if sdk_error:
+            return None, f"{sdk_error}; REST fallback error: {exc}"
+        return None, str(exc)
+
+
 # ─── Routes ──────────────────────────────────────────────────────────────────
 
 @router.post("/chat", response_model=AiChatResponse)
@@ -251,7 +358,7 @@ async def chat(
     """Send a message to the AI Advisor. Persists history."""
     session_id = payload.session_id or str(uuid.uuid4())
     available_ids = {m["id"] for m in _available_models()}
-    model = payload.model if payload.model in available_ids else CHATBOT_MODEL_ID
+    model = payload.model if payload.model in available_ids else GEMINI_MODEL_ID
 
     user_role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
 
@@ -308,7 +415,9 @@ async def chat(
     # Build user message (include file content if present)
     user_content = payload.message
     if payload.file_content:
-        user_content += f"\n\n[Attached file — {payload.file_name or 'file'}]:\n{payload.file_content[:4000]}"
+        file_excerpt = payload.file_content[: settings.URUTI_CHATBOT_MAX_INPUT_CHARS]
+        user_content += f"\n\n[Attached file — {payload.file_name or 'file'}]:\n{file_excerpt}"
+    user_content = user_content[: settings.URUTI_CHATBOT_MAX_INPUT_CHARS]
 
     # Retrieve previous messages in this session for context
     prev = (
@@ -320,7 +429,7 @@ async def chat(
         .order_by(AiChatMessage.created_at)
         .all()
     )
-    history = [{"role": m.role, "content": m.content} for m in prev]
+    history = _compact_history([{"role": m.role, "content": m.content} for m in prev])
 
     # Save user message
     user_msg = AiChatMessage(
@@ -383,17 +492,26 @@ async def chat(
         fallback_used = not bool(pitch_status.get("loaded"))
         if pitch_status.get("load_error"):
             inference_error = str(pitch_status.get("load_error"))
-    else:
-        llama_messages = history + [{"role": "user", "content": user_content}]
-        try:
-            ai_text = chatbot_engine.chat(_SYSTEM_PROMPT + ctx_text, llama_messages)
-            inference_backend = "llama-cpp"
-        except Exception as exc:
+    elif model == GEMINI_MODEL_ID:
+        ai_text, gemini_error = await asyncio.to_thread(
+            _gemini_fallback_response,
+            payload.message,
+            ctx,
+            history + [{"role": "user", "content": user_content}],
+        )
+        if ai_text:
+            inference_backend = "gemini"
+        else:
             ai_text = _fallback_response(payload.message, ctx, history)
             fallback_used = True
             inference_backend = "rule-fallback"
-            inference_error = str(exc)
-        resolved_model = CHATBOT_MODEL_ID
+            inference_error = gemini_error
+        resolved_model = GEMINI_MODEL_ID
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Selected model is not supported by core backend. Use Gemini, venture ranker, or pitch coach.",
+        )
 
     if not ai_text:
         ai_text = "I'm sorry, I couldn't generate a response. Please try again."
@@ -424,19 +542,56 @@ async def chat(
 async def get_admin_runtime_status(
     current_user: User = Depends(get_current_user),
 ):
-    """Return chatbot runtime status for admin diagnostics."""
+    """Return AI runtime status for admin diagnostics."""
 
     role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
     if role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
 
     chatbot_service = await asyncio.to_thread(_probe_chatbot_service, settings.CHATBOT_SERVICE_URL)
+    analysis_info = venture_scorer.get_model_info()
+    pitch_info = pitch_coach_engine.status()
+
+    gemini_key_present = bool((settings.GEMINI_API_KEY or "").strip())
+    hf_token_present = bool(
+        (settings.HF_TOKEN or settings.HUGGINGFACE_TOKEN or settings.HUGGINGFACE_API_TOKEN or "").strip()
+    )
+    chatbot_reachable = chatbot_service.get("reachable", False)
+
+    # Determine effective inference mode for chatbot features.
+    if gemini_key_present:
+        inference_mode = "gemini"
+    elif chatbot_reachable:
+        inference_mode = "gguf-service"
+    else:
+        inference_mode = "rule-based-fallback"
+
+    # Build chatbot_engine status compatible with what the admin dashboard reads.
+    chatbot_engine_status = {
+        "loaded": gemini_key_present or chatbot_reachable,
+        "repo_id": settings.URUTI_CHATBOT_REPO_ID or "n/a",
+        "filename": settings.URUTI_CHATBOT_GGUF_FILENAME or "n/a",
+        "local_path_exists": False,
+        "hf_token_configured": hf_token_present,
+        "gemini_available": gemini_key_present,
+        "inference_mode": inference_mode,
+        "load_error": (
+            None if (gemini_key_present or chatbot_reachable)
+            else "Gemini API key not set and dedicated GGUF service is unreachable"
+        ),
+    }
 
     return {
-        "chatbot_model_id": CHATBOT_MODEL_ID,
-        "chatbot_engine": chatbot_engine.status(),
+        # Keys the admin frontend reads for 'Uruti AI Modules Status' card.
+        "chatbot_model_id": settings.URUTI_BEST_MODEL_ID or "uruti-ai",
+        "chatbot_engine": chatbot_engine_status,
+        # Full-detail analysis/ranker engine info.
+        "analysis_model_id": ANALYSIS_MODEL_ID,
+        "analysis_engine": analysis_info,
+        # Pitch coach engine.
         "pitch_model_id": PITCH_MODEL_ID,
-        "pitch_coach_engine": pitch_coach_engine.status(),
+        "pitch_coach_engine": pitch_info,
+        # Service health.
         "core_service": {
             "service": "core-backend",
             "status": "healthy",

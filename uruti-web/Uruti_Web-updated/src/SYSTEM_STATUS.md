@@ -241,7 +241,7 @@ uruti-digital-ecosystem/
 
 ### Typography
 - ✅ Headings: **Inter Tight** (via `--font-heading`)
-- ✅ Body: **Century Gothic** (via `--font-body`)
+- ✅ Body: **Inter Tight** (via `--font-body`)
 
 ### UI Components
 - ✅ 41 shadcn/ui components installed and configured

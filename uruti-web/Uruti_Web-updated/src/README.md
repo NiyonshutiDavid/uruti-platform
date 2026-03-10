@@ -462,7 +462,7 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
 
 ### Typography
 - **Headings**: Inter Tight (font-heading)
-- **Body**: Century Gothic (font-body)
+- **Body**: Inter Tight (font-body)
 
 ### Liquidglass Aesthetic
 - Translucent panels with backdrop blur
@@ -475,7 +475,7 @@ Uses CSS variables and modern tokens:
 ```css
 @import "tailwindcss";
 --font-heading: 'Inter Tight', sans-serif;
---font-body: 'Century Gothic', sans-serif;
+--font-body: 'Inter Tight', sans-serif;
 ```
 
 ## 🔧 Troubleshooting

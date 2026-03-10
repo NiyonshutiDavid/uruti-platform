@@ -93,40 +93,32 @@ export function AdminDashboardModule() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // Fetch users
-      const usersData = await apiClient.getUsers(0, 1000);
-      setUsers(usersData);
+      const [usersResult, venturesResult, supportResult] = await Promise.allSettled([
+        apiClient.getUsers(0, 1000),
+        apiClient.getVentures(0, 1000),
+        apiClient.getSupportMessages(0, 100),
+      ]);
 
-      // Fetch ventures
-      const venturesData = await apiClient.getVentures(0, 1000);
+      const usersData = usersResult.status === 'fulfilled' ? usersResult.value : [];
+      const venturesData = venturesResult.status === 'fulfilled' ? venturesResult.value : [];
+
+      if (usersResult.status === 'rejected') {
+        console.error('Failed to load users:', usersResult.reason);
+      }
+      if (venturesResult.status === 'rejected') {
+        console.error('Failed to load ventures:', venturesResult.reason);
+      }
+
+      setUsers(usersData);
       setVentures(venturesData);
 
-      // Fetch support messages
-      try {
-        const supportData = await apiClient.getSupportMessages(0, 100);
-        setSupportMessages(supportData);
-      } catch (error) {
+      if (supportResult.status === 'fulfilled') {
+        setSupportMessages(supportResult.value);
+      } else {
         console.log('Support messages not yet available');
         setSupportMessages([]);
       }
 
-      try {
-        const modelData = await apiClient.getAdminModelPerformance();
-        setModelPerformance(modelData);
-      } catch (error) {
-        console.log('Model performance metrics not available');
-        setModelPerformance(null);
-      }
-
-      try {
-        const models = await apiClient.getAiModels();
-        setAiModels(Array.isArray(models) ? models : []);
-      } catch (error) {
-        console.log('AI model list not available');
-        setAiModels([]);
-      }
-
-      // Calculate stats
       const founders = usersData.filter((u: any) => u.role === 'founder').length;
       const investors = usersData.filter((u: any) => u.role === 'investor').length;
 
@@ -135,13 +127,36 @@ export function AdminDashboardModule() {
         totalFounders: founders,
         totalInvestors: investors,
         totalVentures: venturesData.length,
-        totalMessages: 0, // To be implemented with messages endpoint
-        totalAIPrompts: 0, // To be tracked
-        totalUploads: 0, // To be tracked
+        totalMessages: 0,
+        totalAIPrompts: 0,
+        totalUploads: 0,
       });
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      toast.error('Failed to load dashboard data');
+
+      if (usersResult.status === 'rejected' && venturesResult.status === 'rejected') {
+        toast.error('Failed to load dashboard core data');
+      }
+
+      // Load model-specific data in the background so dashboard core data never blocks on AI services.
+      void (async () => {
+        const [modelPerfResult, modelsResult] = await Promise.allSettled([
+          apiClient.getAdminModelPerformance(),
+          apiClient.getAiModels(),
+        ]);
+
+        if (modelPerfResult.status === 'fulfilled') {
+          setModelPerformance(modelPerfResult.value);
+        } else {
+          console.log('Model performance metrics not available');
+          setModelPerformance(null);
+        }
+
+        if (modelsResult.status === 'fulfilled') {
+          setAiModels(Array.isArray(modelsResult.value) ? modelsResult.value : []);
+        } else {
+          console.log('AI model list not available');
+          setAiModels([]);
+        }
+      })();
     } finally {
       setLoading(false);
     }

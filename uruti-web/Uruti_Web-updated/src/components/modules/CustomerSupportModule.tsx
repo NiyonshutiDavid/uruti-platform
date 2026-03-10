@@ -5,6 +5,7 @@ import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { useSupport } from '../../lib/support-context';
+import { formatLocalDateTime, toEpochMs } from '../../lib/datetime';
 import { MessageSquare, Send, CheckCircle, XCircle, Clock, Search, Mail, User } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 
@@ -26,9 +27,9 @@ export function CustomerSupportModule() {
     }>();
 
     const sortedDesc = [...messages].sort((a, b) => {
-      const bTime = new Date(b.created_at || 0).getTime();
-      const aTime = new Date(a.created_at || 0).getTime();
-      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+      const bTime = toEpochMs(b.created_at);
+      const aTime = toEpochMs(a.created_at);
+      return bTime - aTime;
     });
 
     for (const msg of sortedDesc) {
@@ -48,18 +49,18 @@ export function CustomerSupportModule() {
       const thread = byVisitor.get(key)!;
       thread.messages.push(msg);
       if (msg.status === 'pending') thread.pendingCount += 1;
-      const msgTime = new Date(msg.created_at || 0).getTime();
-      const latestTime = new Date(thread.latestAt || 0).getTime();
-      if ((Number.isFinite(msgTime) ? msgTime : 0) > (Number.isFinite(latestTime) ? latestTime : 0)) {
+      const msgTime = toEpochMs(msg.created_at);
+      const latestTime = toEpochMs(thread.latestAt);
+      if (msgTime > latestTime) {
         thread.latestAt = msg.created_at || thread.latestAt;
       }
     }
 
     const built = Array.from(byVisitor.values()).map((thread) => {
       const ordered = [...thread.messages].sort((a, b) => {
-        const aTime = new Date(a.created_at || 0).getTime();
-        const bTime = new Date(b.created_at || 0).getTime();
-        return (Number.isFinite(aTime) ? aTime : 0) - (Number.isFinite(bTime) ? bTime : 0);
+        const aTime = toEpochMs(a.created_at);
+        const bTime = toEpochMs(b.created_at);
+        return aTime - bTime;
       });
 
       const status: 'pending' | 'responded' | 'closed' =
@@ -77,9 +78,9 @@ export function CustomerSupportModule() {
     });
 
     return built.sort((a, b) => {
-      const bTime = new Date(b.latestAt || 0).getTime();
-      const aTime = new Date(a.latestAt || 0).getTime();
-      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+      const bTime = toEpochMs(b.latestAt);
+      const aTime = toEpochMs(a.latestAt);
+      return bTime - aTime;
     });
   }, [messages]);
 
@@ -360,7 +361,7 @@ export function CustomerSupportModule() {
                       </p>
                       <div className="flex items-center justify-between mt-2">
                         <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                          {latest ? new Date(latest.created_at).toLocaleString() : ''}
+                          {latest ? formatLocalDateTime(latest.created_at) : ''}
                         </p>
                         {thread.pendingCount > 0 && (
                           <Badge className="bg-orange-500 text-white">{thread.pendingCount} pending</Badge>
@@ -422,7 +423,7 @@ export function CustomerSupportModule() {
                         Last Message
                       </p>
                       <p className="font-semibold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                        {new Date(selectedThread.latestAt).toLocaleString()}
+                        {formatLocalDateTime(selectedThread.latestAt)}
                       </p>
                     </div>
                   </div>
@@ -440,14 +441,14 @@ export function CustomerSupportModule() {
                           <div className="flex justify-start">
                             <div className="max-w-[85%] rounded-lg p-3 bg-gray-100 dark:bg-gray-800 border border-black/5 dark:border-white/10">
                               <p className="text-sm dark:text-white whitespace-pre-wrap" style={{ fontFamily: 'var(--font-body)' }}>{msg.message}</p>
-                              <p className="text-xs text-muted-foreground mt-1">Visitor • {new Date(msg.created_at).toLocaleString()}</p>
+                              <p className="text-xs text-muted-foreground mt-1">Visitor • {formatLocalDateTime(msg.created_at)}</p>
                             </div>
                           </div>
                           {msg.response && (
                             <div className="flex justify-end">
                               <div className="max-w-[85%] rounded-lg p-3 bg-[#76B947]/10 border border-[#76B947]/20">
                                 <p className="text-sm dark:text-white whitespace-pre-wrap" style={{ fontFamily: 'var(--font-body)' }}>{msg.response}</p>
-                                <p className="text-xs text-muted-foreground mt-1">Admin • {msg.responded_at ? new Date(msg.responded_at).toLocaleString() : ''}</p>
+                                <p className="text-xs text-muted-foreground mt-1">Admin • {msg.responded_at ? formatLocalDateTime(msg.responded_at) : ''}</p>
                               </div>
                             </div>
                           )}

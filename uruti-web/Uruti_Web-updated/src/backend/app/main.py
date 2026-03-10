@@ -2,6 +2,7 @@ import os
 import warnings
 import asyncio
 import logging
+import base64
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 warnings.filterwarnings(
@@ -12,7 +13,7 @@ warnings.filterwarnings(
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pathlib import Path
 from .config import settings
 from .database import engine, Base
@@ -34,9 +35,46 @@ from .routers import (
     pitch,
 )
 from .services.pitch_coach_engine import pitch_coach_engine
-from .services.chatbot_engine import chatbot_engine
+from .services.venture_scorer import venture_scorer
 
 logger = logging.getLogger(__name__)
+
+_TRANSPARENT_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9n6QAAAABJRU5ErkJggg=="
+)
+
+
+def _candidate_upload_roots() -> list[Path]:
+    configured = Path(settings.UPLOAD_DIR)
+    if configured.is_absolute():
+        roots = [configured]
+    else:
+        app_file = Path(__file__).resolve()
+        roots = [
+            Path.cwd() / configured,
+            app_file.parents[1] / configured,  # .../src/backend/uploads
+            app_file.parents[3] / configured,  # .../Uruti_Web-updated/uploads
+            app_file.parents[4] / configured,  # .../uruti-platform/uploads
+        ]
+
+    seen: set[str] = set()
+    unique: list[Path] = []
+    for root in roots:
+        resolved = root.resolve()
+        key = str(resolved)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(resolved)
+    return unique
+
+
+def _resolve_upload_file(filename: str, *, subdir: str | None = None) -> Path | None:
+    for root in _candidate_upload_roots():
+        candidate = root / filename if subdir is None else root / subdir / filename
+        if candidate.exists():
+            return candidate
+    return None
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -108,18 +146,18 @@ def health_check():
 @app.get("/api/v1/profile/uploads/{filename}")
 async def get_uploaded_file(filename: str):
     """Serve uploaded profile images"""
-    file_path = Path("uploads") / filename
-    if not file_path.exists():
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="File not found")
+    file_path = _resolve_upload_file(filename)
+    if file_path is None:
+        # Keep avatar/image widgets stable even when the referenced file is stale.
+        return Response(content=_TRANSPARENT_PNG, media_type="image/png")
     return FileResponse(file_path)
 
 
 @app.get("/api/v1/messages/uploads/{filename}")
 async def get_uploaded_message_file(filename: str):
     """Serve uploaded message attachments"""
-    file_path = Path("uploads") / "messages" / filename
-    if not file_path.exists():
+    file_path = _resolve_upload_file(filename, subdir="messages")
+    if file_path is None:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(file_path)
@@ -145,16 +183,22 @@ app.include_router(pitch.router, prefix=settings.API_V1_PREFIX)
 
 @app.on_event("startup")
 async def _warmup_optional_models() -> None:
-    """Warm optional AI runtimes in background without blocking API startup."""
+    """Warm AI runtimes in controlled order: analysis -> pitch coach."""
 
-    async def _run_warmup(name: str, fn) -> None:
+    async def _ordered_warmup() -> None:
         try:
-            await asyncio.to_thread(fn)
-        except Exception as exc:  # pragma: no cover - defensive logging for runtime-only paths
-            logger.warning("%s warmup failed: %s", name, exc)
+            # 1) Analyzer model bundle (venture scorer)
+            await asyncio.to_thread(venture_scorer.get_model_info)
+        except Exception as exc:  # pragma: no cover
+            logger.warning("analysis warmup failed: %s", exc)
 
-    asyncio.create_task(_run_warmup("chatbot", chatbot_engine.warmup))
-    asyncio.create_task(_run_warmup("pitch_coach", pitch_coach_engine.warmup))
+        try:
+            # 2) Pitch coach model backend
+            await asyncio.to_thread(pitch_coach_engine.warmup)
+        except Exception as exc:  # pragma: no cover
+            logger.warning("pitch_coach warmup failed: %s", exc)
+
+    asyncio.create_task(_ordered_warmup())
 
 
 if __name__ == "__main__":

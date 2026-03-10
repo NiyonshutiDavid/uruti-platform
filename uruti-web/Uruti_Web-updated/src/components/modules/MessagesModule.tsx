@@ -14,7 +14,9 @@ import { useCall } from '../../lib/call-context';
 import { ChatInfoDialog } from '../ChatInfoDialog';
 import { NewMessageDialog } from '../NewMessageDialog';
 import { apiClient } from '../../lib/api-client';
+import { parseServerDate } from '../../lib/datetime';
 import { useAuth } from '../../lib/auth-context';
+import { resolveMediaUrl } from '../../lib/media-url';
 import { toast } from 'sonner';
 
 /* ─── Inline Audio Player ─── */
@@ -67,7 +69,7 @@ function VoiceNotePlayer({ src, isOwn }: { src: string; isOwn: boolean }) {
 
 /* ─── Date-label helper ─── */
 function getDateLabel(dateStr: string): string {
-  const d = new Date(dateStr);
+  const d = parseServerDate(dateStr);
   if (isNaN(d.getTime())) return '';
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -86,12 +88,13 @@ interface Message {
   timestamp: string;
   read: boolean;
   starred?: boolean;
-  attachment?: {
-    type: 'image' | 'file' | 'document' | 'idea' | 'audio';
+  attachments?: Array<{
+    type: 'image' | 'file' | 'document' | 'idea' | 'audio' | 'pdf';
     name: string;
     size: number;
     url?: string;
     duration?: number;
+    contentType?: string;
     ideaData?: {
       id: string;
       name: string;
@@ -100,7 +103,7 @@ interface Message {
       problem: string;
       solution: string;
     };
-  };
+  }>;
 }
 
 interface Conversation {
@@ -134,7 +137,13 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
   const [showChatInfo, setShowChatInfo] = useState(false);
   const [showNewMessageDialog, setShowNewMessageDialog] = useState(false);
   const [showAttachmentDialog, setShowAttachmentDialog] = useState(false);
-  const [selectedAttachment, setSelectedAttachment] = useState<{ type: 'image' | 'file' | 'document' | 'idea' | 'audio'; name: string; size: number; file?: File } | null>(null);
+  const [selectedAttachment, setSelectedAttachment] = useState<{
+    type: 'image' | 'file' | 'document' | 'idea' | 'audio' | 'pdf';
+    name: string;
+    size: number;
+    file?: File;
+    previewUrl?: string;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const { startCall } = useCall();
 
@@ -146,11 +155,7 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
   const audioChunksRef = useRef<Blob[]>([]);
 
   const parseServerTimestamp = (timestamp?: string | null): Date => {
-    const value = (timestamp || '').trim();
-    if (!value) return new Date(0);
-    const normalized = /z$|[+-]\d{2}:?\d{2}$/i.test(value) ? value : `${value}Z`;
-    const parsed = new Date(normalized);
-    return Number.isNaN(parsed.getTime()) ? new Date(0) : parsed;
+    return parseServerDate(timestamp);
   };
 
   useEffect(() => {
@@ -186,24 +191,60 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
     };
   }, [user?.id]);
 
+  const inferAttachmentType = (url: string, contentType?: string): 'image' | 'file' | 'document' | 'audio' | 'pdf' => {
+    const clean = (url || '').toLowerCase();
+    const mime = (contentType || '').toLowerCase();
+
+    if (mime.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(clean)) {
+      return 'image';
+    }
+    if (mime === 'application/pdf' || /\.pdf(\?|$)/i.test(clean)) {
+      return 'pdf';
+    }
+    if (mime.startsWith('audio/') || /\.(webm|ogg|mp3|m4a|wav|aac)(\?|$)/i.test(clean)) {
+      return 'audio';
+    }
+    if (mime.includes('document') || /\.(doc|docx|txt|rtf|odt)(\?|$)/i.test(clean)) {
+      return 'document';
+    }
+    return 'file';
+  };
+
   const mapApiMessages = (messages: any[], currentUserId: number): Message[] => {
     return messages.map((message: any) => {
-      // Extract attachment from the message's attachments array if present
-      let attachment: Message['attachment'] | undefined;
+      // Normalize attachment payloads (string URLs or richer object metadata).
+      let attachments: Message['attachments'] | undefined;
       const rawAttachments = message.attachments;
       if (Array.isArray(rawAttachments) && rawAttachments.length > 0) {
-        const att = rawAttachments[0]; // Use first attachment
-        const url = typeof att === 'string' ? att : att?.url || att?.file_url || '';
-        const name = (typeof att === 'object' ? att?.name || att?.filename : '') || url.split('/').pop() || 'file';
-        const size = typeof att === 'object' ? att?.size || 0 : 0;
-        const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(url);
-        const isAudio = /\.(webm|ogg|mp3|m4a|wav|aac)(\?|$)/i.test(url) || (typeof att === 'object' && att?.content_type?.startsWith?.('audio'));
-        attachment = {
-          type: isAudio ? 'audio' : isImage ? 'image' : 'document',
-          name,
-          size,
-          url,
-        };
+        attachments = rawAttachments
+          .map((att: any) => {
+            const url = typeof att === 'string' ? att : att?.url || att?.file_url || '';
+            if (!url) return null;
+            const contentType = typeof att === 'object' ? (att?.content_type || att?.contentType) : undefined;
+            const name = (typeof att === 'object' ? att?.name || att?.filename : '') || url.split('/').pop() || 'file';
+            const size = typeof att === 'object' ? Number(att?.size || 0) : 0;
+            return {
+              type: inferAttachmentType(url, contentType),
+              name,
+              size,
+              url,
+              contentType,
+            };
+          })
+          .filter(Boolean) as Message['attachments'];
+      } else if (rawAttachments && typeof rawAttachments === 'object') {
+        const att = rawAttachments;
+        const url = att?.url || att?.file_url || '';
+        if (url) {
+          const contentType = att?.content_type || att?.contentType;
+          attachments = [{
+            type: inferAttachmentType(url, contentType),
+            name: att?.name || att?.filename || url.split('/').pop() || 'file',
+            size: Number(att?.size || 0),
+            url,
+            contentType,
+          }];
+        }
       }
 
       return {
@@ -212,8 +253,17 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
         text: message.body || '',
         timestamp: parseServerTimestamp(message.created_at).toISOString(),
         read: Boolean(message.is_read),
-        ...(attachment ? { attachment } : {}),
+        ...(attachments && attachments.length ? { attachments } : {}),
       };
+    });
+  };
+
+  const clearSelectedAttachment = () => {
+    setSelectedAttachment((prev) => {
+      if (prev?.previewUrl) {
+        URL.revokeObjectURL(prev.previewUrl);
+      }
+      return null;
     });
   };
 
@@ -244,7 +294,7 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
             id: String(connection.id),
             userId: Number(connection.id),
             name: connection.display_name || connection.full_name || connection.email,
-            avatar: connection.avatar_url || connection.avatar,
+            avatar: resolveMediaUrl(connection.avatar_url || connection.avatar),
             role: connection.role || 'Connection',
             lastMessage: lastMessage?.text || 'Start a conversation...',
             timestamp: lastMessage?.timestamp || new Date().toISOString(),
@@ -315,16 +365,18 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
 
         await apiClient.sendMessage(selectedConversation.userId, outgoingText, attachUrls);
 
+        const attachmentPayload = selectedAttachment ? [{
+          ...selectedAttachment,
+          url: attachUrls?.[0] || selectedAttachment.previewUrl,
+        }] : undefined;
+
         const newMessage: Message = {
           id: `m-${Date.now()}`,
           senderId: 'me',
           text: outgoingText,
           timestamp: new Date().toISOString(),
           read: true,
-          attachment: selectedAttachment ? {
-            ...selectedAttachment,
-            url: attachUrls?.[0],
-          } : undefined
+          attachments: attachmentPayload,
         };
 
         setConversations(prev =>
@@ -345,7 +397,7 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
         );
 
         setMessageText('');
-        setSelectedAttachment(null);
+        clearSelectedAttachment();
       } catch (error) {
         console.error('Error sending message:', error);
         toast.error('Failed to send message');
@@ -356,14 +408,18 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const fileType = file.type.startsWith('image/') ? 'image' : 
-                      file.type.includes('pdf') || file.type.includes('document') ? 'document' : 'file';
-      
+      const isImage = file.type.startsWith('image/');
+      const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+      const fileType = isImage ? 'image' : isPdf ? 'pdf' : file.type.includes('document') ? 'document' : 'file';
+      const previewUrl = (isImage || isPdf) ? URL.createObjectURL(file) : undefined;
+
+      clearSelectedAttachment();
       setSelectedAttachment({
         type: fileType as any,
         name: file.name,
         size: file.size,
         file,
+        previewUrl,
       });
       
       // Reset the input
@@ -403,7 +459,7 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
             text: '🎤 Voice note',
             timestamp: new Date().toISOString(),
             read: true,
-            attachment: { type: 'audio', name: file.name, size: file.size, url: attachUrl, duration: dur },
+            attachments: [{ type: 'audio', name: file.name, size: file.size, url: attachUrl, duration: dur }],
           };
 
           setConversations(prev =>
@@ -533,7 +589,7 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
       id: `new-${Date.now()}`,
       userId: Number(contact.id),
       name: contact.name,
-      avatar: contact.avatar,
+      avatar: resolveMediaUrl(contact.avatar),
       role: contact.role,
       lastMessage: 'Start a conversation...',
       timestamp: new Date().toISOString(),
@@ -564,7 +620,7 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="h-full min-h-0 grid grid-rows-[auto,1fr] gap-4 sm:gap-6 overflow-hidden">
       <div className="glass-card rounded-2xl p-4 sm:p-6 md:p-8 border border-black/5 dark:border-white/10">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
@@ -581,10 +637,14 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 min-h-[500px] lg:h-[calc(100vh-280px)]">
+      <div className="min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 h-full overflow-hidden">
         {/* Conversations List */}
-        <Card className={`glass-card border-black/5 dark:border-white/10 lg:col-span-1 ${selectedConversation ? 'hidden lg:block' : 'block'}`}>
-          <CardContent className="p-3 sm:p-4 h-full flex flex-col">
+        <Card
+          className={`glass-card border-black/5 dark:border-white/10 lg:col-span-1 h-full min-h-0 overflow-hidden ${
+            selectedConversation ? 'hidden lg:block' : 'block'
+          }`}
+        >
+          <CardContent className="p-3 sm:p-4 h-full min-h-0 flex flex-col">
             <div className="mb-4 space-y-3">
               {/* New Message Button */}
               <Button
@@ -643,7 +703,7 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
               </div>
             </div>
 
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1 min-h-0">
               <div className="space-y-2">
                 {filteredConversations.length === 0 ? (
                   <div className="text-center py-12">
@@ -721,7 +781,11 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
         </Card>
 
         {/* Message Thread */}
-        <Card className="glass-card border-black/5 dark:border-white/10 lg:col-span-2">
+        <Card
+          className={`glass-card border-black/5 dark:border-white/10 lg:col-span-2 h-full min-h-0 overflow-hidden ${
+            selectedConversation ? 'block' : 'hidden lg:flex lg:items-center lg:justify-center'
+          }`}
+        >
           {selectedConversation ? (
             showChatInfo ? (
               /* Chat Info View */
@@ -735,9 +799,9 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
               />
             ) : (
               /* Chat View */
-              <div className="h-full flex flex-col">
+              <div className="h-full min-h-0 flex flex-col">
                 {/* Conversation Header */}
-                <div className="p-4 border-b dark:border-gray-700">
+                <div className="p-4 border-b dark:border-gray-700 sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       {/* Back button for mobile */}
@@ -830,8 +894,9 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
                 </div>
 
                 {/* Messages */}
-                <ScrollArea className="flex-1 p-4">
-                  <div className="space-y-4">
+                <div className="flex-1 min-h-0">
+                  <ScrollArea className="h-full p-4">
+                    <div className="space-y-4">
                     {(() => {
                       let lastDateLabel = '';
                       return selectedConversation.messages.map((message) => {
@@ -875,28 +940,94 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
                                       : 'glass-panel border border-black/10 dark:border-white/10 dark:text-white'
                                   }`}
                                 >
-                                  {/* Voice note player */}
-                                  {message.attachment?.type === 'audio' && message.attachment.url ? (
-                                    <VoiceNotePlayer src={message.attachment.url} isOwn={isMyMessage} />
-                                  ) : (
-                                    <>
-                                      <p className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>
-                                        {message.text}
-                                      </p>
-                                      {message.attachment && message.attachment.type !== 'audio' && (
-                                        <div className="mt-2">
-                                          {message.attachment.type === 'image' && message.attachment.url ? (
-                                            <img src={message.attachment.url} alt={message.attachment.name} className="rounded-lg max-w-full max-h-48 object-cover" />
-                                          ) : (
-                                            <a href={message.attachment.url} target="_blank" rel="noopener noreferrer" className={`flex items-center space-x-2 text-sm ${isMyMessage ? 'text-white/80 hover:text-white' : 'text-[#76B947]'}`}>
-                                              <FileText className="h-4 w-4" />
-                                              <span>{message.attachment.name} ({formatFileSize(message.attachment.size)})</span>
-                                            </a>
-                                          )}
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
+                                  {(() => {
+                                    const allAttachments = message.attachments || [];
+                                    const audioAttachment = allAttachments.find((att) => att.type === 'audio' && att.url);
+                                    const previewAttachments = allAttachments.filter((att) => att.type !== 'audio');
+
+                                    if (audioAttachment?.url) {
+                                      return <VoiceNotePlayer src={audioAttachment.url} isOwn={isMyMessage} />;
+                                    }
+
+                                    return (
+                                      <>
+                                        <p className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>
+                                          {message.text}
+                                        </p>
+                                        {previewAttachments.length > 0 && (
+                                          <div className="mt-2 space-y-2">
+                                            {previewAttachments.map((attachment, idx) => {
+                                              const tone = isMyMessage
+                                                ? 'text-white/85 hover:text-white border-white/30'
+                                                : 'text-[#76B947] hover:text-[#5a8f35] border-[#76B947]/30';
+
+                                              if (attachment.type === 'image' && attachment.url) {
+                                                return (
+                                                  <div key={`${message.id}-att-${idx}`} className="space-y-2">
+                                                    <img
+                                                      src={attachment.url}
+                                                      alt={attachment.name}
+                                                      className="rounded-lg max-w-full max-h-64 object-cover"
+                                                    />
+                                                    <div className={`text-xs ${isMyMessage ? 'text-white/75' : 'text-muted-foreground'}`}>
+                                                      {attachment.name}
+                                                    </div>
+                                                  </div>
+                                                );
+                                              }
+
+                                              if (attachment.type === 'pdf' && attachment.url) {
+                                                return (
+                                                  <div key={`${message.id}-att-${idx}`} className="rounded-lg border border-black/10 dark:border-white/15 overflow-hidden bg-black/5 dark:bg-white/5">
+                                                    <iframe
+                                                      title={attachment.name}
+                                                      src={attachment.url}
+                                                      className="w-full h-56 bg-white"
+                                                    />
+                                                    <div className="p-2 flex items-center justify-between gap-2">
+                                                      <span className={`text-xs truncate ${isMyMessage ? 'text-white/85' : 'text-muted-foreground'}`}>
+                                                        {attachment.name}
+                                                      </span>
+                                                      <div className="flex items-center gap-2">
+                                                        <a
+                                                          href={attachment.url}
+                                                          target="_blank"
+                                                          rel="noopener noreferrer"
+                                                          className={`text-xs underline ${tone}`}
+                                                        >
+                                                          Open
+                                                        </a>
+                                                        <a
+                                                          href={attachment.url}
+                                                          download
+                                                          className={`text-xs underline ${tone}`}
+                                                        >
+                                                          Download
+                                                        </a>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                );
+                                              }
+
+                                              return (
+                                                <a
+                                                  key={`${message.id}-att-${idx}`}
+                                                  href={attachment.url}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className={`flex items-center space-x-2 text-sm ${tone}`}
+                                                >
+                                                  <FileText className="h-4 w-4" />
+                                                  <span>{attachment.name} ({formatFileSize(attachment.size)})</span>
+                                                </a>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
                                 </div>
                                 <p className={`text-xs text-muted-foreground mt-1 ${isMyMessage ? 'text-right' : 'text-left'}`} style={{ fontFamily: 'var(--font-body)' }}>
                                   {formatMessageTime(message.timestamp)}
@@ -907,17 +1038,19 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
                         );
                       });
                     })()}
-                  </div>
-                </ScrollArea>
+                    </div>
+                  </ScrollArea>
+                </div>
 
                 {/* Message Input */}
-                <div className="p-4 border-t dark:border-gray-700">
+                <div className="p-4 border-t dark:border-gray-700 sticky bottom-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75">
                   {/* Attachment Preview */}
                   {selectedAttachment && (
                     <div className="mb-3 glass-panel rounded-lg p-3 border border-[#76B947]/30 flex items-center justify-between">
                       <div className="flex items-center space-x-2">
                         {selectedAttachment.type === 'image' && <ImageIcon className="h-4 w-4 text-[#76B947]" />}
                         {selectedAttachment.type === 'document' && <FileText className="h-4 w-4 text-[#76B947]" />}
+                        {selectedAttachment.type === 'pdf' && <FileText className="h-4 w-4 text-[#76B947]" />}
                         {selectedAttachment.type === 'file' && <Paperclip className="h-4 w-4 text-[#76B947]" />}
                         <div>
                           <p className="text-sm font-medium dark:text-white" style={{ fontFamily: 'var(--font-body)' }}>
@@ -927,11 +1060,23 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
                             {formatFileSize(selectedAttachment.size)}
                           </p>
                         </div>
+                        {selectedAttachment.type === 'image' && selectedAttachment.previewUrl && (
+                          <img
+                            src={selectedAttachment.previewUrl}
+                            alt={selectedAttachment.name}
+                            className="h-12 w-12 rounded object-cover border border-black/10"
+                          />
+                        )}
+                        {selectedAttachment.type === 'pdf' && selectedAttachment.previewUrl && (
+                          <div className="h-12 w-12 rounded border border-black/10 bg-white overflow-hidden">
+                            <iframe title={selectedAttachment.name} src={selectedAttachment.previewUrl} className="w-full h-full" />
+                          </div>
+                        )}
                       </div>
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        onClick={() => setSelectedAttachment(null)}
+                        onClick={clearSelectedAttachment}
                         className="hover:bg-red-500/10 text-red-500"
                       >
                         <X className="h-4 w-4" />
@@ -1011,16 +1156,17 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
               </div>
             )
           ) : (
-            <CardContent className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-[#76B947]/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Search className="h-8 w-8 text-[#76B947]" />
-                </div>
-                <p className="text-lg text-muted-foreground" style={{ fontFamily: 'var(--font-heading)' }}>
-                  Select a conversation to start messaging
-                </p>
+            <div className="text-center px-8 py-12">
+              <div className="w-16 h-16 rounded-full bg-[#76B947]/15 text-[#76B947] flex items-center justify-center mx-auto mb-4">
+                <MessageSquare className="h-8 w-8" />
               </div>
-            </CardContent>
+              <p className="text-lg font-semibold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                Select a conversation
+              </p>
+              <p className="text-sm text-muted-foreground mt-2" style={{ fontFamily: 'var(--font-body)' }}>
+                Choose a chat from the left panel to view and send messages.
+              </p>
+            </div>
           )}
         </Card>
       </div>

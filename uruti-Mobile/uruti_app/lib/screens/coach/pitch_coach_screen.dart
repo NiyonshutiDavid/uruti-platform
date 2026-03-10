@@ -19,10 +19,7 @@ class PitchCoachScreen extends StatelessWidget {
         ),
         title: Text(
           'Pitch Coach',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
       ),
       body: Stack(
@@ -296,7 +293,7 @@ class _SessionTile extends StatelessWidget {
     String timeAgo = '';
     if (createdAt.isNotEmpty) {
       try {
-        final dt = DateTime.parse(createdAt);
+        final dt = DateTime.parse(createdAt).toLocal();
         final diff = DateTime.now().difference(dt);
         if (diff.inDays > 0) {
           timeAgo = '${diff.inDays}d ago';

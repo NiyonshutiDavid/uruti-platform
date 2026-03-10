@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import List, Dict, Any
+from datetime import timezone
 
 from ..auth import get_current_active_user
 from ..database import get_db
@@ -10,6 +11,44 @@ from ..services.pitch_coach_engine import pitch_coach_engine
 
 
 router = APIRouter(prefix="/pitch", tags=["Pitch"])
+
+
+def _clamp_score(value: float, low: int = 0, high: int = 100) -> int:
+    return max(low, min(high, int(round(value))))
+
+
+def _derive_live_metrics(
+    *,
+    duration_seconds: int,
+    target_duration_seconds: int,
+    current_slide: int,
+    total_slides: int,
+    transitions_count: int,
+) -> Dict[str, int]:
+    duration = max(duration_seconds, 0)
+    target = max(target_duration_seconds, 1)
+    progress_ratio = min(max(duration / float(target), 0.0), 1.5)
+
+    pacing = _clamp_score(62 + (1.0 - min(abs(1.0 - progress_ratio), 1.0)) * 34)
+
+    safe_total = max(total_slides, 1)
+    expected_slide = 1 + int(progress_ratio * max(safe_total - 1, 0))
+    slide_gap = abs(current_slide - expected_slide)
+    sync_quality = max(0.0, 1.0 - (slide_gap / float(max(safe_total, 1))))
+    transition_bonus = min(transitions_count, 10) * 1.5
+    clarity = _clamp_score(58 + sync_quality * 34 + transition_bonus)
+
+    confidence = _clamp_score(60 + min(progress_ratio, 1.0) * 28 + min(transitions_count, 6) * 1.2)
+    engagement = _clamp_score((pacing * 0.45) + (confidence * 0.35) + (clarity * 0.20))
+    structure = _clamp_score((clarity * 0.55) + (pacing * 0.45))
+
+    return {
+        "pacing": pacing,
+        "clarity": clarity,
+        "confidence": confidence,
+        "engagement": engagement,
+        "structure": structure,
+    }
 
 
 def _map_session(session: PitchSession, venture_name: str) -> Dict[str, Any]:
@@ -40,10 +79,22 @@ def _map_session(session: PitchSession, venture_name: str) -> Dict[str, Any]:
     structure = int(round((confidence + clarity) / 2)) if (confidence or clarity) else overall
     engagement = int(round((pacing + confidence) / 2)) if (pacing or confidence) else overall
 
+    created_at = session.created_at
+    if created_at:
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        created_at_iso = created_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    else:
+        created_at_iso = ""
+
     return {
         "id": str(session.id),
-        "date": session.created_at.isoformat() if session.created_at else "",
+        "date": created_at_iso,
         "venture": venture_name,
+        "pitchType": (
+            (ai_feedback.get("pitch_type") if isinstance(ai_feedback, dict) else None)
+            or (session.title.replace(" Practice", "") if session.title else "Pitch Session")
+        ),
         "duration": duration_label,
         "overallScore": overall,
         "pacing": pacing,
@@ -146,3 +197,58 @@ def delete_pitch_analysis(
 
     db.commit()
     return None
+
+
+@router.post("/live-feedback")
+def get_live_pitch_feedback(
+    payload: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    venture_id = int(payload.get("venture_id") or 0)
+    if not venture_id:
+        raise HTTPException(status_code=400, detail="venture_id is required")
+
+    venture = db.query(Venture).filter(Venture.id == venture_id).first()
+    if not venture or venture.founder_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized for this venture")
+
+    duration_seconds = int(payload.get("duration_seconds") or 0)
+    target_duration_seconds = int(payload.get("target_duration_seconds") or 0)
+    current_slide = int(payload.get("current_slide") or 1)
+    total_slides = int(payload.get("total_slides") or 1)
+
+    transitions = payload.get("slide_transitions")
+    transitions_count = len(transitions) if isinstance(transitions, list) else 0
+
+    transcript = str(payload.get("transcript") or "").strip()
+    pitch_type = str(payload.get("pitch_type") or "Investor Pitch").strip()
+    context_text = (
+        transcript
+        or f"{pitch_type}. duration={duration_seconds}s target={target_duration_seconds}s "
+           f"slide={current_slide}/{max(total_slides, 1)} transitions={transitions_count}"
+    )
+
+    tips = pitch_coach_engine.generate_feedback(
+        context_text,
+        duration_seconds=duration_seconds,
+        target_duration_seconds=target_duration_seconds,
+        pitch_type=pitch_type,
+    )
+    model_status = pitch_coach_engine.status()
+
+    metrics = _derive_live_metrics(
+        duration_seconds=duration_seconds,
+        target_duration_seconds=target_duration_seconds,
+        current_slide=current_slide,
+        total_slides=total_slides,
+        transitions_count=transitions_count,
+    )
+
+    return {
+        "tips": tips,
+        "metrics": metrics,
+        "model_backend": model_status.get("backend"),
+        "model_loaded": model_status.get("loaded"),
+        "model_error": model_status.get("load_error"),
+    }

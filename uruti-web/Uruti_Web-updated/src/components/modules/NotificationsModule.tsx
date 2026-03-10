@@ -7,6 +7,7 @@ import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Bell, Check, Trash2, TrendingUp, MessageCircle, Calendar, Users, Award, DollarSign, X, UserPlus, Link as LinkIcon } from 'lucide-react';
 import { apiClient } from '../../lib/api-client';
+import { formatRelativeTime } from '../../lib/datetime';
 import { toast } from 'sonner';
 
 interface Notification {
@@ -166,18 +167,7 @@ export function NotificationsModule() {
   };
 
   const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 7) return `${days}d ago`;
-    return date.toLocaleDateString();
+    return formatRelativeTime(timestamp);
   };
 
   const filteredNotifications = filter === 'unread' 
@@ -225,7 +215,7 @@ export function NotificationsModule() {
       </div>
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <Tabs value={filter} onValueChange={(v) => setFilter(v as 'all' | 'unread')}>
+        <Tabs value={filter} onValueChange={(v: string) => setFilter(v as 'all' | 'unread')}>
           <TabsList>
             <TabsTrigger value="all">All Notifications</TabsTrigger>
             <TabsTrigger value="unread">Unread ({unreadCount})</TabsTrigger>

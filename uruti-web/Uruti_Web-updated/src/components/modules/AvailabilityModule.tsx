@@ -25,6 +25,7 @@ import { Switch } from '../ui/switch';
 import { toast } from 'sonner';
 import { apiClient } from '../../lib/api-client';
 import { useAuth } from '../../lib/auth-context';
+import { formatLocalDate } from '../../lib/datetime';
 
 interface TimeSlot {
   id: number;
@@ -107,6 +108,16 @@ export function AvailabilityModule() {
   };
 
   const handleAddSlot = async () => {
+    const [startHour, startMinute] = newSlot.start_time.split(':').map((v) => parseInt(v, 10));
+    const [endHour, endMinute] = newSlot.end_time.split(':').map((v) => parseInt(v, 10));
+    const startTotal = (Number.isFinite(startHour) ? startHour : 0) * 60 + (Number.isFinite(startMinute) ? startMinute : 0);
+    const endTotal = (Number.isFinite(endHour) ? endHour : 0) * 60 + (Number.isFinite(endMinute) ? endMinute : 0);
+
+    if (endTotal <= startTotal) {
+      toast.error('End time must be after start time (for example 09:00 - 10:00).');
+      return;
+    }
+
     try {
       const slot = await apiClient.createAvailability(newSlot);
       setTimeSlots([...timeSlots, slot]);
@@ -271,7 +282,7 @@ export function AvailabilityModule() {
                     <div className="grid grid-cols-3 gap-2">
                       <Select 
                         value={newSlot.day_of_week.toString()} 
-                        onValueChange={(value) => setNewSlot({ ...newSlot, day_of_week: parseInt(value) })}
+                        onValueChange={(value: string) => setNewSlot({ ...newSlot, day_of_week: parseInt(value) })}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Day" />
@@ -396,7 +407,7 @@ export function AvailabilityModule() {
                 <Label htmlFor="sessionDuration">Session Duration (minutes)</Label>
                 <Select 
                   value={bookingSettings.sessionDuration.toString()}
-                  onValueChange={(value) => setBookingSettings({ ...bookingSettings, sessionDuration: parseInt(value) })}
+                  onValueChange={(value: string) => setBookingSettings({ ...bookingSettings, sessionDuration: parseInt(value) })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -413,7 +424,7 @@ export function AvailabilityModule() {
                 <Label htmlFor="bufferTime">Buffer Time (minutes)</Label>
                 <Select 
                   value={bookingSettings.bufferTime.toString()}
-                  onValueChange={(value) => setBookingSettings({ ...bookingSettings, bufferTime: parseInt(value) })}
+                  onValueChange={(value: string) => setBookingSettings({ ...bookingSettings, bufferTime: parseInt(value) })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -501,7 +512,7 @@ export function AvailabilityModule() {
                 </div>
                 <Switch
                   checked={bookingSettings.autoApprove}
-                  onCheckedChange={(checked) => setBookingSettings({ ...bookingSettings, autoApprove: checked })}
+                  onCheckedChange={(checked: boolean) => setBookingSettings({ ...bookingSettings, autoApprove: checked })}
                 />
               </div>
 

@@ -5,7 +5,7 @@
 :root {
   /* Typography */
   --font-heading: 'Inter Tight', sans-serif;
-  --font-body: 'Century Gothic', 'Avant Garde', sans-serif;
+  --font-body: 'Inter Tight', 'Avant Garde', sans-serif;
   --font-size: 14px;
   
   /* Uruti Brand Colors - Bio-Digital Fusion */
@@ -166,7 +166,7 @@
 }
 
 /**
- * Base typography - Inter Tight for headings, Century Gothic for body
+ * Base typography - Inter Tight for headings, Inter Tight for body
  */
 @layer base {
   :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {

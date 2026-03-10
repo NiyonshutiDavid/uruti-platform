@@ -3373,8 +3373,8 @@
     vertical-align: middle;
   }
 
-  .font-\[\'Century_Gothic\'\] {
-    font-family: Century Gothic;
+  .font-\[\'Inter_Tight\'\] {
+    font-family: Inter Tight;
   }
 
   .font-\[\'Inter_Tight\'\] {
@@ -6793,7 +6793,7 @@
 
 :root {
   --font-heading: "Inter Tight", sans-serif;
-  --font-body: "Century Gothic", "Avant Garde", sans-serif;
+  --font-body: "Inter Tight", "Avant Garde", sans-serif;
   --font-size: 14px;
   --uruti-black: #000;
   --uruti-green: #76b947;

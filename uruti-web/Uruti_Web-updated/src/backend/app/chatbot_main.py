@@ -17,7 +17,6 @@ from .database import Base, engine
 from .routers import auth
 from .routers import chatbot as chatbot_router
 from .services.chatbot_engine import chatbot_engine
-from .services.pitch_coach_engine import pitch_coach_engine
 
 # Ensure chatbot service can run independently and create required tables.
 Base.metadata.create_all(bind=engine)
@@ -25,7 +24,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title=f"{settings.APP_NAME} - Uruti AI Modules",
     version=settings.APP_VERSION,
-    description="Dedicated Uruti AI modules service (chatbot, analysis, pitch coach)",
+    description="Dedicated Uruti AI modules service (chatbot only)",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -64,9 +63,8 @@ app.include_router(chatbot_router.router, prefix=settings.API_V1_PREFIX)
 
 @app.on_event("startup")
 async def _warmup_chatbot_model() -> None:
-    # Start model initialization at service boot so runtime requests do not repeatedly load models.
+    # Start chatbot model initialization at service boot.
     asyncio.create_task(asyncio.to_thread(chatbot_engine.warmup))
-    asyncio.create_task(asyncio.to_thread(pitch_coach_engine.warmup))
 
 
 if __name__ == "__main__":

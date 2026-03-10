@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/api-client';
 import { useAuth } from '../../lib/auth-context';
+import { parseServerDate } from '../../lib/datetime';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -110,6 +111,41 @@ interface AIChatModuleProps {
   startupContext?: { name: string; description: string };
   analysisContext?: any;
 }
+
+const baseAiModels: BackendAiModel[] = [
+  {
+    id: 'gemini',
+    name: 'Gemini',
+    description: 'Fast cloud chatbot responses via Google Gemini',
+    type: 'chatbot',
+    requires_venture_context: false,
+    is_default: true,
+    available: false,
+    status: 'offline',
+    offline_reason: 'Model is not loaded yet.',
+  },
+  {
+    id: 'uruti-ai',
+    name: 'Uruti AI Modules - Chatbot',
+    description: 'General startup guidance and advisory conversations',
+    type: 'chatbot',
+    requires_venture_context: false,
+    available: false,
+    status: 'offline',
+    offline_reason: 'Model is not loaded yet.',
+  },
+  {
+    id: 'venture-mlop',
+    name: 'Uruti-Investor_Intelligence_and_Ranker',
+    description: 'Analyze ventures with required venture context',
+    type: 'analysis',
+    requires_venture_context: true,
+    fixed_prompt: 'analyse my venture',
+    available: false,
+    status: 'offline',
+    offline_reason: 'Model is not loaded yet.',
+  },
+];
 
 const founderQuickActions = [
   { icon: Lightbulb, label: 'Refine Idea', prompt: 'Help me refine my startup idea', color: 'text-yellow-500' },
@@ -194,7 +230,9 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
       try {
         setIsLoadingModels(true);
         const data = await apiClient.getAiModels();
-        const models: BackendAiModel[] = (data || []).map((model: any) => ({
+        const fetchedModels: BackendAiModel[] = (data || [])
+          .filter((model: any) => model?.type !== 'coach')
+          .map((model: any) => ({
           id: String(model.id),
           name: String(model.name || model.id),
           description: String(model.description || ''),
@@ -207,13 +245,24 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
           offline_reason: model.offline_reason || null,
         }));
 
+        const byId = new Map<string, BackendAiModel>();
+        baseAiModels.forEach((model) => byId.set(model.id, model));
+        fetchedModels.forEach((model) => {
+          const baseline = byId.get(model.id);
+          byId.set(model.id, {
+            ...(baseline || {} as BackendAiModel),
+            ...model,
+          });
+        });
+        const models = Array.from(byId.values());
+
         setAvailableModels(models);
         const defaultModel = models.find((m) => m.is_default) || models.find((m) => m.type === 'chatbot') || models[0] || null;
         setSelectedModel(defaultModel);
         setModelsOfflineMessage(null);
       } catch (error) {
-        setAvailableModels([]);
-        setSelectedModel(null);
+        setAvailableModels(baseAiModels);
+        setSelectedModel(baseAiModels.find((m) => m.is_default) || baseAiModels[0] || null);
         setModelsOfflineMessage('Models are offline. Uruti AI Modules is still initializing or unreachable.');
       } finally {
         setIsLoadingModels(false);
@@ -290,7 +339,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
           id: session.session_id,
           title: (session.first_message || 'New Chat').slice(0, 50),
           lastMessage: session.first_message || 'No messages yet',
-          timestamp: new Date(session.created_at),
+          timestamp: parseServerDate(session.created_at),
           unread: false,
           startup: undefined,
         }));
@@ -309,7 +358,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
               id: String(msg.id),
               role: msg.role,
               content: msg.content,
-              timestamp: new Date(msg.created_at),
+              timestamp: parseServerDate(msg.created_at),
               startup: undefined,
             }));
             setMessages(formattedMessages);
@@ -617,7 +666,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
         id: String(msg.id),
         role: msg.role,
         content: msg.content,
-        timestamp: new Date(msg.created_at),
+        timestamp: parseServerDate(msg.created_at),
         startup: undefined,
       }));
 
@@ -1219,7 +1268,9 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                         className="rounded-full px-4 h-10 glass-card border-purple-300 dark:border-purple-600 hover:bg-[#76B947]/10 hover:border-[#76B947] transition-all"
                       >
                         <span className="font-medium text-sm" style={{ fontFamily: 'var(--font-heading)' }}>
-                            {selectedModel?.name || (isLoadingModels ? 'Loading models...' : 'No model')}
+                            {selectedModel
+                              ? `${selectedModel.name}${selectedModel.available === false ? ' (offline)' : ''}`
+                              : (isLoadingModels ? 'Loading models...' : 'No model')}
                         </span>
                         <ChevronRight className="h-4 w-4 ml-1 text-muted-foreground rotate-90" />
                       </Button>

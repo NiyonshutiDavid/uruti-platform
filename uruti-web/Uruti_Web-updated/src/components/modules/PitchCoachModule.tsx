@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
-import { Mic, MicOff, Video, VideoOff, Upload, StopCircle, Play, Pause, Volume2, Settings, AlertCircle, Check, AlertTriangle, Info, FileText, X, Maximize, Minimize } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, Upload, StopCircle, Play, Pause, Volume2, Settings, AlertCircle, Check, AlertTriangle, Info, FileText, X, Maximize, Minimize, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Label } from '../ui/label';
@@ -20,13 +20,18 @@ type SlideTransition = {
   atSecond: number;
 };
 
+type PdfDocLike = {
+  numPages: number;
+  getPage: (pageNumber: number) => Promise<any>;
+  destroy?: () => void;
+};
+
 export function PitchCoachModule() {
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isVideoOn, setIsVideoOn] = useState(false);
   const [deckFile, setDeckFile] = useState<File | null>(null);
-  const [deckUrl, setDeckUrl] = useState<string | null>(null);
   const [deckFileName, setDeckFileName] = useState<string | null>(null);
   const [currentSlide, setCurrentSlide] = useState(1);
   const [totalSlides, setTotalSlides] = useState(10);
@@ -38,6 +43,23 @@ export function PitchCoachModule() {
   const [showSettings, setShowSettings] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [liveModelStatus, setLiveModelStatus] = useState<{
+    backend: string;
+    loaded: boolean;
+    error?: string | null;
+  } | null>(null);
+  const [liveModelTips, setLiveModelTips] = useState<string[]>([]);
+
+  const liveBackend = (liveModelStatus?.backend || '').toLowerCase();
+  const isNonAiScoring = Boolean(liveModelStatus) && (
+    liveBackend === 'fallback' ||
+    liveBackend === 'unavailable' ||
+    liveBackend === 'offline' ||
+    liveBackend === 'heuristic' ||
+    liveBackend === 'rule-based' ||
+    !liveModelStatus?.loaded ||
+    Boolean(liveModelStatus?.error)
+  );
 
   // Session configuration states
   const [ventures, setVentures] = useState<any[]>([]);
@@ -59,14 +81,18 @@ export function PitchCoachModule() {
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const composedStreamRef = useRef<MediaStream | null>(null);
-  const displayStreamRef = useRef<MediaStream | null>(null);
-  const screenVideoRef = useRef<HTMLVideoElement | null>(null);
+  const deckCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const renderTaskRef = useRef<any>(null);
+  const pdfDocRef = useRef<PdfDocLike | null>(null);
   const compositionCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const compositionRafRef = useRef<number | null>(null);
   const recorderMimeTypeRef = useRef('video/webm');
   const recordedChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoStopTriggeredRef = useRef(false);
+  const recordingTimeRef = useRef(0);
+  const slideTransitionsRef = useRef<SlideTransition[]>([]);
+  const lastTipRef = useRef('');
 
   // Real-time AI feedback metrics
   const [pitchMetrics, setPitchMetrics] = useState({
@@ -115,9 +141,13 @@ export function PitchCoachModule() {
   useEffect(() => {
     return () => {
       stopCamera();
-      stopDisplayCapture();
       stopComposition();
-      if (deckUrl) URL.revokeObjectURL(deckUrl);
+      if (renderTaskRef.current?.cancel) {
+        renderTaskRef.current.cancel();
+      }
+      if (pdfDocRef.current?.destroy) {
+        pdfDocRef.current.destroy();
+      }
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
@@ -142,6 +172,14 @@ export function PitchCoachModule() {
       }
     };
   }, [isRecording, isPaused]);
+
+  useEffect(() => {
+    recordingTimeRef.current = recordingTime;
+  }, [recordingTime]);
+
+  useEffect(() => {
+    slideTransitionsRef.current = slideTransitions;
+  }, [slideTransitions]);
 
   const startCamera = async () => {
     try {
@@ -197,51 +235,52 @@ export function PitchCoachModule() {
     setIsVideoOn(false);
   };
 
-  const stopDisplayCapture = () => {
-    if (displayStreamRef.current) {
-      displayStreamRef.current.getTracks().forEach((track) => track.stop());
-      displayStreamRef.current = null;
-    }
-    if (screenVideoRef.current) {
-      screenVideoRef.current.srcObject = null;
-      screenVideoRef.current = null;
-    }
-  };
+  const renderPdfPage = useCallback(async (pageNumber: number) => {
+    if (!pdfDocRef.current || !deckCanvasRef.current) return;
 
-  const startDisplayCapture = async () => {
+    const page = await pdfDocRef.current.getPage(pageNumber);
+    const baseViewport = page.getViewport({ scale: 1.0 });
+    const canvas = deckCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const parentWidth = canvas.parentElement?.clientWidth || 1200;
+    const parentHeight = canvas.parentElement?.clientHeight || 675;
+    const scale = Math.min(parentWidth / baseViewport.width, parentHeight / baseViewport.height);
+    const viewport = page.getViewport({ scale: scale > 0 ? scale : 1.0 });
+
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+
+    if (renderTaskRef.current?.cancel) {
+      renderTaskRef.current.cancel();
+    }
+
+    const renderTask = page.render({ canvasContext: ctx, viewport });
+    renderTaskRef.current = renderTask;
+
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          frameRate: { ideal: 30, max: 30 },
-        },
-        audio: false,
-      });
-
-      const previewVideo = document.createElement('video');
-      previewVideo.srcObject = stream;
-      previewVideo.muted = true;
-      previewVideo.playsInline = true;
-      await previewVideo.play();
-
-      displayStreamRef.current = stream;
-      screenVideoRef.current = previewVideo;
-
-      const [videoTrack] = stream.getVideoTracks();
-      if (videoTrack) {
-        videoTrack.onended = () => {
-          stopDisplayCapture();
-          if (isRecording) {
-            toast.warning('Slide sharing stopped. Recording continues with camera only.');
-          }
-        };
+      await renderTask.promise;
+    } catch (err: any) {
+      if (err?.name !== 'RenderingCancelledException') {
+        throw err;
       }
-
-      return stream;
-    } catch (err) {
-      console.error('Display capture denied or unavailable:', err);
-      return null;
     }
-  };
+  }, []);
+
+  const goToSlide = useCallback((nextSlide: number) => {
+    const safeSlide = Math.min(Math.max(nextSlide, 1), Math.max(totalSlides, 1));
+    setCurrentSlide((previousSlide) => {
+      if (previousSlide === safeSlide) return previousSlide;
+      if (isRecording) {
+        setSlideTransitions((history) => [
+          ...history,
+          { slide: safeSlide, atSecond: recordingTime },
+        ]);
+      }
+      return safeSlide;
+    });
+  }, [isRecording, recordingTime, totalSlides]);
 
   const toggleCamera = async () => {
     if (isVideoOn) {
@@ -263,32 +302,88 @@ export function PitchCoachModule() {
     }
   };
 
-  const handleDeckUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDeckUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setError(null);
-    const url = URL.createObjectURL(file);
-    setDeckFile(file);
-    setDeckUrl(url);
-    setDeckFileName(file.name);
-    setCurrentSlide(1);
-    setTotalSlides(10);
-    setSlideTransitions([]);
-    // Auto-start camera for picture-in-picture view
-    if (!isVideoOn) {
-      startCamera();
+
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      setError('Only PDF files are supported in Pitch Coach slide mode.');
+      return;
     }
-  }, [isVideoOn]);
+
+    setError(null);
+    if (renderTaskRef.current?.cancel) {
+      renderTaskRef.current.cancel();
+    }
+    if (pdfDocRef.current?.destroy) {
+      pdfDocRef.current.destroy();
+      pdfDocRef.current = null;
+    }
+
+    try {
+      const pdfjs = await import('pdfjs-dist');
+      if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+        pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+      }
+
+      const data = await file.arrayBuffer();
+      const loadingTask = pdfjs.getDocument({ data });
+      const pdfDoc = (await loadingTask.promise) as PdfDocLike;
+      pdfDocRef.current = pdfDoc;
+
+      setDeckFile(file);
+      setDeckFileName(file.name);
+      setCurrentSlide(1);
+      setTotalSlides(Math.max(1, pdfDoc.numPages || 1));
+      setSlideTransitions([]);
+
+      if (!isVideoOn) {
+        await startCamera();
+      }
+
+      await renderPdfPage(1);
+    } catch (err) {
+      console.error('Unable to load PDF:', err);
+      setError('Unable to load this PDF. Please upload a valid, non-password-protected file.');
+    }
+  }, [isVideoOn, renderPdfPage]);
 
   const removeDeck = useCallback(() => {
-    if (deckUrl) URL.revokeObjectURL(deckUrl);
+    if (renderTaskRef.current?.cancel) {
+      renderTaskRef.current.cancel();
+    }
+    if (pdfDocRef.current?.destroy) {
+      pdfDocRef.current.destroy();
+    }
+    pdfDocRef.current = null;
     setDeckFile(null);
-    setDeckUrl(null);
     setDeckFileName(null);
     setCurrentSlide(1);
-    setTotalSlides(10);
+    setTotalSlides(1);
     setSlideTransitions([]);
-  }, [deckUrl]);
+  }, []);
+
+  useEffect(() => {
+    if (!deckFile || !pdfDocRef.current) return;
+    void renderPdfPage(currentSlide);
+  }, [currentSlide, deckFile, renderPdfPage]);
+
+  useEffect(() => {
+    if (!deckFile || !pdfDocRef.current) return;
+
+    const rerender = () => {
+      void renderPdfPage(currentSlide);
+    };
+
+    const handle = window.setTimeout(rerender, 120);
+    const onResize = () => rerender();
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      window.clearTimeout(handle);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [deckFile, isFullscreen, currentSlide, renderPdfPage]);
 
   useEffect(() => {
     if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') {
@@ -310,7 +405,7 @@ export function PitchCoachModule() {
     videoRef.current.play().catch((err) => {
       console.error('[VIDEO] play() error:', err);
     });
-  }, [deckUrl, isVideoOn]);
+  }, [deckFile, isVideoOn]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -360,9 +455,13 @@ export function PitchCoachModule() {
   const toggleRecording = () => {
     if (!isRecording) {
       autoStopTriggeredRef.current = false;
+      lastTipRef.current = '';
       setIsRecording(true);
       setRecordingTime(0);
       setSlideTransitions([]);
+      setLiveFeedback([]);
+      setLiveModelTips([]);
+      setLiveModelStatus(null);
       startRecording();
     } else {
       setIsRecording(false);
@@ -401,18 +500,16 @@ export function PitchCoachModule() {
         return;
       }
 
-      let displayStream: MediaStream | null = null;
-      if (deckUrl) {
-        toast.info('Select the presentation window/tab so slides appear inside the recorded video.');
-        displayStream = await startDisplayCapture();
+      if (deckFile && !pdfDocRef.current) {
+        toast.error('Slides are not ready yet. Re-upload your deck and try again.');
+        setIsRecording(false);
+        setIsPaused(false);
+        stopComposition();
+        return;
       }
 
-      const composedStream = createComposedStream(sourceStream, displayStream ?? undefined);
+      const composedStream = createComposedStream(sourceStream);
       composedStreamRef.current = composedStream;
-
-      if (deckUrl && !displayStream) {
-        toast.warning('Slides were not shared. Recording will keep camera feed and slide progression metadata.');
-      }
 
       const preferredMimeTypes = [
         'video/mp4;codecs=h264,aac',
@@ -441,9 +538,16 @@ export function PitchCoachModule() {
         const blob = new Blob(recordedChunksRef.current, {
           type: recorderMimeTypeRef.current,
         });
-        setRecordedBlob(blob);
+        setRecordedBlob(blob.size > 0 ? blob : null);
         recordedChunksRef.current = [];
+        mediaRecorderRef.current = null;
         stopComposition();
+
+        if (blob.size > 0) {
+          setShowSaveDialog(true);
+        } else {
+          toast.error('Recording ended, but no video data was captured. Please try again.');
+        }
       };
 
       mediaRecorder.start(1000);
@@ -459,17 +563,19 @@ export function PitchCoachModule() {
 
   const stopRecording = () => {
     if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      // Show save dialog after recording stops
-      setTimeout(() => {
-        setShowSaveDialog(true);
-      }, 500);
+      try {
+        if (mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop();
+        }
+      } catch (err) {
+        console.error('Error stopping recorder:', err);
+        toast.error('Unable to stop recording cleanly.');
+      }
     }
     stopComposition();
-    stopDisplayCapture();
   };
 
-  const createComposedStream = (sourceStream: MediaStream, displayStream?: MediaStream) => {
+  const createComposedStream = (sourceStream: MediaStream) => {
     const canvas = document.createElement('canvas');
     canvas.width = 1280;
     canvas.height = 720;
@@ -479,14 +585,23 @@ export function PitchCoachModule() {
       return sourceStream;
     }
 
-    const displayVideo = screenVideoRef.current;
     const drawFrame = () => {
       // Main background (slides area)
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      if (displayStream && displayVideo && displayVideo.readyState >= 2) {
-        ctx.drawImage(displayVideo, 0, 0, canvas.width, canvas.height);
+      if (deckFile && deckCanvasRef.current) {
+        const slideCanvas = deckCanvasRef.current;
+        const srcW = slideCanvas.width || canvas.width;
+        const srcH = slideCanvas.height || canvas.height;
+
+        const ratio = Math.min(canvas.width / srcW, canvas.height / srcH);
+        const drawW = srcW * ratio;
+        const drawH = srcH * ratio;
+        const drawX = (canvas.width - drawW) / 2;
+        const drawY = (canvas.height - drawH) / 2;
+
+        ctx.drawImage(slideCanvas, drawX, drawY, drawW, drawH);
         ctx.fillStyle = 'rgba(15, 23, 42, 0.22)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       } else {
@@ -494,25 +609,9 @@ export function PitchCoachModule() {
         ctx.fillRect(20, 20, canvas.width - 40, canvas.height - 40);
       }
 
-      ctx.fillStyle = '#76B947';
-      ctx.font = 'bold 26px sans-serif';
-      ctx.fillText(deckFileName || 'Pitch Session', 40, 62);
-
-      ctx.fillStyle = '#d1d5db';
-      ctx.font = '20px sans-serif';
-      ctx.fillText(
-        `Slide ${currentSlide} / ${Math.max(totalSlides, 1)}  •  ${formatTime(recordingTime)}`,
-        40,
-        98,
-      );
-
-      ctx.fillStyle = '#9ca3af';
-      ctx.font = '18px sans-serif';
-      ctx.fillText('Face + slide progression recording', 40, 132);
-
       const video = videoRef.current;
       if (video && video.readyState >= 2) {
-        if (deckUrl || displayStream) {
+        if (deckFile) {
           const pipWidth = 380;
           const pipHeight = 214;
           const pipX = canvas.width - pipWidth - 28;
@@ -549,59 +648,110 @@ export function PitchCoachModule() {
     compositionCanvasRef.current = null;
   };
 
-  // Simulate live feedback during recording
-  useEffect(() => {
-    if (isRecording && !isPaused) {
-      if (liveFeedback.length === 0) {
-        setLiveFeedback([
-          {
-            id: Date.now(),
-            type: 'info',
-            message: 'Session started. Keep your opening clear while AI tracks pacing and confidence.',
-            time: formatTime(recordingTime),
-          },
-        ]);
-      }
-
-      // Update metrics randomly to simulate AI feedback
-      const metricsInterval = setInterval(() => {
-        setPitchMetrics((prev) => ({
-          pacing: Math.min(100, Math.max(0, prev.pacing + (Math.random() - 0.5) * 10)),
-          clarity: Math.min(100, Math.max(0, prev.clarity + (Math.random() - 0.5) * 10)),
-          confidence: Math.min(100, Math.max(0, prev.confidence + (Math.random() - 0.5) * 10)),
-          engagement: Math.min(100, Math.max(0, prev.engagement + (Math.random() - 0.5) * 10)),
-          structure: Math.min(100, Math.max(0, prev.structure + (Math.random() - 0.5) * 10)),
-        }));
-      }, 3000);
-
-      // Add live feedback messages
-      const feedbackInterval = setInterval(() => {
-        const feedbackMessages = [
-          { type: 'positive', message: 'Great energy! Keep it up.' },
-          { type: 'positive', message: 'Clear value proposition delivered' },
-          { type: 'warning', message: 'Slow down your pacing slightly' },
-          { type: 'warning', message: 'Try to maintain eye contact with the camera' },
-          { type: 'info', message: 'Consider adding more market data' },
-          { type: 'info', message: 'Good transition to the next point' },
-        ] as Array<{ type: 'positive' | 'warning' | 'info'; message: string }>;
-
-        const randomFeedback = feedbackMessages[Math.floor(Math.random() * feedbackMessages.length)];
-        const newFeedback = {
-          id: Date.now(),
-          type: randomFeedback.type,
-          message: randomFeedback.message,
-          time: formatTime(recordingTime),
-        };
-
-        setLiveFeedback(prev => [newFeedback, ...prev].slice(0, 5)); // Keep only last 5 feedback items
-      }, 5000);
-
-      return () => {
-        clearInterval(metricsInterval);
-        clearInterval(feedbackInterval);
-      };
+  const pushLiveTip = useCallback((message: string) => {
+    const text = (message || '').trim();
+    if (!text || text === lastTipRef.current) {
+      return;
     }
-  }, [isRecording, isPaused, recordingTime, liveFeedback.length]);
+    lastTipRef.current = text;
+
+    const lower = text.toLowerCase();
+    const type: 'positive' | 'warning' | 'info' =
+      lower.includes('slow down') || lower.includes('reduce') || lower.includes('improve')
+        ? 'warning'
+        : lower.includes('great') || lower.includes('strong') || lower.includes('clear')
+          ? 'positive'
+          : 'info';
+
+    setLiveFeedback((prev) => [
+      {
+        id: Date.now(),
+        type,
+        message: text,
+        time: formatTime(recordingTimeRef.current),
+      },
+      ...prev,
+    ].slice(0, 5));
+  }, []);
+
+  // Fetch live coaching feedback from backend while recording.
+  useEffect(() => {
+    if (!isRecording || isPaused || !selectedVenture?.id) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        const result = await apiClient.getPitchLiveFeedback({
+          venture_id: Number(selectedVenture.id),
+          pitch_type: pitchType,
+          duration_seconds: recordingTimeRef.current,
+          target_duration_seconds: targetDuration * 60,
+          current_slide: currentSlide,
+          total_slides: Math.max(totalSlides, 1),
+          slide_transitions: slideTransitionsRef.current,
+          transcript: '',
+        });
+
+        if (cancelled || !result) return;
+
+        setLiveModelStatus({
+          backend: String(result.model_backend || 'unknown'),
+          loaded: Boolean(result.model_loaded),
+          error: result.model_error || null,
+        });
+
+        if (Array.isArray(result.tips) && result.tips.length > 0) {
+          setLiveModelTips(result.tips.filter(Boolean));
+        }
+
+        if (result.metrics) {
+          setPitchMetrics({
+            pacing: Number(result.metrics.pacing || 0),
+            clarity: Number(result.metrics.clarity || 0),
+            confidence: Number(result.metrics.confidence || 0),
+            engagement: Number(result.metrics.engagement || 0),
+            structure: Number(result.metrics.structure || 0),
+          });
+        }
+
+        const firstTip = Array.isArray(result.tips) ? result.tips[0] : '';
+        if (firstTip) {
+          pushLiveTip(firstTip);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.warn('Live pitch feedback unavailable:', err);
+          setLiveModelStatus({
+            backend: 'unavailable',
+            loaded: false,
+            error: 'live endpoint unreachable',
+          });
+        }
+      }
+    };
+
+    void run();
+    const interval = window.setInterval(() => {
+      void run();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [
+    isRecording,
+    isPaused,
+    selectedVenture?.id,
+    pitchType,
+    targetDuration,
+    currentSlide,
+    totalSlides,
+    pushLiveTip,
+  ]);
 
   const handleSaveRecording = async (notes: string, ventureId: string | number) => {
     const venture = ventures.find(v => v.id.toString() === ventureId.toString());
@@ -626,18 +776,33 @@ export function PitchCoachModule() {
         .filter(Boolean)
         .join('\n');
 
-      await apiClient.uploadPitchVideo(venture.id, file, {
+      const uploadResult = await apiClient.uploadPitchVideo(venture.id, file, {
         pitch_type: pitchType,
         duration: recordingTime,
         target_duration: targetDuration * 60, // convert minutes to seconds
         notes: enrichedNotes,
       });
 
+      const uploadedVideoUrl = uploadResult?.session?.video_url;
+      if (uploadedVideoUrl) {
+        window.dispatchEvent(
+          new CustomEvent('venture-video-updated', {
+            detail: {
+              ventureId: Number(venture.id),
+              videoUrl: uploadedVideoUrl,
+            },
+          }),
+        );
+      }
+
       toast.success('Pitch video saved successfully!');
       // Reset state
       setRecordedBlob(null);
       setRecordingTime(0);
       setLiveFeedback([]);
+      setLiveModelTips([]);
+      setLiveModelStatus(null);
+      lastTipRef.current = '';
       setSlideTransitions([]);
       setPitchMetrics({
         pacing: 0,
@@ -657,6 +822,9 @@ export function PitchCoachModule() {
     setRecordedBlob(null);
     setRecordingTime(0);
     setLiveFeedback([]);
+    setLiveModelTips([]);
+    setLiveModelStatus(null);
+    lastTipRef.current = '';
     setSlideTransitions([]);
     setPitchMetrics({
       pacing: 0,
@@ -711,37 +879,62 @@ export function PitchCoachModule() {
               <input
                 ref={deckInputRef}
                 type="file"
-                accept=".pdf,.ppt,.pptx"
+                accept=".pdf,application/pdf"
                 className="hidden"
                 onChange={handleDeckUpload}
               />
 
-              {deckUrl ? (
-                // Pitch Deck Display
-                <div className="w-full h-full relative">
-                  <iframe
-                    src={deckUrl}
-                    className="w-full h-full border-0"
-                    title="Pitch Deck"
+              {deckFile ? (
+                <div className="w-full h-full relative flex items-center justify-center bg-[#0b1120]">
+                  <canvas
+                    ref={deckCanvasRef}
+                    className="max-h-full max-w-full h-auto w-auto rounded-sm shadow-[0_0_0_1px_rgba(255,255,255,0.08)]"
                   />
-                  {/* Deck filename badge */}
-                  <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm rounded-lg px-3 py-1 flex items-center space-x-2">
-                    <FileText className="h-3 w-3 text-[#76B947]" />
-                    <span className="text-white text-xs truncate max-w-[200px]" style={{ fontFamily: 'var(--font-body)' }}>
+
+                  <div className="absolute top-2 left-2 bg-black/65 backdrop-blur-sm rounded-lg px-3 py-1 flex items-center space-x-2 max-w-[70%]">
+                    <FileText className="h-3 w-3 text-[#76B947] shrink-0" />
+                    <span className="text-white text-xs truncate" style={{ fontFamily: 'var(--font-body)' }}>
                       {deckFileName}
                     </span>
                     <button onClick={removeDeck} className="text-gray-400 hover:text-white ml-1">
                       <X className="h-3 w-3" />
                     </button>
                   </div>
-                  <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded-lg px-2 py-1 flex items-center space-x-2">
-                    <span className="text-white text-xs min-w-[70px] text-center" style={{ fontFamily: 'var(--font-heading)' }}>
+
+                  <div className="absolute top-2 right-2 bg-black/65 backdrop-blur-sm rounded-lg px-2 py-1">
+                    <span className="text-white text-xs min-w-[80px] text-center block" style={{ fontFamily: 'var(--font-heading)' }}>
                       {currentSlide}/{Math.max(totalSlides, 1)}
                     </span>
                   </div>
-                  {/* Picture-in-Picture Camera when deck is loaded and camera is on */}
+
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-sm rounded-full px-3 py-2 flex items-center gap-2 border border-white/10">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-white hover:bg-white/10"
+                      onClick={() => goToSlide(currentSlide - 1)}
+                      disabled={currentSlide <= 1}
+                      title="Previous slide"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-xs text-white min-w-[5.5rem] text-center" style={{ fontFamily: 'var(--font-heading)' }}>
+                      Slide {currentSlide}
+                    </span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-white hover:bg-white/10"
+                      onClick={() => goToSlide(currentSlide + 1)}
+                      disabled={currentSlide >= totalSlides}
+                      title="Next slide"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+
                   {isVideoOn && (
-                    <div className="absolute bottom-4 right-4 w-48 aspect-video rounded-lg overflow-hidden border-2 border-[#76B947] shadow-lg">
+                    <div className="absolute bottom-14 right-4 w-48 aspect-video rounded-lg overflow-hidden border-2 border-[#76B947] shadow-lg">
                       <video
                         ref={videoRef}
                         className="w-full h-full object-cover"
@@ -807,19 +1000,29 @@ export function PitchCoachModule() {
               )}
 
               {isRecording && (
-                <div className="absolute top-16 right-4 w-[min(90vw,22rem)] rounded-xl bg-black/65 p-3 backdrop-blur-md border border-white/10">
+                <div className="absolute top-16 right-4 w-[min(90vw,24rem)] rounded-xl bg-[#76B947]/18 p-3 backdrop-blur-md border border-[#76B947]/40 shadow-[0_8px_20px_rgba(0,0,0,0.25)]">
                   <p className="text-xs font-semibold text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>
                     Live AI Feedback
                   </p>
-                  <p className="mt-1 text-xs text-white" style={{ fontFamily: 'var(--font-body)' }}>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full border text-[#76B947] border-[#76B947]/70 bg-black/45">
+                      Engine: {liveModelStatus?.backend || 'loading'}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-[#b7f08f] drop-shadow-sm" style={{ fontFamily: 'var(--font-body)' }}>
                     {liveFeedback[0]?.message || 'Analyzing delivery, pacing, and confidence...'}
                   </p>
-                  <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-gray-200" style={{ fontFamily: 'var(--font-body)' }}>
+                  <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-[#9be06a]" style={{ fontFamily: 'var(--font-body)' }}>
                     <span>Pacing: {pitchMetrics.pacing}%</span>
                     <span>Clarity: {pitchMetrics.clarity}%</span>
                     <span>Confidence: {pitchMetrics.confidence}%</span>
                     <span>Engagement: {pitchMetrics.engagement}%</span>
                   </div>
+                  {isNonAiScoring && (
+                    <div className="mt-2 rounded-md border border-yellow-300/50 bg-yellow-900/35 px-2 py-1 text-[11px] text-yellow-100" style={{ fontFamily: 'var(--font-body)' }}>
+                      AI pitch coach is currently unavailable. Current scores are running in non-AI fallback mode.
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -835,24 +1038,9 @@ export function PitchCoachModule() {
                 </div>
               )}
 
-              {/* Live Feedback Toast */}
-              {isRecording && liveFeedback[0] && !isFullscreen && (
-                <div className="absolute bottom-20 left-4 right-4">
-                  <div className={`glass-panel backdrop-blur-md rounded-xl p-3 ${
-                    liveFeedback[0].type === 'positive' ? 'bg-[#76B947]/20' :
-                    liveFeedback[0].type === 'warning' ? 'bg-yellow-500/20' :
-                    'bg-blue-500/20'
-                  }`}>
-                    <p className="text-white text-sm" style={{ fontFamily: 'var(--font-body)' }}>
-                      {liveFeedback[0].message}
-                    </p>
-                  </div>
-                </div>
-              )}
-
               {/* Floating controls while fullscreen */}
               {isFullscreen && (
-                <div className="absolute bottom-4 left-1/2 z-20 w-[min(96vw,52rem)] -translate-x-1/2 rounded-2xl border border-white/20 bg-black/70 p-2 backdrop-blur-md">
+                <div className="absolute bottom-4 left-1/2 z-20 w-[min(96vw,56rem)] -translate-x-1/2 rounded-2xl border border-[#76B947]/35 bg-[#0c160f]/78 p-2 backdrop-blur-md">
                   <div className="flex flex-wrap items-center justify-center gap-2">
                     <Button
                       size="sm"
@@ -893,6 +1081,24 @@ export function PitchCoachModule() {
                       size="sm"
                       variant="default"
                       className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
+                      onClick={() => goToSlide(currentSlide - 1)}
+                      disabled={!deckFile || currentSlide <= 1}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" /> Prev
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
+                      onClick={() => goToSlide(currentSlide + 1)}
+                      disabled={!deckFile || currentSlide >= totalSlides}
+                    >
+                      Next <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
                       onClick={() => setShowSettings(!showSettings)}
                     >
                       <Settings className="h-4 w-4" />
@@ -908,6 +1114,7 @@ export function PitchCoachModule() {
                   </div>
                 </div>
               )}
+
             </div>
 
             {/* Control Bar */}
@@ -934,9 +1141,9 @@ export function PitchCoachModule() {
                     size="sm"
                     variant="default"
                     className="bg-[#76B947] hover:bg-[#5a8f35] text-white"
-                    onClick={() => deckUrl ? removeDeck() : deckInputRef.current?.click()}
+                    onClick={() => deckFile ? removeDeck() : deckInputRef.current?.click()}
                   >
-                    {deckUrl ? (
+                    {deckFile ? (
                       <><X className="h-4 w-4 mr-2" />Remove Deck</>
                     ) : (
                       <><Upload className="h-4 w-4 mr-2" />Upload Deck</>
@@ -1126,16 +1333,16 @@ export function PitchCoachModule() {
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className={`w-2 h-2 rounded-full ${deckUrl ? 'bg-[#76B947]' : 'bg-gray-400'}`}></div>
+                    <div className={`w-2 h-2 rounded-full ${deckFile ? 'bg-[#76B947]' : 'bg-gray-400'}`}></div>
                     <span className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>
-                      Pitch Deck {deckUrl ? 'Loaded' : 'Not Loaded'}
+                      Pitch Deck {deckFile ? 'Loaded' : 'Not Loaded'}
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Slide progression controls */}
-              {deckUrl && (
+              {deckFile && (
                 <div>
                   <Label style={{ fontFamily: 'var(--font-body)' }}>Slides</Label>
                   <div className="mt-2 space-y-2">
@@ -1147,28 +1354,35 @@ export function PitchCoachModule() {
                         {currentSlide}/{Math.max(totalSlides, 1)}
                       </span>
                     </div>
-                    <div>
-                      <Label style={{ fontFamily: 'var(--font-body)' }} htmlFor="totalSlides">
-                        Total slides
-                      </Label>
-                      <input
-                        id="totalSlides"
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => goToSlide(currentSlide - 1)}
+                        disabled={currentSlide <= 1}
+                      >
+                        Prev
+                      </Button>
+                      <Input
                         type="number"
                         min={1}
-                        max={200}
-                        value={totalSlides}
+                        max={Math.max(totalSlides, 1)}
+                        value={currentSlide}
                         onChange={(e) => {
                           const value = Number(e.target.value);
-                          const safeValue = Number.isFinite(value)
-                            ? Math.min(200, Math.max(1, Math.floor(value)))
-                            : 1;
-                          setTotalSlides(safeValue);
-                          if (currentSlide > safeValue) {
-                            setCurrentSlide(safeValue);
-                          }
+                          if (!Number.isFinite(value)) return;
+                          goToSlide(value);
                         }}
-                        className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        className="text-center"
                       />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => goToSlide(currentSlide + 1)}
+                        disabled={currentSlide >= totalSlides}
+                      >
+                        Next
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -1184,6 +1398,11 @@ export function PitchCoachModule() {
             <TabsContent value="feedback" className="mt-4">
               <Card className="glass-card border-black/5">
                 <CardContent className="pt-6">
+                  {isNonAiScoring && (
+                    <div className="mb-3 rounded-lg border border-yellow-300/40 bg-yellow-100/70 px-3 py-2 text-xs text-yellow-900 dark:bg-yellow-900/25 dark:text-yellow-100" style={{ fontFamily: 'var(--font-body)' }}>
+                      AI backend is unavailable right now. Feedback scores in this session are not AI-dependent.
+                    </div>
+                  )}
                   <div className="space-y-3">
                     {liveFeedback.map((feedback) => (
                       <div
@@ -1217,26 +1436,21 @@ export function PitchCoachModule() {
               <Card className="glass-card border-black/5">
                 <CardContent className="pt-6">
                   <div className="space-y-3">
-                    <div className="p-3 rounded-lg bg-[#76B947]/10">
-                      <p className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>
-                        Start with a compelling hook that addresses the problem
-                      </p>
-                    </div>
-                    <div className="p-3 rounded-lg bg-[#76B947]/10">
-                      <p className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>
-                        Maintain eye contact with the camera
-                      </p>
-                    </div>
-                    <div className="p-3 rounded-lg bg-[#76B947]/10">
-                      <p className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>
-                        Use data to back your market opportunity claims
-                      </p>
-                    </div>
-                    <div className="p-3 rounded-lg bg-[#76B947]/10">
-                      <p className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>
-                        Practice your transitions between slides
-                      </p>
-                    </div>
+                    {liveModelTips.length > 0 ? (
+                      liveModelTips.map((tip, index) => (
+                        <div key={`${tip}-${index}`} className="p-3 rounded-lg bg-[#76B947]/10 border border-[#76B947]/20">
+                          <p className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>
+                            {tip}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-3 rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
+                        <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                          Model-generated tips will appear once live feedback starts.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

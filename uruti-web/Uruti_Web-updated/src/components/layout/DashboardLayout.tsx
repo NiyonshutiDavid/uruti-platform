@@ -4,7 +4,7 @@ import { useAuth } from '../../lib/auth-context';
 import { getDefaultRouteForRole, hasAccessToRoute } from '../../lib/router-config';
 import { Header } from '../Header';
 import { Sidebar } from '../Sidebar';
-import { FloatingCallWidget } from '../FloatingCallWidget';
+import { FloatingCallWidget } from '../FloatingCallWidget.tsx';
 import { OnboardingTour } from '../OnboardingTour';
 import { FounderSnapshotModule } from '../modules/FounderSnapshotModule';
 import { StartupHubModule } from '../modules/StartupHubModule';
@@ -115,7 +115,15 @@ export function DashboardLayout() {
   const [aiChatContext, setAiChatContext] = useState<{ name: string; description: string } | undefined>();
   const [aiAnalysisContext, setAiAnalysisContext] = useState<any>(undefined);
   const remindedMeetingKeys = useRef<Set<string>>(new Set());
-  const { callState, endCall, acceptIncomingCall, declineIncomingCall } = useCall();
+  const {
+    callState,
+    localStream,
+    remoteStream,
+    remoteVideoEnabled,
+    endCall,
+    acceptIncomingCall,
+    declineIncomingCall,
+  } = useCall();
 
   const showBrowserReminder = useCallback(async (title: string, body: string) => {
     if (typeof window === 'undefined' || !('Notification' in window)) return;
@@ -310,6 +318,9 @@ export function DashboardLayout() {
     return <Navigate to="/login" replace />;
   }
 
+  const isAiChatRoute = location.pathname.startsWith('/dashboard/ai-chat');
+  const isMessagesRoute = location.pathname.startsWith('/dashboard/messages');
+
   return (
     <>
       <Header 
@@ -327,7 +338,9 @@ export function DashboardLayout() {
           setIsMobileSidebarOpen={setIsMobileSidebarOpen}
         />
         <main className={`flex-1 min-h-0 ml-0 lg:ml-64 w-full lg:w-auto overflow-hidden ${
-          activeModule === 'ai-chat' ? '' : 'p-3 sm:p-4 md:p-6 overflow-y-auto'
+          isAiChatRoute ? '' : 'p-3 sm:p-4 md:p-6'
+        } ${
+          isAiChatRoute || isMessagesRoute ? '' : 'overflow-y-auto'
         }`}>
           <Routes>
             {/* Founder routes */}
@@ -388,6 +401,9 @@ export function DashboardLayout() {
           contactName={callState.contactName}
           contactAvatar={callState.contactAvatar}
           contactOnline={callState.contactOnline}
+          localStream={localStream}
+          remoteStream={remoteStream}
+          remoteVideoEnabled={remoteVideoEnabled}
         />
       )}
     </>

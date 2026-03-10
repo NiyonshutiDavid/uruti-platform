@@ -63,7 +63,7 @@ class _PitchPerformanceScreenState extends State<PitchPerformanceScreen> {
     final d = s['created_at'] ?? s['date'] ?? '';
     if (d.toString().length >= 10) {
       try {
-        final dt = DateTime.parse(d.toString());
+        final dt = DateTime.parse(d.toString()).toLocal();
         return '${dt.day}/${dt.month}/${dt.year}';
       } catch (_) {}
     }
@@ -73,6 +73,26 @@ class _PitchPerformanceScreenState extends State<PitchPerformanceScreen> {
   List<String> _feedback(Map<String, dynamic> s) {
     final fb = s['feedback'];
     if (fb is List) return fb.map((e) => e.toString()).toList();
+
+    if (fb is String && fb.trim().isNotEmpty) {
+      return [fb.trim()];
+    }
+
+    if (fb is Map<String, dynamic>) {
+      final tips = fb['tips'];
+      if (tips is List) return tips.map((e) => e.toString()).toList();
+      final summary = fb['summary'];
+      if (summary is String && summary.trim().isNotEmpty) {
+        return [summary.trim()];
+      }
+    }
+
+    final aiFeedback = s['ai_feedback'];
+    if (aiFeedback is Map<String, dynamic>) {
+      final tips = aiFeedback['tips'];
+      if (tips is List) return tips.map((e) => e.toString()).toList();
+    }
+
     return [];
   }
 

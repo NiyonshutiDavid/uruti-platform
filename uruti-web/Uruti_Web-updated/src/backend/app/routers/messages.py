@@ -238,8 +238,16 @@ async def signal_call_event(
 
     if receiver_id <= 0:
         raise HTTPException(status_code=400, detail="receiver_id is required")
-    valid_actions = {"invite", "accept", "decline", "end",
-                     "webrtc_offer", "webrtc_answer", "webrtc_ice"}
+    valid_actions = {
+        "invite",
+        "accept",
+        "decline",
+        "end",
+        "webrtc_offer",
+        "webrtc_answer",
+        "webrtc_ice",
+        "media_state",
+    }
     if action not in valid_actions:
         raise HTTPException(status_code=400, detail="Invalid call action")
 

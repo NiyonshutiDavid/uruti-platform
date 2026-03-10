@@ -18,6 +18,10 @@ interface CallState {
 
 interface CallContextType {
   callState: CallState;
+  localStream: MediaStream | null;
+  remoteStream: MediaStream | null;
+  localVideoEnabled: boolean;
+  remoteVideoEnabled: boolean;
   startCall: (
     type: 'voice' | 'video',
     receiverId: number,
@@ -28,6 +32,7 @@ interface CallContextType {
   acceptIncomingCall: () => Promise<void>;
   declineIncomingCall: () => Promise<void>;
   endCall: () => void;
+  setVideoEnabled: (enabled: boolean) => void;
 }
 
 const CallContext = createContext<CallContextType | undefined>(undefined);
@@ -41,6 +46,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const pendingOfferRef = useRef<Record<string, unknown> | null>(null);
   const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const ringingTimerRef = useRef<number | null>(null);
+  const ringAudioContextRef = useRef<AudioContext | null>(null);
   const callStateRef = useRef<CallState>({
     isOpen: false,
     isRinging: false,
@@ -63,6 +70,65 @@ export function CallProvider({ children }: { children: ReactNode }) {
     callId: undefined,
     counterpartId: undefined,
   });
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [localVideoEnabled, setLocalVideoEnabled] = useState(true);
+  const [remoteVideoEnabled, setRemoteVideoEnabled] = useState(true);
+
+  const stopRingingTone = () => {
+    if (ringingTimerRef.current) {
+      window.clearInterval(ringingTimerRef.current);
+      ringingTimerRef.current = null;
+    }
+    if (ringAudioContextRef.current) {
+      void ringAudioContextRef.current.close();
+      ringAudioContextRef.current = null;
+    }
+  };
+
+  const startRingingTone = (incoming: boolean) => {
+    if (ringingTimerRef.current) return;
+
+    const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+
+    const context = new AudioCtx();
+    ringAudioContextRef.current = context;
+
+    const playPattern = () => {
+      const now = context.currentTime;
+      const sequence = incoming
+        ? [0, 0.18, 0.7, 0.88]
+        : [0, 0.15];
+
+      sequence.forEach((offset, index) => {
+        const osc = context.createOscillator();
+        const gain = context.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = incoming ? (index % 2 === 0 ? 820 : 620) : 440;
+        gain.gain.value = 0.0001;
+        osc.connect(gain);
+        gain.connect(context.destination);
+        const start = now + offset;
+        const end = start + 0.12;
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(0.08, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, end);
+        osc.start(start);
+        osc.stop(end + 0.02);
+      });
+    };
+
+    void context.resume().then(() => {
+      playPattern();
+      ringingTimerRef.current = window.setInterval(
+        playPattern,
+        incoming ? 1900 : 1100,
+      );
+    }).catch(() => {
+      stopRingingTone();
+    });
+  };
 
   const clearCallState = () => {
     setCallState({
@@ -97,6 +163,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
     }
+    setLocalStream(null);
+    setRemoteStream(null);
+    setLocalVideoEnabled(true);
+    setRemoteVideoEnabled(true);
+    stopRingingTone();
 
     if (remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = null;
@@ -113,6 +184,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
       video: type === 'video',
     });
     localStreamRef.current = stream;
+    setLocalVideoEnabled(type === 'video');
+    setLocalStream(stream);
     return stream;
   };
 
@@ -138,8 +211,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
     });
 
     connection.ontrack = (event) => {
-      const [remoteStream] = event.streams;
-      if (!remoteStream) return;
+      const [incomingRemoteStream] = event.streams;
+      if (!incomingRemoteStream) return;
+      setRemoteStream(incomingRemoteStream);
 
       if (remoteAudioRef.current == null) {
         const element = document.createElement('audio');
@@ -148,10 +222,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
         remoteAudioRef.current = element;
       }
 
-      remoteAudioRef.current.srcObject = remoteStream;
+      remoteAudioRef.current.srcObject = incomingRemoteStream;
       void remoteAudioRef.current.play().catch(() => {
         // Browser may block autoplay until user interaction; Accept/Start click usually enables it.
       });
+
+      if (incomingRemoteStream.getVideoTracks().length > 0) {
+        setRemoteVideoEnabled(true);
+      }
     };
 
     connection.onicecandidate = ({ candidate }) => {
@@ -434,6 +512,19 @@ export function CallProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        if (action === 'media_state') {
+          const mediaData = payload.webrtc_data;
+          const callMatches = Boolean(currentCall.callId && callId && currentCall.callId === callId);
+          if (!callMatches || !mediaData || typeof mediaData !== 'object') {
+            return;
+          }
+
+          if (typeof mediaData.video_enabled === 'boolean') {
+            setRemoteVideoEnabled(mediaData.video_enabled);
+          }
+          return;
+        }
+
         const isMyOwnEvent = callerId === myUserId;
         if (isMyOwnEvent && action === 'invite') {
           return;
@@ -545,6 +636,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
       contactAvatar: resolveMediaUrl(contactAvatar),
       contactOnline,
     });
+    setRemoteVideoEnabled(true);
+    setLocalVideoEnabled(type === 'video');
+    startRingingTone(false);
 
     try {
       await apiClient.sendCallSignal({
@@ -573,6 +667,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (!allowed) return;
 
     setCallState((prev) => ({ ...prev, isRinging: false, isIncoming: false }));
+    stopRingingTone();
     try {
       await apiClient.sendCallSignal({
         receiver_id: callState.counterpartId,
@@ -631,14 +726,71 @@ export function CallProvider({ children }: { children: ReactNode }) {
     clearCallState();
   };
 
+  const setVideoEnabled = (enabled: boolean) => {
+    const stream = localStreamRef.current;
+    if (stream) {
+      stream.getVideoTracks().forEach((track) => {
+        track.enabled = enabled;
+      });
+    }
+    setLocalVideoEnabled(enabled);
+
+    const snapshot = callStateRef.current;
+    if (!snapshot.callId || !snapshot.counterpartId) {
+      return;
+    }
+
+    void apiClient.sendCallSignal({
+      receiver_id: snapshot.counterpartId,
+      action: 'media_state',
+      call_id: snapshot.callId,
+      is_video: snapshot.type === 'video',
+      webrtc_data: {
+        video_enabled: enabled,
+      },
+    }).catch(() => {
+      // Ignore transient signaling errors for media state updates.
+    });
+  };
+
+  useEffect(() => {
+    if (!callState.isOpen) {
+      stopRingingTone();
+      return;
+    }
+
+    if (callState.isRinging) {
+      startRingingTone(callState.isIncoming);
+    } else {
+      stopRingingTone();
+    }
+
+    return () => {
+      if (!callState.isOpen) {
+        stopRingingTone();
+      }
+    };
+  }, [callState.isOpen, callState.isRinging, callState.isIncoming]);
+
+  useEffect(() => {
+    return () => {
+      stopRingingTone();
+    };
+  }, []);
+
   return (
     <CallContext.Provider
       value={{
         callState,
+        localStream,
+        remoteStream,
+        localVideoEnabled,
+        remoteVideoEnabled,
         startCall,
         acceptIncomingCall,
         declineIncomingCall,
         endCall,
+        setVideoEnabled,
       }}
     >
       {children}
