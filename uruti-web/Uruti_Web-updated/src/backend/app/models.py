@@ -546,6 +546,21 @@ class UserSession(Base):
     user = relationship("User", back_populates="sessions")
 
 
+class QrLoginChallenge(Base):
+    """Persistent QR login challenge for cross-worker/device auth approval."""
+    __tablename__ = "qr_login_challenges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    request_id = Column(String, unique=True, nullable=False, index=True)
+    code = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="pending")
+    approved_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    consumed = Column(Boolean, default=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
 class AdvisoryTrack(Base):
     """AI Advisory Track model for educational content"""
     __tablename__ = "advisory_tracks"

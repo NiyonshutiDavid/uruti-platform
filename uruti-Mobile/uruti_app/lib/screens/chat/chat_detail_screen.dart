@@ -586,11 +586,67 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       if (msg['kind'] == 'call_event') {
         widgets.add(_CallSummaryBubble(msg: msg));
       } else {
-        widgets.add(_MessageBubble(msg: msg, isMe: isMe));
+        widgets.add(
+          GestureDetector(
+            onLongPress: () => _promptDeleteMessage(msg),
+            child: _MessageBubble(msg: msg, isMe: isMe),
+          ),
+        );
       }
     }
 
     return widgets;
+  }
+
+  Future<void> _promptDeleteMessage(Map<String, dynamic> message) async {
+    final messageId = int.tryParse('${message['id'] ?? ''}') ?? 0;
+    if (messageId <= 0) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dlg) => AlertDialog(
+        backgroundColor: context.colors.surface,
+        title: Text(
+          'Delete message?',
+          style: TextStyle(color: context.colors.textPrimary),
+        ),
+        content: Text(
+          'This will permanently delete this message for this conversation.',
+          style: TextStyle(color: context.colors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dlg, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: context.colors.textSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dlg, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await ApiService.instance.deleteMessage(messageId);
+      if (!mounted) return;
+      setState(() {
+        _messages.removeWhere((m) => '${m['id'] ?? ''}' == '$messageId');
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Message deleted')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to delete message')),
+      );
+    }
   }
 
   void _openComposerActions() {

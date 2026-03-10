@@ -34,7 +34,6 @@ class _MessagesHomeState extends State<_MessagesHome> {
   String _search = '';
   final _searchCtrl = TextEditingController();
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
-  final Set<String> _deletedIds = {};
   Timer? _onlineRefreshTimer;
 
   static const _filters = ['All', 'Unread', 'Starred'];
@@ -201,10 +200,7 @@ class _MessagesHomeState extends State<_MessagesHome> {
   }
 
   List<Map<String, dynamic>> get _filtered {
-    var list = _conversations.where((c) {
-      final other = (c['other_user'] as Map?)?.cast<String, dynamic>() ?? {};
-      return !_deletedIds.contains('${other['id'] ?? ''}');
-    }).toList();
+    var list = _conversations.toList();
     if (_filter == 'Unread') {
       list = list.where((c) => (c['unread_count'] as int? ?? 0) > 0).toList();
     } else if (_filter == 'Starred') {
@@ -453,8 +449,25 @@ class _MessagesHomeState extends State<_MessagesHome> {
                               ),
                             );
                           },
-                          onDismissed: (_) {
-                            setState(() => _deletedIds.add(uid));
+                          onDismissed: (_) async {
+                            final messenger = ScaffoldMessenger.of(context);
+                            final otherUserId = int.tryParse(uid) ?? 0;
+                            if (otherUserId > 0) {
+                              try {
+                                await ApiService.instance.deleteMessageThread(otherUserId);
+                              } catch (_) {
+                                messenger.showSnackBar(
+                                  const SnackBar(content: Text('Failed to delete conversation on server')),
+                                );
+                              }
+                            }
+                            if (!mounted) return;
+                            setState(() {
+                              _conversations.removeWhere((conversation) {
+                                final other = (conversation['other_user'] as Map?)?.cast<String, dynamic>() ?? {};
+                                return '${other['id'] ?? ''}' == uid;
+                              });
+                            });
                           },
                           child: _ConversationTile(
                             name: name,

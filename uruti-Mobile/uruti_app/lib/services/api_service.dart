@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -15,6 +16,7 @@ class ApiService {
   static ApiService get instance => _instance;
 
   String? _token;
+  static const Duration _authTimeout = Duration(seconds: 12);
 
   Future<String?> get token async {
     if (_token != null) return _token;
@@ -135,19 +137,29 @@ class ApiService {
     String? platform,
     String? os,
   }) async {
-    final res = await http.post(
-      Uri.parse('${AppConstants.apiV1}/auth/login'),
-      headers: await _headers(),
-      body: jsonEncode({
-        'email': email,
-        'password': password,
-        if (deviceId != null) 'device_id': deviceId,
-        if (deviceName != null) 'device_name': deviceName,
-        if (platform != null) 'platform': platform,
-        if (os != null) 'os': os,
-      }),
-    );
-    return _handleResponse(res);
+    try {
+      final res = await http
+          .post(
+            Uri.parse('${AppConstants.apiV1}/auth/login'),
+            headers: await _headers(),
+            body: jsonEncode({
+              'email': email,
+              'password': password,
+              if (deviceId != null) 'device_id': deviceId,
+              if (deviceName != null) 'device_name': deviceName,
+              if (platform != null) 'platform': platform,
+              if (os != null) 'os': os,
+            }),
+          )
+          .timeout(_authTimeout);
+      return _handleResponse(res);
+    } on TimeoutException {
+      throw ApiException(
+        statusCode: 0,
+        message:
+            'Connection timed out while reaching ${AppConstants.apiBaseUrl}. For physical devices, set BACKEND_URL to your machine LAN IP (example: http://192.168.x.x:8010).',
+      );
+    }
   }
 
   /// Register / refresh a session for the current device on the backend.
@@ -193,11 +205,20 @@ class ApiService {
   }
 
   Future<UserModel> getCurrentUser() async {
-    final res = await http.get(
-      Uri.parse('${AppConstants.apiV1}/auth/me'),
-      headers: await _headers(auth: true),
-    );
-    return UserModel.fromJson(await _handleResponse(res));
+    try {
+      final res = await http
+          .get(
+            Uri.parse('${AppConstants.apiV1}/auth/me'),
+            headers: await _headers(auth: true),
+          )
+          .timeout(_authTimeout);
+      return UserModel.fromJson(await _handleResponse(res));
+    } on TimeoutException {
+      throw ApiException(
+        statusCode: 0,
+        message: 'Connection timed out while validating session.',
+      );
+    }
   }
 
   // ──────────────────── PROFILE ────────────────────
@@ -602,6 +623,22 @@ class ApiService {
     }
   }
 
+  Future<void> deleteMessage(int messageId) async {
+    final res = await http.delete(
+      Uri.parse('${AppConstants.apiV1}/messages/$messageId'),
+      headers: await _headers(auth: true),
+    );
+    await _handleResponse(res);
+  }
+
+  Future<void> deleteMessageThread(int otherUserId) async {
+    final res = await http.delete(
+      Uri.parse('${AppConstants.apiV1}/messages/threads/$otherUserId'),
+      headers: await _headers(auth: true),
+    );
+    await _handleResponse(res);
+  }
+
   Future<Map<String, dynamic>> sendCallSignal({
     required int receiverId,
     required String action,
@@ -700,6 +737,33 @@ class ApiService {
     final res = await http.get(
       Uri.parse('${AppConstants.apiV1}/pitch-coach/sessions/$sessionId'),
       headers: await _headers(auth: true),
+    );
+    return _handleResponse(res);
+  }
+
+  Future<Map<String, dynamic>> getPitchLiveFeedback({
+    required int ventureId,
+    required String pitchType,
+    required int durationSeconds,
+    required int targetDurationSeconds,
+    required int currentSlide,
+    required int totalSlides,
+    required List<Map<String, dynamic>> slideTransitions,
+    String transcript = '',
+  }) async {
+    final res = await http.post(
+      Uri.parse('${AppConstants.apiV1}/pitch/live-feedback'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({
+        'venture_id': ventureId,
+        'pitch_type': pitchType,
+        'duration_seconds': durationSeconds,
+        'target_duration_seconds': targetDurationSeconds,
+        'current_slide': currentSlide,
+        'total_slides': totalSlides,
+        'slide_transitions': slideTransitions,
+        'transcript': transcript,
+      }),
     );
     return _handleResponse(res);
   }

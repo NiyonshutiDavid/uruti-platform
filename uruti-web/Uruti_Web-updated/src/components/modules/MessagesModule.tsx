@@ -613,9 +613,18 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
     });
     if (!confirmed) return;
 
-    setConversations(prev => prev.filter(conv => conv.id !== conversationId));
-    if (selectedConversation?.id === conversationId) {
-      setSelectedConversation(null);
+    const conversation = conversations.find((conv) => conv.id === conversationId);
+    if (!conversation) return;
+
+    try {
+      await apiClient.deleteMessageThread(conversation.userId);
+      setConversations(prev => prev.filter(conv => conv.id !== conversationId));
+      if (selectedConversation?.id === conversationId) {
+        setSelectedConversation(null);
+      }
+      toast.success('Conversation deleted');
+    } catch (error) {
+      toast.error('Failed to delete conversation');
     }
   };
 

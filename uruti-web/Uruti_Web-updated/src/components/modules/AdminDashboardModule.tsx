@@ -93,8 +93,9 @@ export function AdminDashboardModule() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [usersResult, venturesResult, supportResult] = await Promise.allSettled([
+      const [usersResult, userStatsResult, venturesResult, supportResult] = await Promise.allSettled([
         apiClient.getUsers(0, 1000),
+        apiClient.getUserStats(),
         apiClient.getVentures(0, 1000),
         apiClient.getSupportMessages(0, 100),
       ]);
@@ -119,11 +120,18 @@ export function AdminDashboardModule() {
         setSupportMessages([]);
       }
 
-      const founders = usersData.filter((u: any) => u.role === 'founder').length;
-      const investors = usersData.filter((u: any) => u.role === 'investor').length;
+      const founders = userStatsResult.status === 'fulfilled'
+        ? Number(userStatsResult.value.founders || 0)
+        : usersData.filter((u: any) => u.role === 'founder').length;
+      const investors = userStatsResult.status === 'fulfilled'
+        ? Number(userStatsResult.value.investors || 0)
+        : usersData.filter((u: any) => u.role === 'investor').length;
+      const totalUsers = userStatsResult.status === 'fulfilled'
+        ? Number(userStatsResult.value.total || 0)
+        : usersData.length;
 
       setStats({
-        totalUsers: usersData.length,
+        totalUsers,
         totalFounders: founders,
         totalInvestors: investors,
         totalVentures: venturesData.length,

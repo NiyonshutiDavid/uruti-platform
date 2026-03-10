@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from datetime import timedelta, datetime, timezone
-from typing import Dict, Optional
+from typing import Optional
 from secrets import token_urlsafe
-from threading import Lock
 from pydantic import BaseModel
 from ..database import get_db
-from ..models import User, UserSession
+from ..models import User, UserSession, QrLoginChallenge
 from ..schemas import (
     UserCreate,
     UserResponse,
@@ -62,29 +61,14 @@ def _create_session(
     return session
 
 
-class _QrLoginChallenge:
-    def __init__(self, request_id: str, code: str, expires_at: datetime):
-        self.request_id = request_id
-        self.code = code
-        self.expires_at = expires_at
-        self.status = "pending"
-        self.approved_user_id = None
-        self.consumed = False
-
-
-_QR_LOGIN_CHALLENGES: Dict[str, _QrLoginChallenge] = {}
-_QR_LOGIN_LOCK = Lock()
 _QR_LOGIN_TTL_SECONDS = 180
 
 
-def _cleanup_qr_challenges(now: datetime) -> None:
-    stale_keys = [
-        key
-        for key, challenge in _QR_LOGIN_CHALLENGES.items()
-        if challenge.expires_at <= now or challenge.consumed
-    ]
-    for key in stale_keys:
-        _QR_LOGIN_CHALLENGES.pop(key, None)
+def _cleanup_qr_challenges(db: Session, now: datetime) -> None:
+    db.query(QrLoginChallenge).filter(
+        (QrLoginChallenge.expires_at <= now) | (QrLoginChallenge.consumed == True)
+    ).delete(synchronize_session=False)
+    db.commit()
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -156,19 +140,23 @@ def login(login_data: LoginRequestExt, request: Request, db: Session = Depends(g
 
 
 @router.post("/qr/request")
-def request_qr_login():
+def request_qr_login(db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc)
     request_id = token_urlsafe(18)
     code = token_urlsafe(16)
     expires_at = now + timedelta(seconds=_QR_LOGIN_TTL_SECONDS)
 
-    with _QR_LOGIN_LOCK:
-        _cleanup_qr_challenges(now)
-        _QR_LOGIN_CHALLENGES[request_id] = _QrLoginChallenge(
-            request_id=request_id,
-            code=code,
-            expires_at=expires_at,
-        )
+    _cleanup_qr_challenges(db, now)
+    challenge = QrLoginChallenge(
+        request_id=request_id,
+        code=code,
+        status="pending",
+        approved_user_id=None,
+        consumed=False,
+        expires_at=expires_at,
+    )
+    db.add(challenge)
+    db.commit()
 
     qr_payload = f"uruti://linked-login?request_id={request_id}&code={code}"
     return {
@@ -183,21 +171,26 @@ def request_qr_login():
 @router.post("/qr/approve")
 def approve_qr_login(
     payload: QrLoginApproveRequest,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     now = datetime.now(timezone.utc)
-    with _QR_LOGIN_LOCK:
-        _cleanup_qr_challenges(now)
-        challenge = _QR_LOGIN_CHALLENGES.get(payload.request_id)
-        if not challenge:
-            raise HTTPException(status_code=404, detail="QR login request not found")
-        if challenge.expires_at <= now:
-            challenge.status = "expired"
-            raise HTTPException(status_code=410, detail="QR login request expired")
-        if challenge.code != payload.code:
-            raise HTTPException(status_code=400, detail="Invalid QR login code")
-        challenge.status = "approved"
-        challenge.approved_user_id = current_user.id
+    _cleanup_qr_challenges(db, now)
+    challenge = db.query(QrLoginChallenge).filter(
+        QrLoginChallenge.request_id == payload.request_id
+    ).first()
+    if not challenge:
+        raise HTTPException(status_code=404, detail="QR login request not found")
+    if challenge.expires_at <= now:
+        challenge.status = "expired"
+        db.commit()
+        raise HTTPException(status_code=410, detail="QR login request expired")
+    if challenge.code != payload.code:
+        raise HTTPException(status_code=400, detail="Invalid QR login code")
+
+    challenge.status = "approved"
+    challenge.approved_user_id = current_user.id
+    db.commit()
 
     return {
         "request_id": payload.request_id,
@@ -209,41 +202,44 @@ def approve_qr_login(
 @router.get("/qr/status/{request_id}")
 def qr_login_status(request_id: str, code: str, db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc)
+    _cleanup_qr_challenges(db, now)
+    challenge = db.query(QrLoginChallenge).filter(
+        QrLoginChallenge.request_id == request_id
+    ).first()
+    if not challenge:
+        raise HTTPException(status_code=404, detail="QR login request not found")
+    if challenge.expires_at <= now:
+        challenge.status = "expired"
+        db.commit()
+        raise HTTPException(status_code=410, detail="QR login request expired")
+    if challenge.code != code:
+        raise HTTPException(status_code=400, detail="Invalid QR login code")
 
-    with _QR_LOGIN_LOCK:
-        _cleanup_qr_challenges(now)
-        challenge = _QR_LOGIN_CHALLENGES.get(request_id)
-        if not challenge:
-            raise HTTPException(status_code=404, detail="QR login request not found")
-        if challenge.expires_at <= now:
-            challenge.status = "expired"
-            raise HTTPException(status_code=410, detail="QR login request expired")
-        if challenge.code != code:
-            raise HTTPException(status_code=400, detail="Invalid QR login code")
+    if challenge.status != "approved" or not challenge.approved_user_id:
+        return {
+            "request_id": request_id,
+            "status": challenge.status,
+            "expires_at": challenge.expires_at.isoformat(),
+        }
 
-        if challenge.status != "approved" or not challenge.approved_user_id:
-            return {
-                "request_id": request_id,
-                "status": challenge.status,
-                "expires_at": challenge.expires_at.isoformat(),
-            }
+    user = db.query(User).filter(User.id == challenge.approved_user_id).first()
+    if not user or not user.is_active:
+        challenge.status = "failed"
+        db.commit()
+        return {
+            "request_id": request_id,
+            "status": "failed",
+            "detail": "Approved user is no longer active",
+        }
 
-        user = db.query(User).filter(User.id == challenge.approved_user_id).first()
-        if not user or not user.is_active:
-            challenge.status = "failed"
-            return {
-                "request_id": request_id,
-                "status": "failed",
-                "detail": "Approved user is no longer active",
-            }
-
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": user.id},
-            expires_delta=access_token_expires,
-        )
-        challenge.status = "consumed"
-        challenge.consumed = True
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.id},
+        expires_delta=access_token_expires,
+    )
+    challenge.status = "consumed"
+    challenge.consumed = True
+    db.commit()
 
     return {
         "request_id": request_id,

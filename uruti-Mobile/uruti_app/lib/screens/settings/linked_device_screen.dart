@@ -18,6 +18,7 @@ class LinkedDeviceScreen extends StatefulWidget {
 class _LinkedDeviceScreenState extends State<LinkedDeviceScreen> {
   List<Map<String, dynamic>> _sessions = [];
   bool _loading = true;
+  bool _revoking = false;
   String? _currentDeviceId;
 
   @override
@@ -56,6 +57,14 @@ class _LinkedDeviceScreenState extends State<LinkedDeviceScreen> {
   }
 
   Future<void> _revokeSession(String sessionId) async {
+    if (_revoking) return;
+    if (sessionId.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot revoke this device session yet')),
+      );
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -89,17 +98,22 @@ class _LinkedDeviceScreenState extends State<LinkedDeviceScreen> {
     if (confirmed != true) return;
 
     try {
+      setState(() => _revoking = true);
       await ApiService.instance.revokeSession(sessionId);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Device logged out')));
-      _loadSessions();
+      await _loadSessions();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error: $e')));
+    } finally {
+      if (mounted) {
+        setState(() => _revoking = false);
+      }
     }
   }
 

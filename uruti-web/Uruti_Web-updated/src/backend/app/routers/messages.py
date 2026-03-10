@@ -468,6 +468,28 @@ def delete_message(
     return None
 
 
+@router.delete("/threads/{other_user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_thread(
+    other_user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Delete all messages in a direct thread between current user and other user."""
+
+    if other_user_id <= 0:
+        raise HTTPException(status_code=400, detail="Invalid user id")
+
+    db.query(Message).filter(
+        or_(
+            (Message.sender_id == current_user.id) & (Message.receiver_id == other_user_id),
+            (Message.sender_id == other_user_id) & (Message.receiver_id == current_user.id),
+        )
+    ).delete(synchronize_session=False)
+
+    db.commit()
+    return None
+
+
 @router.get("/unread/count")
 def get_unread_count(
     db: Session = Depends(get_db),

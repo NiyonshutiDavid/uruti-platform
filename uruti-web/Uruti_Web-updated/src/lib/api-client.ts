@@ -628,6 +628,20 @@ class ApiClient {
     });
   }
 
+  async deleteMessage(messageId: number) {
+    return this.request<void>(`/api/v1/messages/${messageId}`, {
+      method: 'DELETE',
+      requiresAuth: true,
+    });
+  }
+
+  async deleteMessageThread(otherUserId: number) {
+    return this.request<void>(`/api/v1/messages/threads/${otherUserId}`, {
+      method: 'DELETE',
+      requiresAuth: true,
+    });
+  }
+
   async sendCallSignal(data: {
     receiver_id: number;
     action:
@@ -1205,7 +1219,42 @@ class ApiClient {
   }
 
   // WebSocket connection
+  private createDisabledSocket(): WebSocket {
+    const stub = {
+      readyState: WebSocket.CLOSED,
+      bufferedAmount: 0,
+      extensions: '',
+      protocol: '',
+      binaryType: 'blob' as BinaryType,
+      url: '',
+      onopen: null,
+      onerror: null,
+      onclose: null,
+      onmessage: null,
+      close: () => {},
+      send: (_data: string | ArrayBufferLike | Blob | ArrayBufferView) => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    } as unknown as WebSocket;
+    return stub;
+  }
+
   createWebSocket(token: string): WebSocket {
+    const explicitWsBase = String((import.meta as any).env?.VITE_WS_URL || '').trim().replace(/\/$/, '');
+    if (explicitWsBase) {
+      const wsBaseUrl = explicitWsBase
+        .replace(/^http:\/\//, 'ws://')
+        .replace(/^https:\/\//, 'wss://');
+      return new WebSocket(`${wsBaseUrl}/api/v1/messages/ws?token=${token}`);
+    }
+
+    // When running behind Netlify proxy without a dedicated WS endpoint,
+    // avoid noisy failed reconnect loops in the browser console.
+    if (!this.baseUrl || this.baseUrl.trim() === '') {
+      return this.createDisabledSocket();
+    }
+
     const wsBaseUrl = this.baseUrl
       .replace(/^http:\/\//, 'ws://')
       .replace(/^https:\/\//, 'wss://');
@@ -1217,6 +1266,18 @@ class ApiClient {
   }
 
   createNotificationsWebSocket(token: string): WebSocket {
+    const explicitWsBase = String((import.meta as any).env?.VITE_WS_URL || '').trim().replace(/\/$/, '');
+    if (explicitWsBase) {
+      const wsBaseUrl = explicitWsBase
+        .replace(/^http:\/\//, 'ws://')
+        .replace(/^https:\/\//, 'wss://');
+      return new WebSocket(`${wsBaseUrl}/api/v1/notifications/ws?token=${token}`);
+    }
+
+    if (!this.baseUrl || this.baseUrl.trim() === '') {
+      return this.createDisabledSocket();
+    }
+
     const wsBaseUrl = this.baseUrl
       .replace(/^http:\/\//, 'ws://')
       .replace(/^https:\/\//, 'wss://');
