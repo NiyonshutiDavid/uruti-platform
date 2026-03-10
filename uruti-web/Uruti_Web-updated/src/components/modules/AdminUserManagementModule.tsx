@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -40,6 +40,12 @@ export function AdminUserManagementModule() {
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [pendingDeleteUser, setPendingDeleteUser] = useState<any | null>(null);
   const [onlineIds, setOnlineIds] = useState<Set<number>>(new Set());
+  const [userStats, setUserStats] = useState({
+    total: 0,
+    founders: 0,
+    investors: 0,
+    admins: 0,
+  });
   const pageSize = 10;
   const [newUser, setNewUser] = useState({
     full_name: '',
@@ -95,9 +101,19 @@ export function AdminUserManagementModule() {
     }
   };
 
+  const fetchUserStats = async () => {
+    try {
+      const stats = await apiClient.getUserStats();
+      setUserStats(stats);
+    } catch {
+      // silently ignore - table data still renders
+    }
+  };
+
   useEffect(() => {
     loadUsers(currentPage);
     fetchOnlineIds();
+    fetchUserStats();
   }, []);
 
   // Poll online status every 30 seconds
@@ -118,15 +134,6 @@ export function AdminUserManagementModule() {
     loadUsers(currentPage);
   }, [currentPage]);
 
-  const filteredStats = useMemo(() => {
-    return {
-      total: users.length,
-      founders: users.filter((u) => u.role === 'founder').length,
-      investors: users.filter((u) => u.role === 'investor').length,
-      admins: users.filter((u) => u.role === 'admin').length,
-    };
-  }, [users]);
-
   const handleCreateUser = async () => {
     if (!newUser.full_name || !newUser.email || !newUser.password) {
       toast.error('Please fill all fields');
@@ -141,6 +148,7 @@ export function AdminUserManagementModule() {
       setSearchTerm('');
       setCurrentPage(1);
       await loadUsers(1);
+      await fetchUserStats();
     } catch (error: any) {
       toast.error(error.message || 'Failed to create user');
     } finally {
@@ -160,6 +168,7 @@ export function AdminUserManagementModule() {
       setUsers((prev) => prev.filter((u) => u.id !== targetUser.id));
       toast.success(`Deleted ${targetUser.full_name || targetUser.email}`);
       loadUsers(currentPage);
+      fetchUserStats();
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete user');
     }
@@ -178,6 +187,7 @@ export function AdminUserManagementModule() {
       await apiClient.updateUserAsAdmin(targetUser.id, { is_active: nextState });
       setUsers((prev) => prev.map((u) => (u.id === targetUser.id ? { ...u, is_active: nextState } : u)));
       toast.success(`${targetUser.full_name || targetUser.email} ${nextState ? 'activated' : 'deactivated'}`);
+      fetchUserStats();
     } catch (error: any) {
       toast.error(error.message || 'Failed to update account status');
     }
@@ -264,6 +274,7 @@ export function AdminUserManagementModule() {
       setIsEditOpen(false);
       setEditingUser(null);
       await loadUsers(currentPage);
+      await fetchUserStats();
     } catch (error: any) {
       toast.error(error.message || 'Failed to update user');
     }
@@ -302,25 +313,25 @@ export function AdminUserManagementModule() {
         <Card className="glass-card border-black/10 dark:border-white/10 h-full">
           <CardContent className="p-6 h-full flex flex-col justify-between">
             <p className="text-sm text-muted-foreground">Total</p>
-            <p className="text-2xl font-bold dark:text-white">{filteredStats.total}</p>
+            <p className="text-2xl font-bold dark:text-white">{userStats.total}</p>
           </CardContent>
         </Card>
         <Card className="glass-card border-black/10 dark:border-white/10 h-full">
           <CardContent className="p-6 h-full flex flex-col justify-between">
             <p className="text-sm text-muted-foreground">Founders</p>
-            <p className="text-2xl font-bold dark:text-white">{filteredStats.founders}</p>
+            <p className="text-2xl font-bold dark:text-white">{userStats.founders}</p>
           </CardContent>
         </Card>
         <Card className="glass-card border-black/10 dark:border-white/10 h-full">
           <CardContent className="p-6 h-full flex flex-col justify-between">
             <p className="text-sm text-muted-foreground">Investors</p>
-            <p className="text-2xl font-bold dark:text-white">{filteredStats.investors}</p>
+            <p className="text-2xl font-bold dark:text-white">{userStats.investors}</p>
           </CardContent>
         </Card>
         <Card className="glass-card border-black/10 dark:border-white/10 h-full">
           <CardContent className="p-6 h-full flex flex-col justify-between">
             <p className="text-sm text-muted-foreground">Admins</p>
-            <p className="text-2xl font-bold dark:text-white">{filteredStats.admins}</p>
+            <p className="text-2xl font-bold dark:text-white">{userStats.admins}</p>
           </CardContent>
         </Card>
         <Card className="glass-card border-black/10 dark:border-white/10 h-full">

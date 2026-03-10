@@ -354,6 +354,22 @@ class ApiClient {
     });
   }
 
+  async getUserStats(): Promise<{
+    total: number;
+    founders: number;
+    investors: number;
+    admins: number;
+  }> {
+    return this.request<{
+      total: number;
+      founders: number;
+      investors: number;
+      admins: number;
+    }>('/api/v1/users/stats', {
+      requiresAuth: true,
+    });
+  }
+
   async deleteUserAsAdmin(userId: number) {
     return this.request<void>(`/api/v1/users/${userId}`, {
       method: 'DELETE',

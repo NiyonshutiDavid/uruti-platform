@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, desc
+from sqlalchemy import or_, desc, func
 from typing import List
 from datetime import datetime, timedelta
 from ..database import get_db
@@ -64,6 +64,40 @@ def search_users(
         .all()
     )
     return users
+
+
+@router.get("/stats")
+def get_user_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Return aggregate user counts for admin dashboard cards."""
+    _ensure_admin(current_user)
+
+    role_counts = (
+        db.query(User.role, func.count(User.id))
+        .group_by(User.role)
+        .all()
+    )
+
+    counts = {
+        "founder": 0,
+        "investor": 0,
+        "admin": 0,
+    }
+    for role, count in role_counts:
+        role_key = str(role.value if hasattr(role, "value") else role)
+        if role_key in counts:
+            counts[role_key] = int(count)
+
+    total_users = int(sum(counts.values()))
+
+    return {
+        "total": total_users,
+        "founders": counts["founder"],
+        "investors": counts["investor"],
+        "admins": counts["admin"],
+    }
 
 
 @router.get("/online-ids", response_model=List[int])
