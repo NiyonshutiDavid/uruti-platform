@@ -146,8 +146,11 @@ class PitchCoachEngine:
         self._last_load_attempt = now
 
         # Prefer local pitch model assets when available.
+        # If no HF model id is provided, automatically attempt local RL loading
+        # even when the explicit env toggle is false.
         local_error: str | None = None
-        if self.enable_local_rl:
+        should_try_local = self.enable_local_rl or (not self.model_id and self._local_inference_path() is not None)
+        if should_try_local:
             try:
                 self._ensure_local_model()
                 return

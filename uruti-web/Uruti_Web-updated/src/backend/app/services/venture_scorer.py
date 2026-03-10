@@ -26,6 +26,7 @@ def _clamp(value: float, low: float, high: float) -> float:
 class VentureScorer:
     def __init__(self) -> None:
         self._loaded: Optional[_LoadedBundle] = None
+        self._load_error: Optional[str] = None
         self._model_folder_name = "Uruti-Investor_Intelligence_and_Ranker"
 
     def _resolve_paths(self) -> Tuple[Optional[Path], Optional[Path]]:
@@ -72,7 +73,11 @@ class VentureScorer:
         except Exception:
             pass
 
-        loaded_obj = joblib.load(bundle_path)
+        try:
+            loaded_obj = joblib.load(bundle_path)
+        except Exception as exc:
+            self._load_error = f"failed to load model bundle: {exc}"
+            return None
         estimator = loaded_obj
 
         if isinstance(loaded_obj, dict):
@@ -110,6 +115,7 @@ class VentureScorer:
             model_name=folder_name,
             bundle_path=str(bundle_path),
         )
+        self._load_error = None
         return self._loaded
 
     def get_model_info(self) -> Dict[str, Any]:
@@ -133,6 +139,7 @@ class VentureScorer:
                 "bundle_path": str(bundle_path) if bundle_path else None,
                 "meta_path": str(meta_path) if meta_path else None,
                 "inference_backend": "rule_based",
+                "load_error": self._load_error,
                 "class_names": ["not_ready", "mentorship_needed", "investment_ready"],
                 "expected_feature_count": int(meta.get("expected_feature_count") or 10),
                 "score_definition": str(meta.get("score") or "Uruti score is 0-100"),
