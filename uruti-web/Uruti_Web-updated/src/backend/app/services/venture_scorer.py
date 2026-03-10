@@ -5,7 +5,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import json
+import subprocess
 import sys
+import tempfile
 
 import joblib
 import pandas as pd
@@ -21,6 +23,32 @@ class _LoadedBundle:
 
 def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
+
+
+def _probe_bundle(bundle_path: Path) -> bool:
+    """Return True if joblib.load() succeeds in an isolated subprocess.
+
+    Running the load in a child process ensures that a native crash (segfault)
+    due to numpy/sklearn ABI incompatibilities cannot kill the main server
+    process.  The child exits with code 0 on success and non-zero on failure.
+    """
+    probe_script = (
+        "import sys, joblib; "
+        "import numpy.core as _c; "
+        "sys.modules.setdefault('numpy._core', _c); "
+        "joblib.load(sys.argv[1]); "
+        "sys.exit(0)"
+    )
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", probe_script, str(bundle_path)],
+            timeout=30,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
 
 
 class VentureScorer:
@@ -72,6 +100,17 @@ class VentureScorer:
                 sys.modules["numpy._core.numeric"] = _np_core.numeric
         except Exception:
             pass
+
+        # Probe the bundle in a child process first. If the subprocess crashes
+        # (segfault due to numpy/sklearn ABI mismatch) the main server process
+        # stays alive and we fall back to the heuristic scorer.
+        if not _probe_bundle(bundle_path):
+            self._load_error = (
+                "bundle probe subprocess crashed or timed out — "
+                "likely numpy/sklearn ABI incompatibility on this host; "
+                "using heuristic fallback"
+            )
+            return None
 
         try:
             loaded_obj = joblib.load(bundle_path)

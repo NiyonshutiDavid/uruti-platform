@@ -372,8 +372,9 @@ def delete_venture(
     if not venture:
         raise HTTPException(status_code=404, detail="Venture not found")
     
-    # Check ownership
-    if venture.founder_id != current_user.id:
+    # Admins can delete any venture; founders can only delete their own
+    is_admin = current_user.role == UserRole.ADMIN
+    if not is_admin and venture.founder_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to delete this venture")
     
     db.delete(venture)
