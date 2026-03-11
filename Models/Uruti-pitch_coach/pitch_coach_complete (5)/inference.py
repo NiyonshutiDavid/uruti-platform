@@ -30,6 +30,10 @@ def _resolve_sb3_model_path(model_path):
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for root, _, files in os.walk(model_path):
             for name in files:
+                # Skip optimizer state — not needed for inference and causes
+                # version-mismatch errors when torch version differs from training.
+                if name == "policy.optimizer.pth":
+                    continue
                 file_path = os.path.join(root, name)
                 arcname = os.path.relpath(file_path, model_path)
                 zf.write(file_path, arcname=arcname)
