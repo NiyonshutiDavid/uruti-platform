@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from datetime import timedelta, datetime, timezone
 from typing import Optional
@@ -21,8 +22,10 @@ from ..auth import (
     get_current_active_user
 )
 from ..config import settings
+from jose import jwt
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/login")
 
 
 class LoginRequestExt(BaseModel):
@@ -119,7 +122,7 @@ def login(login_data: LoginRequestExt, request: Request, db: Session = Depends(g
 
     # Track login session
     ip = request.client.host if request.client else None
-    _create_session(
+    session = _create_session(
         db,
         user.id,
         device_id=login_data.device_id,
@@ -132,7 +135,7 @@ def login(login_data: LoginRequestExt, request: Request, db: Session = Depends(g
     # Create access token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.id},
+        data={"sub": user.id, "sid": session.id},
         expires_delta=access_token_expires
     )
     
@@ -272,6 +275,7 @@ def logout(current_user: User = Depends(get_current_user)):
 def get_active_sessions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
+    token: str = Depends(oauth2_scheme),
 ):
     """List all active sessions (linked devices) for the current user."""
     sessions = (
@@ -284,6 +288,14 @@ def get_active_sessions(
         .all()
     )
 
+    current_session_id: Optional[int] = None
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        sid = payload.get("sid")
+        current_session_id = int(sid) if sid is not None else None
+    except Exception:
+        current_session_id = None
+
     return {
         "sessions": [
             {
@@ -295,7 +307,7 @@ def get_active_sessions(
                 "ip_address": s.ip_address,
                 "last_active": s.last_active.isoformat() if s.last_active else None,
                 "created_at": s.created_at.isoformat() if s.created_at else None,
-                "is_current": False,  # Client determines this via device_id match
+                "is_current": bool(current_session_id is not None and s.id == current_session_id),
             }
             for s in sessions
         ]

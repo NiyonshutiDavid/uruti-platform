@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from .config import settings
 from .database import get_db
-from .models import User
+from .models import User, UserSession
 from .schemas import TokenData
 
 # Password hashing
@@ -66,17 +66,30 @@ async def get_current_user(
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         subject = payload.get("sub")
+        session_claim = payload.get("sid")
         user_id: Optional[int] = int(subject) if subject is not None else None
+        session_id: Optional[int] = int(session_claim) if session_claim is not None else None
         if user_id is None:
             raise credentials_exception
         token_data = TokenData(user_id=user_id)
-    except JWTError:
+    except (JWTError, ValueError, TypeError):
         raise credentials_exception
     
     user = db.query(User).filter(User.id == token_data.user_id).first()
     if user is None:
         raise credentials_exception
     
+    # If token is session-bound, enforce that the session is still active.
+    if session_id is not None:
+        active_session = db.query(UserSession).filter(
+            UserSession.id == session_id,
+            UserSession.user_id == user.id,
+            UserSession.is_active == True,
+        ).first()
+        if active_session is None:
+            raise credentials_exception
+        active_session.last_active = datetime.utcnow()
+
     # Update last login
     user.last_login = datetime.utcnow()
     db.commit()

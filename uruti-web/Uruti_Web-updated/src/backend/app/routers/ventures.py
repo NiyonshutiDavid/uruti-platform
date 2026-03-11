@@ -80,6 +80,21 @@ def _apply_venture_score(venture: Venture) -> None:
     venture.score_breakdown = analysis
 
 
+def _best_pitch_video_for_venture(db: Session, venture_id: int) -> Optional[str]:
+    best_session = (
+        db.query(PitchSession)
+        .filter(
+            PitchSession.venture_id == venture_id,
+            PitchSession.video_url.isnot(None),
+        )
+        .order_by(desc(PitchSession.overall_score), desc(PitchSession.created_at))
+        .first()
+    )
+    if not best_session:
+        return None
+    return best_session.video_url
+
+
 def _ensure_admin(current_user: User) -> None:
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -600,12 +615,13 @@ async def upload_pitch_video(
             ai_feedback=ai_feedback,
         )
 
-        # Keep venture-level demo video in sync so Startup Hub details show latest recording.
-        venture.demo_video_url = session.video_url
-
         db.add(session)
         db.commit()
         db.refresh(session)
+
+        # Keep venture-level demo video in sync with strongest/latest pitch result.
+        venture.demo_video_url = _best_pitch_video_for_venture(db, venture_id)
+        db.commit()
 
         return {
             "message": "Pitch video uploaded successfully",

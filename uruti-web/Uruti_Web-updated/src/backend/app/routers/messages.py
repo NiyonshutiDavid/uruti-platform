@@ -311,6 +311,22 @@ async def signal_call_event(
     await notification_hub.broadcast_to_user(receiver_id, event_payload)
     _enqueue_call_signal_fallback(db, user_id=receiver_id, payload=event_payload["data"])
 
+    # Push the incoming invite to all registered devices so backgrounded/locked
+    # devices still ring even when WebSocket delivery is not active.
+    if action == "invite":
+        invite_notification = create_notification(
+            db,
+            user_id=receiver_id,
+            title=f"Incoming {('video' if bool(payload.get('is_video', False)) else 'voice')} call",
+            message=f"{current_user.display_name} is calling you",
+            notification_type=NotificationType.SYSTEM,
+            data={
+                "kind": CALL_SIGNAL_KIND,
+                **event_payload["data"],
+            },
+        )
+        await publish_notification(invite_notification, db)
+
     return {"status": "ok", "call_id": call_id, "action": action}
 
 
@@ -413,6 +429,10 @@ def get_conversations(
                 (Message.sender_id == other_user_id) & (Message.receiver_id == current_user.id),
             )
         ).order_by(desc(Message.created_at)).first()
+
+        # Only show established conversations (threads with at least one message).
+        if last_message is None:
+            continue
 
         unread_count = db.query(Message).filter(
             Message.sender_id == other_user_id,

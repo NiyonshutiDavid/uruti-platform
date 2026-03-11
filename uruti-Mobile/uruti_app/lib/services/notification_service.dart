@@ -141,7 +141,14 @@ class NotificationService {
 
     _tokenRefreshSub = _messaging.onTokenRefresh.listen((token) {
       final platform = _platformName();
-      ApiService.instance.registerDeviceToken(token, platform: platform);
+      unawaited(() async {
+        final deviceId = await _getDeviceId();
+        await ApiService.instance.registerDeviceToken(
+          token,
+          platform: platform,
+          deviceId: deviceId,
+        );
+      }());
     });
 
     _initialized = true;

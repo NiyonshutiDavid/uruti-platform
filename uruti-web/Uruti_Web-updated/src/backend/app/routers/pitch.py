@@ -13,6 +13,21 @@ from ..services.pitch_coach_engine import pitch_coach_engine
 router = APIRouter(prefix="/pitch", tags=["Pitch"])
 
 
+def _best_pitch_video_for_venture(db: Session, venture_id: int) -> str | None:
+    best_session = (
+        db.query(PitchSession)
+        .filter(
+            PitchSession.venture_id == venture_id,
+            PitchSession.video_url.isnot(None),
+        )
+        .order_by(desc(PitchSession.overall_score), desc(PitchSession.created_at))
+        .first()
+    )
+    if not best_session:
+        return None
+    return best_session.video_url
+
+
 def _clamp_score(value: float, low: int = 0, high: int = 100) -> int:
     return max(low, min(high, int(round(value))))
 
@@ -157,13 +172,13 @@ def create_pitch_analysis(
         ai_feedback={"tips": feedback},
     )
 
-    # Keep startup profile pitch video aligned with latest recorded session.
-    if session.video_url:
-        venture.demo_video_url = session.video_url
-
     db.add(session)
     db.commit()
     db.refresh(session)
+
+    # Keep startup profile pitch video aligned with the strongest session.
+    venture.demo_video_url = _best_pitch_video_for_venture(db, venture.id)
+    db.commit()
 
     return _map_session(session, venture.name)
 
@@ -187,13 +202,7 @@ def delete_pitch_analysis(
     db.flush()
 
     if deleted_video_url and venture.demo_video_url == deleted_video_url:
-        latest_session = (
-            db.query(PitchSession)
-            .filter(PitchSession.venture_id == venture.id)
-            .order_by(desc(PitchSession.created_at))
-            .first()
-        )
-        venture.demo_video_url = latest_session.video_url if latest_session else None
+        venture.demo_video_url = _best_pitch_video_for_venture(db, venture.id)
 
     db.commit()
     return None

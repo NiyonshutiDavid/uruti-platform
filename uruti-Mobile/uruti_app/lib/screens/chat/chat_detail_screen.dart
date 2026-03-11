@@ -293,6 +293,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   Future<void> _pollMessages() async {
     if (!mounted) return;
+    if (context.read<CallProvider>().hasCall) return;
     try {
       final token = context.read<AuthProvider>().token ?? '';
       final parsedUserId = int.tryParse(widget.userId) ?? 0;

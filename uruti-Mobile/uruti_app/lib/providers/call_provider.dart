@@ -161,14 +161,17 @@ class CallProvider extends ChangeNotifier {
     final peerId = int.tryParse(_peerUserId ?? '');
     if (peerId != null && peerId > 0 && _session != null) {
       if (_pendingOffer != null) {
-        unawaited(
-          WebRtcService.instance.answerCall(
-            callId: _session!.id,
-            peerId: peerId,
-            isVideo: _session!.isVideo,
-            offerSdp: _pendingOffer!,
-          ),
-        );
+        final offer = Map<String, dynamic>.from(_pendingOffer!);
+        unawaited(() async {
+          try {
+            await WebRtcService.instance.answerCall(
+              callId: _session!.id,
+              peerId: peerId,
+              isVideo: _session!.isVideo,
+              offerSdp: offer,
+            );
+          } catch (_) {}
+        }());
         _pendingOffer = null;
       }
     }

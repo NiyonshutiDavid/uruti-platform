@@ -18,6 +18,8 @@ class WebRtcService {
   MediaStream? _localStream;
   MediaStream? _remoteStream;
   StreamSubscription<Map<String, dynamic>>? _sigSub;
+  final List<RTCIceCandidate> _pendingRemoteCandidates = <RTCIceCandidate>[];
+  bool _hasRemoteDescription = false;
 
   String? _currentCallId;
   int? _currentPeerId;
@@ -114,6 +116,8 @@ class WebRtcService {
     await _peerConnection!.setRemoteDescription(
       RTCSessionDescription(offerSdp['sdp'], offerSdp['type']),
     );
+    _hasRemoteDescription = true;
+    await _flushPendingRemoteCandidates();
 
     // Create and set local answer
     final answer = await _peerConnection!.createAnswer(
@@ -150,6 +154,8 @@ class WebRtcService {
 
     _currentCallId = null;
     _currentPeerId = null;
+    _pendingRemoteCandidates.clear();
+    _hasRemoteDescription = false;
 
     onRemoteStreamChanged?.call();
     onLocalStreamChanged?.call();
@@ -197,6 +203,10 @@ class WebRtcService {
   }
 
   Future<void> _createPeerConnection() async {
+    if (_peerConnection != null) {
+      await _peerConnection!.close();
+      _peerConnection = null;
+    }
     _peerConnection = await createPeerConnection(_iceConfig);
 
     // Add local tracks to peer connection
@@ -264,20 +274,43 @@ class WebRtcService {
     final sdp = data['sdp']?.toString();
     final type = data['type']?.toString();
     if (sdp == null || type == null) return;
-    await _peerConnection!.setRemoteDescription(
-      RTCSessionDescription(sdp, type),
-    );
+    try {
+      await _peerConnection!.setRemoteDescription(
+        RTCSessionDescription(sdp, type),
+      );
+      _hasRemoteDescription = true;
+      await _flushPendingRemoteCandidates();
+    } catch (_) {}
   }
 
   Future<void> _handleRemoteIce(Map<String, dynamic> data) async {
     if (_peerConnection == null) return;
     final candidate = data['candidate']?.toString();
     final sdpMid = data['sdpMid']?.toString();
-    final sdpMLineIndex = data['sdpMLineIndex'] as int?;
+    final rawIndex = data['sdpMLineIndex'];
+    final sdpMLineIndex = rawIndex is int
+        ? rawIndex
+        : int.tryParse('${rawIndex ?? ''}');
     if (candidate == null) return;
-    await _peerConnection!.addCandidate(
-      RTCIceCandidate(candidate, sdpMid, sdpMLineIndex),
-    );
+    final parsed = RTCIceCandidate(candidate, sdpMid, sdpMLineIndex);
+    if (!_hasRemoteDescription) {
+      _pendingRemoteCandidates.add(parsed);
+      return;
+    }
+    try {
+      await _peerConnection!.addCandidate(parsed);
+    } catch (_) {}
+  }
+
+  Future<void> _flushPendingRemoteCandidates() async {
+    if (_peerConnection == null || _pendingRemoteCandidates.isEmpty) return;
+    final pending = List<RTCIceCandidate>.from(_pendingRemoteCandidates);
+    _pendingRemoteCandidates.clear();
+    for (final candidate in pending) {
+      try {
+        await _peerConnection!.addCandidate(candidate);
+      } catch (_) {}
+    }
   }
 
   Future<void> _sendSignal(
