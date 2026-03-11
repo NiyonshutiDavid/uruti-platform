@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/app_colors.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/call_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/realtime_service.dart';
 import '../main_scaffold.dart';
@@ -36,7 +35,6 @@ class _MessagesHomeState extends State<_MessagesHome> {
   final _searchCtrl = TextEditingController();
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
   Timer? _onlineRefreshTimer;
-  Timer? _conversationPollTimer;
 
   static const _filters = ['All', 'Unread', 'Starred'];
 
@@ -95,12 +93,6 @@ class _MessagesHomeState extends State<_MessagesHome> {
       const Duration(seconds: 30),
       (_) => _refreshOnlineStatus(),
     );
-
-    _conversationPollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (!mounted) return;
-      if (context.read<CallProvider>().hasCall) return;
-      _load();
-    });
   }
 
   /// Update a single user's online status in the conversation list.
@@ -153,7 +145,6 @@ class _MessagesHomeState extends State<_MessagesHome> {
   void dispose() {
     _realtimeSub?.cancel();
     _onlineRefreshTimer?.cancel();
-    _conversationPollTimer?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }

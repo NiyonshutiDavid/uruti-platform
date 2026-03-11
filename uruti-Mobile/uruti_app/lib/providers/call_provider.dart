@@ -35,6 +35,7 @@ class CallProvider extends ChangeNotifier {
   String? _secondaryPeerUserId;
   Duration _secondaryActiveDuration = Duration.zero;
   bool _dismissingSystemCallUI = false;
+  bool _acceptingCall = false;
   Map<String, dynamic>? _pendingOffer;
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
 
@@ -55,6 +56,10 @@ class CallProvider extends ChangeNotifier {
     CallSession session, {
     bool showSystemIncomingUi = true,
   }) async {
+    if (_session?.id == session.id || _secondarySession?.id == session.id) {
+      return;
+    }
+
     if (_session != null && _session!.id != session.id) {
       if (_secondarySession != null && _secondarySession!.id != session.id) {
         await _sendSignalToPeer(
@@ -142,26 +147,26 @@ class CallProvider extends ChangeNotifier {
   }
 
   Future<void> acceptCall({bool notifyPeer = true}) async {
-    if (_session == null) return;
-    _phase = CallPhase.active;
-    _fullScreen = true;
-    _activeStartedAt = DateTime.now();
-    _startTimer();
-    if (_shouldEndSystemCall) {
-      _dismissingSystemCallUI = true;
-      await CallService.instance.endSystemCall(_session!.id);
-    }
+    if (_session == null || _acceptingCall) return;
+    _acceptingCall = true;
+    try {
+      _phase = CallPhase.active;
+      _fullScreen = true;
+      _activeStartedAt = DateTime.now();
+      _startTimer();
+      if (_shouldEndSystemCall) {
+        _dismissingSystemCallUI = true;
+        await CallService.instance.endSystemCall(_session!.id);
+      }
 
-    if (notifyPeer) {
-      await _sendSignalToPeer(action: 'accept');
-    }
+      if (notifyPeer) {
+        await _sendSignalToPeer(action: 'accept');
+      }
 
-    // Start WebRTC media — if we have a pending offer, answer it; otherwise
-    // wait for the caller's offer to arrive via signaling.
-    final peerId = int.tryParse(_peerUserId ?? '');
-    if (peerId != null && peerId > 0 && _session != null) {
-      if (_pendingOffer != null) {
+      final peerId = int.tryParse(_peerUserId ?? '');
+      if (peerId != null && peerId > 0 && _session != null && _pendingOffer != null) {
         final offer = Map<String, dynamic>.from(_pendingOffer!);
+        _pendingOffer = null;
         unawaited(() async {
           try {
             await WebRtcService.instance.answerCall(
@@ -172,10 +177,11 @@ class CallProvider extends ChangeNotifier {
             );
           } catch (_) {}
         }());
-        _pendingOffer = null;
       }
+      notifyListeners();
+    } finally {
+      _acceptingCall = false;
     }
-    notifyListeners();
   }
 
   Future<void> declineCall({bool notifyPeer = true}) async {

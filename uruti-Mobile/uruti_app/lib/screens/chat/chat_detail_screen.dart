@@ -45,7 +45,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   bool _isRecordingVoiceNote = false;
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
   Timer? _onlineRefreshTimer;
-  Timer? _messagePollTimer;
   final AudioRecorder _audioRecorder = AudioRecorder();
 
   static final RegExp _callSummaryRegex = RegExp(
@@ -82,11 +81,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       const Duration(seconds: 20),
       (_) => _refreshOnlineStatus(),
     );
-
-    _messagePollTimer = Timer.periodic(
-      const Duration(seconds: 2),
-      (_) => _pollMessages(),
-    );
   }
 
   @override
@@ -95,7 +89,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     MessageNotificationHandler.instance.activeConversationUserId = null;
     _realtimeSub?.cancel();
     _onlineRefreshTimer?.cancel();
-    _messagePollTimer?.cancel();
     if (_isRecordingVoiceNote) {
       try {
         _audioRecorder.stop();
@@ -288,42 +281,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           _otherUser = {..._otherUser!, 'is_online': isOnline};
         });
       }
-    } catch (_) {}
-  }
-
-  Future<void> _pollMessages() async {
-    if (!mounted) return;
-    if (context.read<CallProvider>().hasCall) return;
-    try {
-      final token = context.read<AuthProvider>().token ?? '';
-      final parsedUserId = int.tryParse(widget.userId) ?? 0;
-      if (parsedUserId <= 0) return;
-
-      final data = await ApiService.instance.getMessages(parsedUserId, token);
-      final normalized =
-          _normalizeThreadMessages(List<Map<String, dynamic>>.from(data)).map((
-            msg,
-          ) {
-            if (msg['sender_id'] == parsedUserId) {
-              return {...msg, 'is_read': true};
-            }
-            return msg;
-          }).toList();
-
-      final currentIds = _messages.map((item) => '${item['id']}').toList();
-      final nextIds = normalized.map((item) => '${item['id']}').toList();
-      if (currentIds.length == nextIds.length &&
-          currentIds.join(',') == nextIds.join(',')) {
-        return;
-      }
-
-      await ApiService.instance.markThreadAsRead(parsedUserId);
-
-      if (!mounted) return;
-      setState(() {
-        _messages = normalized;
-      });
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
     } catch (_) {}
   }
 

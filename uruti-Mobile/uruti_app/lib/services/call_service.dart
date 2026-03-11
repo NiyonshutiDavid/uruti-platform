@@ -15,6 +15,7 @@ class CallService {
   static final CallService instance = CallService._();
 
   StreamSubscription? _eventsSub;
+  final Set<String> _activeSystemCallIds = <String>{};
 
   void bindNativeEvents(NativeCallEventHandler onEvent) {
     _eventsSub ??= FlutterCallkitIncoming.onEvent.listen((event) {
@@ -28,6 +29,10 @@ class CallService {
   }
 
   Future<void> showSystemIncomingCall(CallSession call) async {
+    if (_activeSystemCallIds.contains(call.id)) {
+      return;
+    }
+
     final safeAvatar = (call.callerAvatarUrl?.trim().isNotEmpty ?? false)
         ? call.callerAvatarUrl!.trim()
         : null;
@@ -73,13 +78,16 @@ class CallService {
     );
 
     await FlutterCallkitIncoming.showCallkitIncoming(params);
+    _activeSystemCallIds.add(call.id);
   }
 
   Future<void> endSystemCall(String callId) async {
+    _activeSystemCallIds.remove(callId);
     await FlutterCallkitIncoming.endCall(callId);
   }
 
   Future<void> endAllSystemCalls() async {
+    _activeSystemCallIds.clear();
     await FlutterCallkitIncoming.endAllCalls();
   }
 
