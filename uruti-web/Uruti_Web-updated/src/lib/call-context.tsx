@@ -171,6 +171,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
     if (remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = null;
+      remoteAudioRef.current.pause();
+      if (remoteAudioRef.current.parentNode) {
+        remoteAudioRef.current.parentNode.removeChild(remoteAudioRef.current);
+      }
+      remoteAudioRef.current = null;
     }
   };
 
@@ -219,6 +224,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
         const element = document.createElement('audio');
         element.autoplay = true;
         element.playsInline = true;
+        // Must be appended to the DOM — browsers block autoplay on detached elements
+        document.body.appendChild(element);
         remoteAudioRef.current = element;
       }
 

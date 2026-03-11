@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { useCall } from '../../lib/call-context';
 import { ChatInfoDialog } from '../ChatInfoDialog';
 import { NewMessageDialog } from '../NewMessageDialog';
+import { BookingWeekDialog } from '../BookingWeekDialog';
 import { apiClient } from '../../lib/api-client';
 import { parseServerDate } from '../../lib/datetime';
 import { useAuth } from '../../lib/auth-context';
@@ -137,6 +138,7 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
   const [showChatInfo, setShowChatInfo] = useState(false);
   const [showNewMessageDialog, setShowNewMessageDialog] = useState(false);
   const [showAttachmentDialog, setShowAttachmentDialog] = useState(false);
+  const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedAttachment, setSelectedAttachment] = useState<{
     type: 'image' | 'file' | 'document' | 'idea' | 'audio' | 'pdf';
     name: string;
@@ -890,7 +892,9 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
                 contactAvatar={selectedConversation.avatar}
                 contactRole={selectedConversation.role}
                 contactOnline={selectedConversation.online}
+                contactId={selectedConversation.userId}
                 messages={selectedConversation.messages}
+                onScheduleMeeting={() => setBookingDialogOpen(true)}
               />
             ) : (
               /* Chat View */
@@ -1273,6 +1277,16 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
         userType={userType}
         onStartConversation={handleStartNewConversation}
       />
+
+      {/* Schedule Meeting Dialog */}
+      {selectedConversation && (
+        <BookingWeekDialog
+          open={bookingDialogOpen}
+          onOpenChange={setBookingDialogOpen}
+          targetUserId={selectedConversation.userId}
+          targetUserName={selectedConversation.name}
+        />
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -31,7 +32,9 @@ interface ChatInfoDialogProps {
   contactAvatar?: string;
   contactRole: string;
   contactOnline: boolean;
+  contactId?: number;
   messages?: ChatMessage[];
+  onScheduleMeeting?: () => void;
 }
 
 function formatFileSize(bytes: number): string {
@@ -52,7 +55,8 @@ function getFileIcon(name: string) {
   return <File className="h-5 w-5 text-[#76B947]" />;
 }
 
-export function ChatInfoDialog({ onClose, contactName, contactAvatar, contactRole, contactOnline, messages = [] }: ChatInfoDialogProps) {
+export function ChatInfoDialog({ onClose, contactName, contactAvatar, contactRole, contactOnline, contactId, messages = [], onScheduleMeeting }: ChatInfoDialogProps) {
+  const navigate = useNavigate();
   // Extract real shared documents and media from conversation messages
   const { sharedDocuments, sharedMedia } = useMemo(() => {
     const docs: { id: string; name: string; size: string; date: string; url: string }[] = [];
@@ -224,22 +228,27 @@ export function ChatInfoDialog({ onClose, contactName, contactAvatar, contactRol
 
           {/* Action Buttons */}
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" className="hover:bg-[#76B947]/10 hover:border-[#76B947]">
+            <Button
+              variant="outline"
+              className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
+              onClick={() => {
+                if (onScheduleMeeting) {
+                  onScheduleMeeting();
+                }
+              }}
+            >
               <Calendar className="h-4 w-4 mr-2" />
               Schedule Meeting
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
+              disabled={!contactId}
               onClick={() => {
-                window.dispatchEvent(new CustomEvent('navigate-to-contact-profile', { 
-                  detail: { 
-                    contactName,
-                    contactAvatar,
-                    contactRole
-                  } 
-                }));
-                onClose();
+                if (contactId) {
+                  onClose();
+                  navigate(`/profile/${contactId}`);
+                }
               }}
             >
               <ExternalLink className="h-4 w-4 mr-2" />

@@ -1407,21 +1407,13 @@ export function PitchCoachModule() {
                     {liveFeedback.map((feedback) => (
                       <div
                         key={feedback.id}
-                        className={`p-3 rounded-lg ${
-                          feedback.type === 'positive' ? 'bg-[#76B947]/10' :
-                          feedback.type === 'warning' ? 'bg-yellow-500/10' :
-                          'bg-blue-500/10'
-                        }`}
+                        className="p-3 rounded-lg bg-[#76B947]/10"
                       >
                         <div className="flex items-start space-x-2">
-                          <div className={`w-2 h-2 rounded-full mt-1.5 ${
-                            feedback.type === 'positive' ? 'bg-[#76B947]' :
-                            feedback.type === 'warning' ? 'bg-yellow-500' :
-                            'bg-blue-500'
-                          }`}></div>
+                          <div className="w-2 h-2 rounded-full mt-1.5 bg-[#76B947]"></div>
                           <div className="flex-1">
-                            <p className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>{feedback.message}</p>
-                            <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: 'var(--font-body)' }}>
+                            <p className="text-sm text-[#76B947]" style={{ fontFamily: 'var(--font-body)' }}>{feedback.message}</p>
+                            <p className="text-xs text-[#76B947]/70 mt-1" style={{ fontFamily: 'var(--font-body)' }}>
                               {feedback.time}
                             </p>
                           </div>
