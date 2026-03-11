@@ -30,14 +30,41 @@ def _resolve_sb3_model_path(model_path):
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for root, _, files in os.walk(model_path):
             for name in files:
-                # Skip optimizer state — not needed for inference and causes
-                # version-mismatch errors when torch version differs from training.
-                if name == "policy.optimizer.pth":
-                    continue
                 file_path = os.path.join(root, name)
                 arcname = os.path.relpath(file_path, model_path)
                 zf.write(file_path, arcname=arcname)
     return zip_path, temp_dir
+
+
+def _load_sb3_for_inference(algo_class, zip_path, device="cpu"):
+    """Load an SB3 model for inference, tolerating optimizer state mismatches.
+
+    Tries a standard load first.  If the optimizer state dict is incompatible
+    with the installed torch version (common when the model was trained on a
+    different torch release), patches BasePolicy.set_parameters to use
+    exact_match=False so that a missing or mismatched optimizer is silently
+    skipped — the optimizer is never needed for inference.
+    """
+    # Attempt 1: standard load (works when torch versions align).
+    try:
+        return algo_class.load(zip_path, device=device)
+    except Exception:
+        pass
+
+    # Attempt 2: relax the exact-match check so a mismatched / absent
+    # optimizer state does not block loading the policy weights.
+    from stable_baselines3.common.policies import BasePolicy
+    _orig = BasePolicy.set_parameters
+
+    def _relaxed(self, load_path_or_dict, exact_match=True, device="auto"):
+        return _orig(self, load_path_or_dict, exact_match=False, device=device)
+
+    BasePolicy.set_parameters = _relaxed
+    try:
+        return algo_class.load(zip_path, device=device)
+    finally:
+        BasePolicy.set_parameters = _orig
+
 
 def load_models():
     base_path = os.path.dirname(os.path.abspath(__file__))
@@ -56,7 +83,7 @@ def load_models():
     load_path, temp_dir = _resolve_sb3_model_path(model_path)
 
     algorithms = {"DQN": DQN, "PPO": PPO, "A2C": A2C, "TRPO": TRPO}
-    rl_agent = algorithms[algo_name].load(load_path, device="cpu")
+    rl_agent = _load_sb3_for_inference(algorithms[algo_name], load_path, device="cpu")
     if temp_dir is not None:
         rl_agent._uruti_temp_dir = temp_dir
 
