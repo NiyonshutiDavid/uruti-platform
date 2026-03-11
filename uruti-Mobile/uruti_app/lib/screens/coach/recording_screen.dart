@@ -19,6 +19,8 @@ class RecordingScreen extends StatefulWidget {
 
 class _RecordingScreenState extends State<RecordingScreen>
     with TickerProviderStateMixin {
+  static const Color _liveFeedbackGreen = Color(0xFF39FF14);
+
   bool _recording = false;
   bool _muted = false;
   bool _cameraOn = true;
@@ -340,6 +342,8 @@ class _RecordingScreenState extends State<RecordingScreen>
         _recordedDurationSeconds = _seconds;
         _sessionFindings = _buildSessionFindings();
       });
+      await _showStopSummaryDialog();
+      if (!mounted) return;
       if (autoStopped) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -357,6 +361,42 @@ class _RecordingScreenState extends State<RecordingScreen>
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to stop recording: $e')));
     }
+  }
+
+  Future<void> _showStopSummaryDialog() async {
+    if (!mounted) return;
+    final pacing = _metricPercent('pacing');
+    final clarity = _metricPercent('clarity');
+    final confidence = _metricPercent('confidence');
+    final engagement = _metricPercent('engagement');
+    final durationLabel = '${_recordedDurationSeconds ~/ 60}:${(_recordedDurationSeconds % 60).toString().padLeft(2, '0')}';
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Session Stopped'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Overall Score: $_overallScore/100'),
+            const SizedBox(height: 6),
+            Text('Pacing: $pacing%'),
+            Text('Clarity: $clarity%'),
+            Text('Confidence: $confidence%'),
+            Text('Engagement: $engagement%'),
+            const SizedBox(height: 6),
+            Text('Recorded Duration: $durationLabel'),
+          ],
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _uploadRecording(String filePath) async {
@@ -748,7 +788,7 @@ class _RecordingScreenState extends State<RecordingScreen>
                                         Text(
                                           'Real-time Tip',
                                           style: TextStyle(
-                                            color: context.colors.accent,
+                                            color: _liveFeedbackGreen,
                                             fontSize: 12,
                                             fontWeight: FontWeight.w700,
                                           ),
@@ -757,8 +797,9 @@ class _RecordingScreenState extends State<RecordingScreen>
                                         Text(
                                           _liveTip,
                                           style: TextStyle(
-                                            color: context.colors.textPrimary,
+                                            color: _liveFeedbackGreen,
                                             fontSize: 13,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
                                       ],
@@ -1476,7 +1517,7 @@ class _RecordingScreenState extends State<RecordingScreen>
                           Text(
                             'Live AI Feedback',
                             style: TextStyle(
-                              color: context.colors.accent,
+                              color: _liveFeedbackGreen,
                               fontWeight: FontWeight.w700,
                               fontSize: 12,
                             ),
@@ -1484,9 +1525,10 @@ class _RecordingScreenState extends State<RecordingScreen>
                           const SizedBox(height: 4),
                           Text(
                             _liveTip,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: _liveFeedbackGreen,
                               fontSize: 12,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
