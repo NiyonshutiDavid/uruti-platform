@@ -624,6 +624,14 @@ class ApiService {
     return _handleResponse(res);
   }
 
+  Future<void> deletePitchSession(int sessionId) async {
+    final res = await http.delete(
+      Uri.parse('${AppConstants.apiV1}/pitch/analyses/$sessionId'),
+      headers: await _headers(auth: true),
+    );
+    await _handleResponse(res);
+  }
+
   Future<Map<String, dynamic>> getPitchLiveFeedback({
     required int ventureId,
     required String pitchType,

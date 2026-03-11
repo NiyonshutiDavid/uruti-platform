@@ -20,6 +20,7 @@ class _PitchPerformanceScreenState extends State<PitchPerformanceScreen> {
   int? _selectedIndex; // null = no session selected (list view)
   VideoPlayerController? _videoController;
   bool _playingVideo = false;
+  final Set<int> _deletingSessionIds = <int>{};
 
   @override
   void initState() {
@@ -125,6 +126,63 @@ class _PitchPerformanceScreenState extends State<PitchPerformanceScreen> {
           .toList();
     }
     return list;
+  }
+
+  int? _sessionId(Map<String, dynamic> s) {
+    final raw = s['id'];
+    if (raw is int) return raw;
+    return int.tryParse('${raw ?? ''}');
+  }
+
+  Future<bool> _confirmAndDeleteSession(Map<String, dynamic> s) async {
+    final sessionId = _sessionId(s);
+    if (sessionId == null) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to delete this session')),
+      );
+      return false;
+    }
+
+    if (_deletingSessionIds.contains(sessionId)) return false;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete session?'),
+        content: Text(
+          'This will permanently remove ${_ventureName(s)} (${_date(s)}).',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return false;
+
+    setState(() => _deletingSessionIds.add(sessionId));
+    try {
+      await ApiService.instance.deletePitchSession(sessionId);
+      return true;
+    } catch (_) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to delete session')),
+      );
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() => _deletingSessionIds.remove(sessionId));
+      }
+    }
   }
 
   void _openVideo(Map<String, dynamic> session) {
@@ -626,68 +684,90 @@ class _PitchPerformanceScreenState extends State<PitchPerformanceScreen> {
             else
               ...List.generate(filtered.length, (i) {
                 final s = filtered[i];
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedIndex = i),
-                  child: Container(
+                final sessionId = _sessionId(s) ?? i;
+                return Dismissible(
+                  key: ValueKey('pitch-session-$sessionId'),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
                     margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: context.colors.card,
+                      color: const Color(0xFFFF4D4F),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: context.colors.divider),
                     ),
-                    child: Row(
-                      children: [
-                        // Score circle
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _scoreColor(
-                              _score(s),
-                            ).withValues(alpha: 0.15),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            '${_score(s)}',
-                            style: TextStyle(
-                              color: _scoreColor(_score(s)),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    child: const Icon(Icons.delete_outline, color: Colors.white),
+                  ),
+                  confirmDismiss: (_) => _confirmAndDeleteSession(s),
+                  onDismissed: (_) {
+                    if (!mounted) return;
+                    setState(() {
+                      _sessions.removeWhere((item) => _sessionId(item) == _sessionId(s));
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Pitch session deleted')),
+                    );
+                  },
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedIndex = i),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: context.colors.card,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: context.colors.divider),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _scoreColor(_score(s)).withValues(alpha: 0.15),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              '${_score(s)}',
+                              style: TextStyle(
+                                color: _scoreColor(_score(s)),
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _ventureName(s),
-                                style: TextStyle(
-                                  color: context.colors.textPrimary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _ventureName(s),
+                                  style: TextStyle(
+                                    color: context.colors.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${_pitchType(s).isNotEmpty ? '${_pitchType(s)} • ' : ''}${_date(s)} • ${_duration(s)}',
-                                style: TextStyle(
-                                  color: context.colors.textSecondary,
-                                  fontSize: 12,
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${_pitchType(s).isNotEmpty ? '${_pitchType(s)} • ' : ''}${_date(s)} • ${_duration(s)}',
+                                  style: TextStyle(
+                                    color: context.colors.textSecondary,
+                                    fontSize: 12,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        Icon(
-                          Icons.chevron_right,
-                          color: context.colors.textSecondary,
-                          size: 22,
-                        ),
-                      ],
+                          Icon(
+                            Icons.chevron_right,
+                            color: context.colors.textSecondary,
+                            size: 22,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
