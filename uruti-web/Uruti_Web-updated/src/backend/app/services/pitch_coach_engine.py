@@ -6,6 +6,8 @@ import sys
 import time
 from pathlib import Path
 from typing import Any
+import json
+import urllib.request
 
 from ..config import settings
 
@@ -189,6 +191,65 @@ class PitchCoachEngine:
             "End with a clear funding ask and milestone-based use of funds.",
         ]
 
+    def _gemini_feedback(self, text: str, pitch_type: str, duration_seconds: int, target_duration_seconds: int) -> list[str] | None:
+        """Call Gemini to generate pitch coach feedback. Returns None on failure."""
+        api_key = (settings.GEMINI_API_KEY or "").strip()
+        if not api_key:
+            return None
+        model = (settings.GEMINI_MODEL or "gemini-1.5-flash").strip() or "gemini-1.5-flash"
+        prompt = (
+            "You are an expert startup pitch coach. "
+            f"The founder delivered a {pitch_type or 'general'} pitch "
+            f"(duration: {duration_seconds}s, target: {target_duration_seconds or duration_seconds}s).\n\n"
+            "Pitch transcript/notes:\n"
+            f"{text}\n\n"
+            "Give exactly 4 concise, actionable coaching tips to improve this pitch. "
+            "Format as a numbered list (1. 2. 3. 4.). "
+            "Focus on clarity, structure, traction evidence, and investor readiness. "
+            "Keep each tip under 25 words."
+        )
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        try:
+            from google import genai as _genai  # type: ignore
+            client = _genai.Client(api_key=api_key)
+            response = client.models.generate_content(model=model, contents=prompt)
+            raw = str(getattr(response, "text", "") or "").strip()
+            if raw:
+                return self._parse_tip_lines(raw)
+        except Exception:
+            pass
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=max(3.0, float(settings.GEMINI_TIMEOUT_SECONDS))) as resp:
+                body = json.loads(resp.read().decode("utf-8", errors="ignore"))
+                candidates = body.get("candidates") or []
+                if candidates:
+                    parts = (candidates[0].get("content") or {}).get("parts") or []
+                    raw = " ".join(p.get("text", "") for p in parts if isinstance(p, dict)).strip()
+                    if raw:
+                        return self._parse_tip_lines(raw)
+        except Exception:
+            pass
+        return None
+
+    def _parse_tip_lines(self, raw: str) -> list[str]:
+        lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
+        tips: list[str] = []
+        for ln in lines:
+            # Strip leading numbering/bullets (1. 2. • - *)
+            cleaned = ln.lstrip("0123456789.-•* \t")
+            if cleaned and len(cleaned) > 8:
+                tips.append(cleaned)
+            if len(tips) == 4:
+                break
+        return tips if tips else self._fallback()
+
     def generate_feedback(
         self,
         transcript_or_notes: str,
@@ -226,6 +287,11 @@ class PitchCoachEngine:
                 return deduped
 
             if self._pipe is None:
+                # Try Gemini before giving up with hardcoded static tips.
+                gemini_tips = self._gemini_feedback(text, pitch_type, duration_seconds, target_duration_seconds)
+                if gemini_tips:
+                    self._backend = "gemini"
+                    return gemini_tips
                 return self._fallback()
 
             prompt = (
@@ -257,10 +323,16 @@ class PitchCoachEngine:
             return deduped if deduped else self._fallback()
         except Exception:
             self._backend = "fallback"
-            return self._fallback()
+            gemini_tips = self._gemini_feedback(text, pitch_type, duration_seconds, target_duration_seconds)
+            return gemini_tips if gemini_tips else self._fallback()
 
     def status(self) -> dict[str, Any]:
-        service_available = self._pipe is not None or self._rl_agent is not None or self._backend == "fallback"
+        service_available = (
+            self._pipe is not None
+            or self._rl_agent is not None
+            or self._backend in ("fallback", "gemini")
+            or bool((settings.GEMINI_API_KEY or "").strip())
+        )
         return {
             "backend": self._backend,
             "loaded": service_available,

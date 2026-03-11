@@ -28,7 +28,8 @@ def load_models():
     with open(os.path.join(base_path, "models", "best_model_name.txt"), "r") as f:
         algo_name = f.read().strip()
 
-    model_path = os.path.join(base_path, "models", "best_model.zip")
+    # SB3 saves as a directory (folder of .pth files) — pass the folder path directly.
+    model_path = os.path.join(base_path, "models", "best_model")
 
     algorithms = {"DQN": DQN, "PPO": PPO, "A2C": A2C, "TRPO": TRPO}
     rl_agent = algorithms[algo_name].load(model_path, device="cpu")

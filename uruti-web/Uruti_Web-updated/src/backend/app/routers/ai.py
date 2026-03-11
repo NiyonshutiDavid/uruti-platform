@@ -102,6 +102,15 @@ def _available_models() -> list[dict]:
             "fixed_prompt": "analyse my venture",
             "is_default": False,
         },
+        {
+            "id": PITCH_MODEL_ID,
+            "name": "Pitch Coach",
+            "description": "Get AI-powered pitch coaching feedback on your startup pitch",
+            "type": "coach",
+            "requires_venture_context": False,
+            "fixed_prompt": None,
+            "is_default": False,
+        },
     ]
     return models
 
