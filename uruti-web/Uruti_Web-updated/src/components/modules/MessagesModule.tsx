@@ -159,7 +159,7 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
   };
 
   useEffect(() => {
-    void loadConversations();
+    void loadConversations(true);
   }, [user?.id]);
 
   useEffect(() => {
@@ -172,7 +172,10 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
       try {
         const parsed = JSON.parse(event.data);
         if (parsed?.event === 'message_created') {
-          void loadConversations();
+          void loadConversations(false);
+          if (selectedConversation?.userId) {
+            void loadThreadMessages(selectedConversation.userId);
+          }
         }
       } catch {
         // ignore malformed realtime payloads
@@ -189,19 +192,22 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
       window.clearInterval(ping);
       socket.close();
     };
-  }, [user?.id]);
+  }, [selectedConversation?.userId, user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
 
     const timer = window.setInterval(() => {
-      void loadConversations();
-    }, 5000);
+      void loadConversations(false);
+      if (selectedConversation?.userId) {
+        void loadThreadMessages(selectedConversation.userId);
+      }
+    }, 2500);
 
     return () => {
       window.clearInterval(timer);
     };
-  }, [user?.id]);
+  }, [selectedConversation?.userId, user?.id]);
 
   useEffect(() => {
     if (!selectedConversation) return;
@@ -287,44 +293,64 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
     });
   };
 
-  const loadConversations = async () => {
+  const loadThreadMessages = async (conversationUserId: number) => {
+    const currentUserId = Number(user?.id);
+    if (!currentUserId || !conversationUserId) return;
+
+    try {
+      const rawMessages = await apiClient.getMessages(conversationUserId, 0, 200);
+      const mappedMessages = mapApiMessages(rawMessages, currentUserId);
+
+      setConversations(prev => prev.map((conversation) => (
+        conversation.userId === conversationUserId
+          ? {
+              ...conversation,
+              messages: mappedMessages,
+              lastMessage: mappedMessages[mappedMessages.length - 1]?.text || conversation.lastMessage,
+              timestamp: mappedMessages[mappedMessages.length - 1]?.timestamp || conversation.timestamp,
+            }
+          : conversation
+      )));
+
+      setSelectedConversation(prev => (
+        prev && prev.userId === conversationUserId
+          ? {
+              ...prev,
+              messages: mappedMessages,
+            }
+          : prev
+      ));
+    } catch (error) {
+      console.error('Error loading thread messages:', error);
+    }
+  };
+
+  const loadConversations = async (showSpinner: boolean = true) => {
     const currentUserId = Number(user?.id);
     if (!currentUserId) return;
 
-    setLoading(true);
+    if (showSpinner) {
+      setLoading(true);
+    }
+
     try {
-      const connections = await apiClient.getConnections();
-      const builtConversations = await Promise.all(
-        connections.map(async (connection: any) => {
-          const rawMessages = await apiClient.getMessages(Number(connection.id), 0, 200);
-          const mappedMessages = mapApiMessages(rawMessages, currentUserId);
-          const lastMessage = mappedMessages.length > 0 ? mappedMessages[mappedMessages.length - 1] : null;
-          const unread = rawMessages.filter(
-            (message: any) => Number(message.receiver_id) === currentUserId && !message.is_read
-          ).length;
-
-          const isOnline = (() => {
-            if (!connection.is_active) return false;
-            if (!connection.last_login) return false;
-            const lastLogin = parseServerTimestamp(connection.last_login);
-            return (Date.now() - lastLogin.getTime()) < 10 * 60 * 1000; // 10 minutes
-          })();
-
-          return {
-            id: String(connection.id),
-            userId: Number(connection.id),
-            name: connection.display_name || connection.full_name || connection.email,
-            avatar: resolveMediaUrl(connection.avatar_url || connection.avatar),
-            role: connection.role || 'Connection',
-            lastMessage: lastMessage?.text || 'Start a conversation...',
-            timestamp: lastMessage?.timestamp || new Date().toISOString(),
-            unread,
-            online: isOnline,
-            messages: mappedMessages,
-            starred: false,
-          } as Conversation;
-        })
-      );
+      const rawConversations = await apiClient.getConversations();
+      const builtConversations = rawConversations.map((conversation: any) => {
+        const otherUser = conversation.other_user || {};
+        return {
+          id: String(otherUser.id),
+          userId: Number(otherUser.id),
+          name: otherUser.display_name || otherUser.full_name || 'Connection',
+          avatar: resolveMediaUrl(otherUser.avatar_url || otherUser.avatar),
+          role: otherUser.role || 'Connection',
+          lastMessage: conversation.last_message || 'Start a conversation...',
+          timestamp: conversation.last_message_time || new Date().toISOString(),
+          unread: Number(conversation.unread_count || 0),
+          online: Boolean(otherUser.is_online),
+          messages: conversations.find((item) => item.userId === Number(otherUser.id))?.messages || [],
+          starred: Boolean(conversation.is_starred),
+        } as Conversation;
+      });
 
       builtConversations.sort((left, right) =>
         parseServerTimestamp(right.timestamp).getTime() -
@@ -334,10 +360,14 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
       setConversations(builtConversations);
     } catch (error) {
       console.error('Error loading conversations:', error);
-      toast.error('Failed to load conversations');
-      setConversations([]);
+      if (showSpinner) {
+        toast.error('Failed to load conversations');
+        setConversations([]);
+      }
     } finally {
-      setLoading(false);
+      if (showSpinner) {
+        setLoading(false);
+      }
     }
   };
 
@@ -587,6 +617,7 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
   const handleSelectConversation = (conv: Conversation) => {
     setSelectedConversation(conv);
     setShowChatInfo(false);
+    void loadThreadMessages(conv.userId);
     
     // Mark messages as read
     if (conv.unread > 0) {

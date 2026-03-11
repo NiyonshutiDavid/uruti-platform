@@ -569,28 +569,15 @@ class ApiClient {
   }
 
   async getConversations() {
-    return this.request<any[]>('/api/v1/messages/inbox', {
+    return this.request<any[]>('/api/v1/messages/conversations', {
       requiresAuth: true,
     });
   }
 
   async getMessages(userId: number, skip: number = 0, limit: number = 50) {
-    const [inbox, sent] = await Promise.all([
-      this.getInboxMessages(skip, limit),
-      this.getSentMessages(skip, limit),
-    ]);
-
-    const merged = [...inbox, ...sent].filter((message: any) => (
-      Number(message.sender_id) === Number(userId) || Number(message.receiver_id) === Number(userId)
-    ));
-
-    merged.sort((left: any, right: any) => {
-      const a = new Date(left.created_at).getTime();
-      const b = new Date(right.created_at).getTime();
-      return a - b;
+    return this.request<any[]>(`/api/v1/messages/thread/${userId}?skip=${skip}&limit=${limit}`, {
+      requiresAuth: true,
     });
-
-    return merged;
   }
 
   async sendMessage(recipientId: number, content: string, attachments?: string[]) {

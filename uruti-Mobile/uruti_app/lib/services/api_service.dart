@@ -38,17 +38,6 @@ class ApiService {
     return headers;
   }
 
-  String? _safeAvatarUrl(dynamic raw) {
-    final value = raw?.toString().trim() ?? '';
-    if (value.isEmpty) return null;
-    final uri = Uri.tryParse(value);
-    if (uri == null) return null;
-    if (uri.hasScheme && (uri.path.isEmpty || uri.path == '/')) {
-      return null;
-    }
-    return value;
-  }
-
   MediaType _imageMediaTypeFromPath(String filePath) {
     final ext = filePath.toLowerCase();
     if (ext.endsWith('.png')) return MediaType('image', 'png');
@@ -378,171 +367,23 @@ class ApiService {
   // ──────────────────── MESSAGES ────────────────────
   Future<List<dynamic>> getConversations([String? token]) async {
     try {
-      DateTime parseApiDateTime(dynamic raw) {
-        final value = (raw ?? '').toString().trim();
-        if (value.isEmpty) return DateTime.fromMillisecondsSinceEpoch(0);
-        final normalized = value.contains('Z') || value.contains('+')
-            ? value
-            : '${value}Z';
-        return DateTime.tryParse(normalized)?.toLocal() ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-      }
-
-      final results = await Future.wait([
-        http.get(
-          Uri.parse('${AppConstants.apiV1}/connections/'),
-          headers: await _headers(auth: true),
-        ),
-        http.get(
-          Uri.parse('${AppConstants.apiV1}/messages/inbox'),
-          headers: await _headers(auth: true),
-        ),
-        http.get(
-          Uri.parse('${AppConstants.apiV1}/messages/sent'),
-          headers: await _headers(auth: true),
-        ),
-      ]);
-
-      final connections = await _handleListResponse(results[0]);
-      final inbox = await _handleListResponse(results[1]);
-      final sent = await _handleListResponse(results[2]);
-
-      bool isOnline(Map<String, dynamic> connection) {
-        final isActive = connection['is_active'] == true;
-        final rawLastLogin = connection['last_login']?.toString();
-        if (!isActive || rawLastLogin == null || rawLastLogin.isEmpty) {
-          return false;
-        }
-        // Backend sends UTC timestamps without timezone indicator.
-        // Append 'Z' so Dart parses as UTC, then compare against UTC now.
-        final normalized =
-            rawLastLogin.contains('Z') || rawLastLogin.contains('+')
-            ? rawLastLogin
-            : '${rawLastLogin}Z';
-        final lastLogin = DateTime.tryParse(normalized)?.toUtc();
-        if (lastLogin == null) return false;
-        return DateTime.now().toUtc().difference(lastLogin).inMinutes <= 10;
-      }
-
-      String roleLabel(dynamic role) {
-        final value = (role ?? '').toString().trim().toLowerCase();
-        if (value.isEmpty) return '';
-        return value[0].toUpperCase() + value.substring(1);
-      }
-
-      String fmtTime(dynamic isoTs) {
-        final parsed = parseApiDateTime(isoTs);
-        if (parsed.millisecondsSinceEpoch == 0) return '';
-        final hour = parsed.hour % 12 == 0 ? 12 : parsed.hour % 12;
-        final minute = parsed.minute.toString().padLeft(2, '0');
-        final ampm = parsed.hour >= 12 ? 'PM' : 'AM';
-        return '$hour:$minute $ampm';
-      }
-
-      final conversations = connections.map<Map<String, dynamic>>((connection) {
-        final uid = int.tryParse('${connection['id'] ?? 0}') ?? 0;
-        final thread = [
-          ...inbox.where(
-            (m) => m['sender_id'] == uid || m['receiver_id'] == uid,
-          ),
-          ...sent.where(
-            (m) => m['sender_id'] == uid || m['receiver_id'] == uid,
-          ),
-        ];
-
-        thread.sort((a, b) {
-          final ta = parseApiDateTime(a['created_at']);
-          final tb = parseApiDateTime(b['created_at']);
-          return ta.compareTo(tb);
-        });
-
-        final last = thread.isNotEmpty ? thread.last : null;
-        final unread = inbox
-            .where((m) => m['sender_id'] == uid && m['is_read'] != true)
-            .length;
-        final displayNameRaw = (connection['display_name'] ?? '')
-            .toString()
-            .trim();
-        final fullNameRaw = (connection['full_name'] ?? '').toString().trim();
-        final emailRaw = (connection['email'] ?? '').toString().trim();
-        final displayName = displayNameRaw.isNotEmpty
-            ? displayNameRaw
-            : (fullNameRaw.isNotEmpty
-                  ? fullNameRaw
-                  : (emailRaw.isNotEmpty ? emailRaw : 'Connection'));
-
-        return {
-          'other_user': {
-            'id': uid,
-            'full_name': displayName,
-            'display_name': connection['display_name'],
-            'role': roleLabel(connection['role']),
-            'avatar_url':
-                _safeAvatarUrl(connection['avatar_url']) ??
-                _safeAvatarUrl(connection['avatar']),
-            'phone': connection['phone'],
-            'is_online': isOnline(Map<String, dynamic>.from(connection)),
-          },
-          'last_message': (last?['body'] ?? '').toString(),
-          'last_message_time': (last?['created_at'] ?? '').toString(),
-          'last_message_time_label': fmtTime(last?['created_at']),
-          'unread_count': unread,
-          'is_starred': false,
-        };
-      }).toList();
-
-      conversations.sort((a, b) {
-        final ta = parseApiDateTime(a['last_message_time']);
-        final tb = parseApiDateTime(b['last_message_time']);
-        return tb.compareTo(ta);
-      });
-
-      return conversations;
+      final response = await http.get(
+        Uri.parse('${AppConstants.apiV1}/messages/conversations'),
+        headers: await _headers(auth: true),
+      );
+      return await _handleListResponse(response);
     } catch (_) {
       return [];
     }
   }
 
   Future<List<dynamic>> getMessages(int userId, [String? token]) async {
-    // Backend has no /messages/{user_id} thread endpoint.
-    // Fetch inbox + sent in parallel, then filter by the other user's ID.
     try {
-      final results = await Future.wait([
-        http.get(
-          Uri.parse('${AppConstants.apiV1}/messages/inbox'),
-          headers: await _headers(auth: true),
-        ),
-        http.get(
-          Uri.parse('${AppConstants.apiV1}/messages/sent'),
-          headers: await _headers(auth: true),
-        ),
-      ]);
-      final inbox = await _handleListResponse(results[0]);
-      final sent = await _handleListResponse(results[1]);
-      final thread = [
-        ...inbox.where(
-          (m) => m['sender_id'] == userId || m['receiver_id'] == userId,
-        ),
-        ...sent.where(
-          (m) => m['sender_id'] == userId || m['receiver_id'] == userId,
-        ),
-      ];
-      thread.sort((a, b) {
-        DateTime parseApiDateTime(dynamic raw) {
-          final value = (raw ?? '').toString().trim();
-          if (value.isEmpty) return DateTime.fromMillisecondsSinceEpoch(0);
-          final normalized = value.contains('Z') || value.contains('+')
-              ? value
-              : '${value}Z';
-          return DateTime.tryParse(normalized)?.toLocal() ??
-              DateTime.fromMillisecondsSinceEpoch(0);
-        }
-
-        final ta = parseApiDateTime(a['created_at']);
-        final tb = parseApiDateTime(b['created_at']);
-        return ta.compareTo(tb);
-      });
-      return thread;
+      final response = await http.get(
+        Uri.parse('${AppConstants.apiV1}/messages/thread/$userId'),
+        headers: await _headers(auth: true),
+      );
+      return await _handleListResponse(response);
     } catch (_) {
       return [];
     }
@@ -684,7 +525,8 @@ class ApiService {
     return items
         .where((item) => item is Map)
         .map(
-          (item) => Map<String, dynamic>.from((item as Map).cast<dynamic, dynamic>()),
+          (item) =>
+              Map<String, dynamic>.from((item as Map).cast<dynamic, dynamic>()),
         )
         .toList();
   }

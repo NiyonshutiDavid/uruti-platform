@@ -16,7 +16,7 @@ from .notifications import (
     publish_notification,
     notification_hub,
 )
-from datetime import datetime
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/messages", tags=["Messages"])
 
@@ -96,6 +96,17 @@ def _enqueue_call_signal_fallback(
             "payload": payload,
         },
     )
+
+
+def _parse_call_created_at(payload: Dict[str, Any]) -> Optional[datetime]:
+    raw = str(payload.get("created_at") or "").strip()
+    if not raw:
+        return None
+    normalized = raw.replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
 
 
 def _to_message_payload(message: Message, sender: Optional[User] = None) -> Dict[str, Any]:
@@ -317,6 +328,9 @@ def consume_pending_call_events(
 
     pending: List[Dict[str, Any]] = []
     consumed_ids: List[int] = []
+    grouped_by_call: Dict[str, List[Dict[str, Any]]] = {}
+    terminal_actions = {"decline", "end"}
+    stale_cutoff = datetime.utcnow() - timedelta(seconds=20)
 
     for notification in rows:
         data = notification.data or {}
@@ -325,19 +339,129 @@ def consume_pending_call_events(
 
         payload = data.get("payload")
         consumed_ids.append(notification.id)
-        if isinstance(payload, dict):
+        if not isinstance(payload, dict):
+            continue
+
+        call_id = str(payload.get("call_id") or "").strip()
+        if not call_id:
             pending.append({
                 "event": CALL_SIGNAL_KIND,
                 "data": payload,
             })
-        if len(pending) >= limit:
-            break
+            if len(pending) >= limit:
+                break
+            continue
+
+        grouped_by_call.setdefault(call_id, []).append(payload)
+
+    if len(pending) < limit:
+        for call_id, events in grouped_by_call.items():
+            terminal = [item for item in events if str(item.get("action") or "").lower() in terminal_actions]
+            if terminal:
+                latest_terminal = sorted(
+                    terminal,
+                    key=lambda item: _parse_call_created_at(item) or datetime.min,
+                )[-1]
+                pending.append({
+                    "event": CALL_SIGNAL_KIND,
+                    "data": latest_terminal,
+                })
+            else:
+                filtered = [
+                    item for item in events
+                    if str(item.get("action") or "").lower() != "invite"
+                    or (_parse_call_created_at(item) and _parse_call_created_at(item) >= stale_cutoff)
+                ]
+                for item in filtered:
+                    pending.append({
+                        "event": CALL_SIGNAL_KIND,
+                        "data": item,
+                    })
+                    if len(pending) >= limit:
+                        break
+            if len(pending) >= limit:
+                break
 
     if consumed_ids:
         db.query(Notification).filter(Notification.id.in_(consumed_ids)).delete(synchronize_session=False)
         db.commit()
 
     return pending
+
+
+@router.get("/conversations", status_code=status.HTTP_200_OK)
+def get_conversations(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    connection_ids = _get_connection_user_ids(current_user.id, db)
+    if not connection_ids:
+        return []
+
+    users = db.query(User).filter(User.id.in_(connection_ids)).all()
+    users_by_id = {user.id: user for user in users}
+    conversations: List[Dict[str, Any]] = []
+
+    for other_user_id in connection_ids:
+        other_user = users_by_id.get(other_user_id)
+        if other_user is None:
+            continue
+
+        last_message = db.query(Message).filter(
+            or_(
+                (Message.sender_id == current_user.id) & (Message.receiver_id == other_user_id),
+                (Message.sender_id == other_user_id) & (Message.receiver_id == current_user.id),
+            )
+        ).order_by(desc(Message.created_at)).first()
+
+        unread_count = db.query(Message).filter(
+            Message.sender_id == other_user_id,
+            Message.receiver_id == current_user.id,
+            Message.is_read == False,
+            Message.is_archived == False,
+        ).count()
+
+        is_online = bool(
+            other_user.is_active and
+            other_user.last_login and
+            (datetime.utcnow() - other_user.last_login.replace(tzinfo=None)).total_seconds() < 600
+        )
+
+        conversations.append({
+            "other_user": {
+                "id": other_user.id,
+                "full_name": other_user.display_name,
+                "display_name": other_user.display_name,
+                "role": other_user.role.value if hasattr(other_user.role, "value") else str(other_user.role),
+                "avatar_url": other_user.avatar_url,
+                "phone": other_user.phone,
+                "is_online": is_online,
+            },
+            "last_message": (last_message.body if last_message else "") or "",
+            "last_message_time": last_message.created_at.isoformat() if last_message and last_message.created_at else "",
+            "unread_count": unread_count,
+            "is_starred": False,
+        })
+
+    conversations.sort(key=lambda item: item.get("last_message_time") or "", reverse=True)
+    return conversations
+
+
+@router.get("/thread/{other_user_id}", response_model=List[MessageResponse])
+def get_thread_messages(
+    other_user_id: int,
+    skip: int = 0,
+    limit: int = 200,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    messages = db.query(Message).filter(
+        or_(
+            (Message.sender_id == current_user.id) & (Message.receiver_id == other_user_id),
+            (Message.sender_id == other_user_id) & (Message.receiver_id == current_user.id),
+        )
+    ).order_by(Message.created_at.asc()).offset(skip).limit(limit).all()
+    return messages
 
 
 @router.get("/inbox", response_model=List[MessageResponse])

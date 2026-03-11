@@ -84,7 +84,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
 
     _messagePollTimer = Timer.periodic(
-      const Duration(seconds: 4),
+      const Duration(seconds: 2),
       (_) => _pollMessages(),
     );
   }
@@ -299,14 +299,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       if (parsedUserId <= 0) return;
 
       final data = await ApiService.instance.getMessages(parsedUserId, token);
-      final normalized = _normalizeThreadMessages(
-        List<Map<String, dynamic>>.from(data),
-      ).map((msg) {
-        if (msg['sender_id'] == parsedUserId) {
-          return {...msg, 'is_read': true};
-        }
-        return msg;
-      }).toList();
+      final normalized =
+          _normalizeThreadMessages(List<Map<String, dynamic>>.from(data)).map((
+            msg,
+          ) {
+            if (msg['sender_id'] == parsedUserId) {
+              return {...msg, 'is_read': true};
+            }
+            return msg;
+          }).toList();
 
       final currentIds = _messages.map((item) => '${item['id']}').toList();
       final nextIds = normalized.map((item) => '${item['id']}').toList();

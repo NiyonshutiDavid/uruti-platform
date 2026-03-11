@@ -235,7 +235,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
     connection.onicecandidate = ({ candidate }) => {
       if (!candidate) return;
       void apiClient.sendCallSignal({
-    let pollTimer: number | null = null;
         receiver_id: receiverId,
         action: 'webrtc_ice',
         call_id: callId,
@@ -274,13 +273,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
     type: 'voice' | 'video',
     receiverId: number,
     callId: string,
-    pollTimer = window.setInterval(() => {
-      void apiClient.consumePendingCallSignals().then((events) => {
-        events.forEach((event) => handleCallRealtimeEnvelope(event));
-      }).catch(() => {
-        // HTTP polling is a fallback; ignore transient failures.
-      });
-    }, 1000);
   ) => {
     const connection = await getOrCreatePeerConnection(type, receiverId, callId);
     const offer = await connection.createOffer({
@@ -294,8 +286,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
       action: 'webrtc_offer',
       call_id: callId,
       is_video: type === 'video',
-        window.clearInterval(pollTimer);
-      }
       webrtc_data: {
         type: offer.type,
         sdp: offer.sdp,
