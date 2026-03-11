@@ -63,6 +63,7 @@ export function ProfileViewModule({ userId, onBack, onModuleChange }: ProfileVie
   const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'none' | 'pending' | 'connected'>('none');
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
 
@@ -75,6 +76,7 @@ export function ProfileViewModule({ userId, onBack, onModuleChange }: ProfileVie
 
   const fetchProfile = async () => {
     setLoading(true);
+    setProfileError(false);
     try {
       const [data, connCount] = await Promise.all([
         apiClient.getUserById(userId),
@@ -84,6 +86,7 @@ export function ProfileViewModule({ userId, onBack, onModuleChange }: ProfileVie
     } catch (error) {
       console.error('Failed to fetch profile:', error);
       toast.error('Failed to load profile');
+      setProfileError(true);
     } finally {
       setLoading(false);
     }
@@ -165,12 +168,28 @@ export function ProfileViewModule({ userId, onBack, onModuleChange }: ProfileVie
     }
   };
 
-  if (loading || !profile) {
+  if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-[#76B947] border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-muted-foreground">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (profileError || !profile) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-muted-foreground">Could not load this profile.</p>
+          {onBack && (
+            <Button variant="outline" onClick={onBack} className="hover:bg-[#76B947]/10 hover:border-[#76B947]">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Go Back
+            </Button>
+          )}
         </div>
       </div>
     );

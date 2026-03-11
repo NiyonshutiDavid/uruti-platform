@@ -20,6 +20,7 @@ import { SignupPage } from './components/auth/SignupPage';
 import { AdminLoginPage } from './components/auth/AdminLoginPage';
 import { SplashScreen } from './components/SplashScreen';
 import { ScrollToTop } from './components/ScrollToTop';
+import { NotFoundPage } from './components/NotFoundPage';
 import apiClient from './lib/api-client';
 
 function AppContent() {
@@ -261,8 +262,8 @@ function AppContent() {
           } 
         />
 
-        {/* Catch all - redirect to home */}
-        <Route path="*" element={<Navigate to="/home" replace />} />
+        {/* Catch all - 404 page */}
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </ThemeProvider>
   );
