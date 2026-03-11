@@ -326,6 +326,22 @@ def mark_all_as_read(
     return {"message": "All notifications marked as read"}
 
 
+@router.delete("/clear-all", status_code=status.HTTP_200_OK)
+def clear_all_notifications(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Delete all notifications for the current user"""
+
+    deleted = db.query(Notification).filter(
+        Notification.user_id == current_user.id
+    ).delete(synchronize_session=False)
+
+    db.commit()
+
+    return {"message": "All notifications cleared", "deleted_count": int(deleted or 0)}
+
+
 @router.delete("/{notification_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_notification(
     notification_id: int,

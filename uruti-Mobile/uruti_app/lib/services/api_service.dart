@@ -689,6 +689,22 @@ class ApiService {
     _handleResponse(res);
   }
 
+  Future<void> deleteNotification(int id) async {
+    final res = await http.delete(
+      Uri.parse('${AppConstants.apiV1}/notifications/$id'),
+      headers: await _headers(auth: true),
+    );
+    _handleResponse(res);
+  }
+
+  Future<void> clearAllNotifications() async {
+    final res = await http.delete(
+      Uri.parse('${AppConstants.apiV1}/notifications/clear-all'),
+      headers: await _headers(auth: true),
+    );
+    _handleResponse(res);
+  }
+
   Future<void> registerDeviceToken(
     String token, {
     String platform = 'unknown',

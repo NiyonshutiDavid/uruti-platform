@@ -119,9 +119,62 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   void _dismissNotification(int index) {
     if (index < 0 || index >= _notifs.length) return;
+    final item = _notifs[index] as Map;
+    final id = (item['id'] as num?)?.toInt();
+    if (id == null) return;
+
+    final removed = _notifs[index];
     setState(() {
       _notifs.removeAt(index);
     });
+
+    ApiService.instance.deleteNotification(id).catchError((_) {
+      if (!mounted) return;
+      setState(() {
+        _notifs.insert(index.clamp(0, _notifs.length), removed);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to delete notification')),
+      );
+    });
+  }
+
+  Future<void> _clearAllNotifications() async {
+    if (_notifs.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear all notifications?'),
+        content: const Text('This will permanently delete all notifications.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Clear all'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await ApiService.instance.clearAllNotifications();
+      if (!mounted) return;
+      setState(() {
+        _notifs = [];
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All notifications cleared')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to clear notifications')),
+      );
+    }
   }
 
   @override
@@ -158,6 +211,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
         actions: [
+          IconButton(
+            onPressed: _notifs.isEmpty ? null : _clearAllNotifications,
+            tooltip: 'Clear all',
+            icon: const Icon(Icons.delete_sweep_rounded, color: Colors.white),
+          ),
           TextButton(
             onPressed: () async {
               await ApiService.instance.markAllNotificationsRead();
@@ -262,8 +320,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 data: data,
                                 onClose: () {
                                   final realIdx = _notifs.indexOf(filtered[i]);
-                                  if (realIdx >= 0)
+                                  if (realIdx >= 0) {
                                     _dismissNotification(realIdx);
+                                  }
                                 },
                               ),
                             );
