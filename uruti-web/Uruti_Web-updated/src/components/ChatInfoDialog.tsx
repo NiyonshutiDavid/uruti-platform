@@ -247,7 +247,7 @@ export function ChatInfoDialog({ onClose, contactName, contactAvatar, contactRol
               onClick={() => {
                 if (contactId) {
                   onClose();
-                  navigate(`/profile/${contactId}`);
+                  navigate(`/dashboard/profile/${contactId}`);
                 }
               }}
             >
