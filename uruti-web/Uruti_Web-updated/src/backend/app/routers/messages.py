@@ -8,7 +8,7 @@ from jose import JWTError, jwt
 from ..database import get_db
 from ..config import settings
 from ..database import SessionLocal
-from ..models import User, Message, NotificationType, Connection
+from ..models import User, Message, NotificationType, Connection, Notification
 from ..schemas import MessageCreate, MessageResponse
 from ..auth import get_current_active_user
 from .notifications import (
@@ -19,6 +19,8 @@ from .notifications import (
 from datetime import datetime
 
 router = APIRouter(prefix="/messages", tags=["Messages"])
+
+CALL_SIGNAL_KIND = "call_event"
 
 
 class _MessageRealtimeHub:
@@ -75,6 +77,25 @@ def _get_connection_user_ids(user_id: int, db: Session) -> List[int]:
         other = conn.user2_id if conn.user1_id == user_id else conn.user1_id
         ids.append(other)
     return ids
+
+
+def _enqueue_call_signal_fallback(
+    db: Session,
+    *,
+    user_id: int,
+    payload: Dict[str, Any],
+) -> None:
+    create_notification(
+        db,
+        user_id=user_id,
+        title="Call event",
+        message=str(payload.get("action") or "call_event"),
+        notification_type=NotificationType.SYSTEM,
+        data={
+            "kind": CALL_SIGNAL_KIND,
+            "payload": payload,
+        },
+    )
 
 
 def _to_message_payload(message: Message, sender: Optional[User] = None) -> Dict[str, Any]:
@@ -277,8 +298,46 @@ async def signal_call_event(
     # self-echo can trigger duplicate incoming-call UI on some mobile builds.
     await realtime_hub.broadcast_to_user(receiver_id, event_payload)
     await notification_hub.broadcast_to_user(receiver_id, event_payload)
+    _enqueue_call_signal_fallback(db, user_id=receiver_id, payload=event_payload["data"])
 
     return {"status": "ok", "call_id": call_id, "action": action}
+
+
+@router.get("/call/pending", status_code=status.HTTP_200_OK)
+def consume_pending_call_events(
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Return and delete pending call signaling events for polling fallbacks."""
+
+    rows = db.query(Notification).filter(
+        Notification.user_id == current_user.id
+    ).order_by(Notification.created_at.asc()).all()
+
+    pending: List[Dict[str, Any]] = []
+    consumed_ids: List[int] = []
+
+    for notification in rows:
+        data = notification.data or {}
+        if not isinstance(data, dict) or data.get("kind") != CALL_SIGNAL_KIND:
+            continue
+
+        payload = data.get("payload")
+        consumed_ids.append(notification.id)
+        if isinstance(payload, dict):
+            pending.append({
+                "event": CALL_SIGNAL_KIND,
+                "data": payload,
+            })
+        if len(pending) >= limit:
+            break
+
+    if consumed_ids:
+        db.query(Notification).filter(Notification.id.in_(consumed_ids)).delete(synchronize_session=False)
+        db.commit()
+
+    return pending
 
 
 @router.get("/inbox", response_model=List[MessageResponse])

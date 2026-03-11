@@ -15,6 +15,11 @@ from ..services.push_notifications import send_push_notification
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
 
+def _is_transient_call_notification(notification: Notification) -> bool:
+    data = notification.data or {}
+    return isinstance(data, dict) and data.get("kind") == "call_event"
+
+
 class _NotificationRealtimeHub:
     def __init__(self):
         self._connections: Dict[int, Set[WebSocket]] = {}
@@ -260,9 +265,10 @@ def get_notifications(
     if notification_type:
         query = query.filter(Notification.type == notification_type)
     
-    notifications = query.order_by(desc(Notification.created_at)).offset(skip).limit(limit).all()
-    
-    return notifications
+    notifications = query.order_by(desc(Notification.created_at)).all()
+    visible_notifications = [item for item in notifications if not _is_transient_call_notification(item)]
+
+    return visible_notifications[skip:skip + limit]
 
 
 @router.get("/{notification_id}", response_model=NotificationResponse)
@@ -371,9 +377,11 @@ def get_unread_count(
 ):
     """Get count of unread notifications"""
     
-    count = db.query(Notification).filter(
+    unread_notifications = db.query(Notification).filter(
         Notification.user_id == current_user.id,
         Notification.is_read == False
-    ).count()
-    
+    ).all()
+
+    count = sum(1 for item in unread_notifications if not _is_transient_call_notification(item))
+
     return {"unread_count": count}

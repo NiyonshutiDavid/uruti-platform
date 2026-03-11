@@ -664,6 +664,31 @@ class ApiService {
     return Map<String, dynamic>.from(data as Map);
   }
 
+  Future<List<Map<String, dynamic>>> consumePendingCallSignals() async {
+    final res = await http.get(
+      Uri.parse('${AppConstants.apiV1}/messages/call/pending'),
+      headers: await _headers(auth: true),
+    );
+
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      await _handleResponse(res);
+      return <Map<String, dynamic>>[];
+    }
+
+    final body = utf8.decode(res.bodyBytes).trim();
+    if (body.isEmpty) return <Map<String, dynamic>>[];
+
+    final decoded = jsonDecode(body);
+    if (decoded is! List) return <Map<String, dynamic>>[];
+    final items = List<dynamic>.from(decoded);
+    return items
+        .where((item) => item is Map)
+        .map(
+          (item) => Map<String, dynamic>.from((item as Map).cast<dynamic, dynamic>()),
+        )
+        .toList();
+  }
+
   // ──────────────────── NOTIFICATIONS ────────────────────
   Future<List<dynamic>> getNotifications([String? token]) async {
     final res = await http.get(

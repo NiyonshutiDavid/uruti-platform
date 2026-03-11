@@ -664,6 +664,12 @@ class ApiClient {
     });
   }
 
+  async consumePendingCallSignals() {
+    return this.request<Array<{ event: string; data: Record<string, unknown> }>>('/api/v1/messages/call/pending', {
+      requiresAuth: true,
+    });
+  }
+
   // Notifications endpoints
   async getNotifications(skip: number = 0, limit: number = 50) {
     return this.request<any[]>(`/api/v1/notifications?skip=${skip}&limit=${limit}`, {

@@ -191,6 +191,26 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const timer = window.setInterval(() => {
+      void loadConversations();
+    }, 5000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!selectedConversation) return;
+    const updatedConversation = conversations.find((conversation) => conversation.id === selectedConversation.id);
+    if (!updatedConversation) return;
+    if (updatedConversation === selectedConversation) return;
+    setSelectedConversation(updatedConversation);
+  }, [conversations, selectedConversation]);
+
   const inferAttachmentType = (url: string, contentType?: string): 'image' | 'file' | 'document' | 'audio' | 'pdf' => {
     const clean = (url || '').toLowerCase();
     const mime = (contentType || '').toLowerCase();

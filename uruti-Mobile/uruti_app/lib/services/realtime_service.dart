@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../core/app_constants.dart';
+import 'api_service.dart';
 
 class RealtimeService {
   RealtimeService._();
@@ -15,6 +16,7 @@ class RealtimeService {
   StreamSubscription? _notificationsSub;
   Timer? _reconnectTimer;
   Timer? _heartbeatTimer;
+  Timer? _callPollTimer;
   String? _token;
   bool _connecting = false;
   bool _socketReady = false;
@@ -86,6 +88,16 @@ class RealtimeService {
           _notificationsChannel?.sink.add(jsonEncode({'event': 'ping'}));
         } catch (_) {}
       });
+
+      _callPollTimer?.cancel();
+      _callPollTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
+        try {
+          final events = await ApiService.instance.consumePendingCallSignals();
+          for (final event in events) {
+            _eventsCtrl.add(event);
+          }
+        } catch (_) {}
+      });
     } catch (_) {
       _scheduleReconnect();
     } finally {
@@ -101,6 +113,8 @@ class RealtimeService {
     _reconnectTimer = null;
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
+    _callPollTimer?.cancel();
+    _callPollTimer = null;
     await _disposeSocket();
   }
 
