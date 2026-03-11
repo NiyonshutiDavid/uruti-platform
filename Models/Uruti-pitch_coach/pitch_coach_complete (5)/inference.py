@@ -41,9 +41,8 @@ def _load_sb3_for_inference(algo_class, zip_path, device="cpu"):
 
     Tries a standard load first.  If the optimizer state dict is incompatible
     with the installed torch version (common when the model was trained on a
-    different torch release), patches BasePolicy.set_parameters to use
-    exact_match=False so that a missing or mismatched optimizer is silently
-    skipped — the optimizer is never needed for inference.
+    different torch release), patches torch.optim.Optimizer.load_state_dict to
+    silently skip the failure — the optimizer is never needed for inference.
     """
     # Attempt 1: standard load (works when torch versions align).
     try:
@@ -51,19 +50,23 @@ def _load_sb3_for_inference(algo_class, zip_path, device="cpu"):
     except Exception:
         pass
 
-    # Attempt 2: relax the exact-match check so a mismatched / absent
-    # optimizer state does not block loading the policy weights.
-    from stable_baselines3.common.policies import BasePolicy
-    _orig = BasePolicy.set_parameters
+    # Attempt 2: make torch Optimizer.load_state_dict fault-tolerant.
+    # This works with any SB3 version and is safe for inference since the
+    # optimizer state is only needed for continued training, not prediction.
+    import torch.optim as _optim
+    _orig_lsd = _optim.Optimizer.load_state_dict
 
-    def _relaxed(self, load_path_or_dict, exact_match=True, device="auto"):
-        return _orig(self, load_path_or_dict, exact_match=False, device=device)
+    def _tolerant_lsd(self, state_dict):
+        try:
+            _orig_lsd(self, state_dict)
+        except Exception:
+            pass  # Optimizer saved on different torch version – safe to skip for inference
 
-    BasePolicy.set_parameters = _relaxed
+    _optim.Optimizer.load_state_dict = _tolerant_lsd
     try:
         return algo_class.load(zip_path, device=device)
     finally:
-        BasePolicy.set_parameters = _orig
+        _optim.Optimizer.load_state_dict = _orig_lsd
 
 
 def load_models():
