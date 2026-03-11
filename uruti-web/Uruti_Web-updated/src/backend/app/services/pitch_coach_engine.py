@@ -27,7 +27,9 @@ class PitchCoachEngine:
         self._startup_init_completed = False
         self.model_id = settings.PITCH_COACH_MODEL_ID or os.getenv("PITCH_COACH_MODEL_ID", "")
         self.enable_local_rl = settings.PITCH_COACH_ENABLE_LOCAL_RL
-        self.local_model_dir = settings.PITCH_COACH_LOCAL_MODEL_DIR or self._default_local_model_dir()
+        self.local_model_dir = self._resolve_local_model_dir(
+            settings.PITCH_COACH_LOCAL_MODEL_DIR or self._default_local_model_dir()
+        )
         self._action_map = {
             0: "Increase Energy (Speak louder and with more passion).",
             1: "Improve Eye Contact (Look directly at the camera).",
@@ -56,6 +58,55 @@ class PitchCoachEngine:
                 return str(candidate)
         return ""
 
+    def _project_search_roots(self) -> list[Path]:
+        here = Path(__file__).resolve()
+        roots: list[Path] = []
+        seen: set[Path] = set()
+
+        for candidate in [Path.cwd(), *here.parents]:
+            resolved = candidate.resolve()
+            if resolved not in seen:
+                seen.add(resolved)
+                roots.append(resolved)
+
+        return roots
+
+    def _candidate_local_model_dirs(self, configured_dir: str) -> list[Path]:
+        raw = (configured_dir or "").strip()
+        if not raw:
+            return []
+
+        configured_path = Path(raw).expanduser()
+        candidates: list[Path] = []
+        seen: set[Path] = set()
+
+        def add(path: Path) -> None:
+            resolved = path.resolve(strict=False)
+            if resolved not in seen:
+                seen.add(resolved)
+                candidates.append(resolved)
+
+        if configured_path.is_absolute():
+            add(configured_path)
+        else:
+            for root in self._project_search_roots():
+                add(root / configured_path)
+
+        parts = configured_path.parts
+        if "Models" in parts:
+            models_index = parts.index("Models")
+            suffix = Path(*parts[models_index:])
+            for root in self._project_search_roots():
+                add(root / suffix)
+
+        return candidates
+
+    def _resolve_local_model_dir(self, configured_dir: str) -> str:
+        for candidate in self._candidate_local_model_dirs(configured_dir):
+            if (candidate / "inference.py").exists():
+                return str(candidate)
+        return configured_dir.strip()
+
     def _hf_token(self) -> str | None:
         return (
             settings.HF_TOKEN
@@ -71,8 +122,15 @@ class PitchCoachEngine:
     def _local_inference_path(self) -> Path | None:
         if not self.local_model_dir:
             return None
-        path = Path(self.local_model_dir) / "inference.py"
-        return path if path.exists() else None
+        for candidate in self._candidate_local_model_dirs(self.local_model_dir):
+            path = candidate / "inference.py"
+            if path.exists():
+                self.local_model_dir = str(candidate)
+                return path
+        return None
+
+    def _gemini_available(self) -> bool:
+        return bool((settings.GEMINI_API_KEY or "").strip())
 
     def _compute_local_state(self, text: str, duration_seconds: int, target_seconds: int) -> list[float]:
         words = max(len([w for w in text.split() if w.strip()]), 1)
@@ -166,7 +224,7 @@ class PitchCoachEngine:
         if not self.model_id:
             suffix = f": {local_error}" if local_error else ""
             self._load_error = f"PITCH_COACH_MODEL_ID is not set and local model is unavailable{suffix}"
-            self._backend = "fallback"
+            self._backend = "gemini" if self._gemini_available() else "fallback"
             return
 
         try:
@@ -287,11 +345,12 @@ class PitchCoachEngine:
                 return deduped
 
             if self._pipe is None:
-                # Try Gemini before giving up with hardcoded static tips.
+                # Gemini is the intended production fallback whenever RL/HF is unavailable.
                 gemini_tips = self._gemini_feedback(text, pitch_type, duration_seconds, target_duration_seconds)
                 if gemini_tips:
                     self._backend = "gemini"
                     return gemini_tips
+                self._backend = "fallback"
                 return self._fallback()
 
             prompt = (
@@ -322,16 +381,19 @@ class PitchCoachEngine:
 
             return deduped if deduped else self._fallback()
         except Exception:
-            self._backend = "fallback"
             gemini_tips = self._gemini_feedback(text, pitch_type, duration_seconds, target_duration_seconds)
-            return gemini_tips if gemini_tips else self._fallback()
+            if gemini_tips:
+                self._backend = "gemini"
+                return gemini_tips
+            self._backend = "fallback"
+            return self._fallback()
 
     def status(self) -> dict[str, Any]:
         service_available = (
             self._pipe is not None
             or self._rl_agent is not None
             or self._backend in ("fallback", "gemini")
-            or bool((settings.GEMINI_API_KEY or "").strip())
+            or self._gemini_available()
         )
         return {
             "backend": self._backend,
@@ -343,6 +405,7 @@ class PitchCoachEngine:
             "enable_local_rl": self.enable_local_rl,
             "local_model_dir": self.local_model_dir,
             "local_model_available": self._local_inference_path() is not None,
+            "gemini_available": self._gemini_available(),
             "startup_init_started": self._startup_init_started,
             "startup_init_completed": self._startup_init_completed,
         }

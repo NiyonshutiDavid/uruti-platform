@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 import os
+import tempfile
+import zipfile
 from stable_baselines3 import DQN, PPO, A2C
 from sb3_contrib import TRPO
 
@@ -14,6 +16,24 @@ class RewardMLP(nn.Module):
             nn.Linear(64, 1)
         )
     def forward(self, x): return self.net(x)
+
+
+def _resolve_sb3_model_path(model_path):
+    if os.path.isfile(model_path):
+        return model_path, None
+
+    if not os.path.isdir(model_path):
+        raise FileNotFoundError(f"SB3 model artifact not found: {model_path}")
+
+    temp_dir = tempfile.TemporaryDirectory(prefix="uruti_pitch_sb3_")
+    zip_path = os.path.join(temp_dir.name, "best_model.zip")
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for root, _, files in os.walk(model_path):
+            for name in files:
+                file_path = os.path.join(root, name)
+                arcname = os.path.relpath(file_path, model_path)
+                zf.write(file_path, arcname=arcname)
+    return zip_path, temp_dir
 
 def load_models():
     base_path = os.path.dirname(os.path.abspath(__file__))
@@ -28,11 +48,13 @@ def load_models():
     with open(os.path.join(base_path, "models", "best_model_name.txt"), "r") as f:
         algo_name = f.read().strip()
 
-    # SB3 saves as a directory (folder of .pth files) — pass the folder path directly.
     model_path = os.path.join(base_path, "models", "best_model")
+    load_path, temp_dir = _resolve_sb3_model_path(model_path)
 
     algorithms = {"DQN": DQN, "PPO": PPO, "A2C": A2C, "TRPO": TRPO}
-    rl_agent = algorithms[algo_name].load(model_path, device="cpu")
+    rl_agent = algorithms[algo_name].load(load_path, device="cpu")
+    if temp_dir is not None:
+        rl_agent._uruti_temp_dir = temp_dir
 
     return reward_model, rl_agent
 
