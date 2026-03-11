@@ -238,6 +238,8 @@ async def signal_call_event(
 
     if receiver_id <= 0:
         raise HTTPException(status_code=400, detail="receiver_id is required")
+    if receiver_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot signal a call to yourself")
     valid_actions = {
         "invite",
         "accept",

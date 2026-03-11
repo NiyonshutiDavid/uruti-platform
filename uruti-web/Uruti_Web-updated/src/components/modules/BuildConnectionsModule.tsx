@@ -46,6 +46,7 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [sentRequests, setSentRequests] = useState<any[]>([]);
   const [receivedRequests, setReceivedRequests] = useState<any[]>([]);
+  const [mutualConnectionCounts, setMutualConnectionCounts] = useState<Record<string, number>>({});
   const [requestStatusFilter, setRequestStatusFilter] = useState<RequestStatus>('pending');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
@@ -141,6 +142,9 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
       console.log('Build Connections - Pending requests:', pendingData);
       setPendingRequests(pendingData);
 
+      const mutualCounts = await apiClient.getMutualConnectionCounts();
+      setMutualConnectionCounts(mutualCounts || {});
+
       await refreshRequestSections(requestStatusFilter);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -150,6 +154,7 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
       setPendingRequests([]);
       setSentRequests([]);
       setReceivedRequests([]);
+      setMutualConnectionCounts({});
     } finally {
       setLoading(false);
     }
@@ -569,6 +574,7 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
                 {directoryUsers.slice(0, displayedCount).map((person) => {
                   const status = checkConnectionStatus(person.id);
                   const requestId = findSentRequestIdByUserId(person.id);
+                  const mutualCount = Number(mutualConnectionCounts[String(person.id)] || 0);
 
                   return (
                     <div
@@ -630,7 +636,9 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
                         <div className="mb-4 py-3 border-t border-black/5 dark:border-white/10">
                           <p className="text-xs text-muted-foreground text-center dark:text-gray-400" style={{ fontFamily: 'var(--font-body)' }}>
                             <Users className="h-3 w-3 inline mr-1" />
-                            12 mutual connections
+                            {mutualCount > 0
+                              ? `${mutualCount} mutual connection${mutualCount === 1 ? '' : 's'}`
+                              : 'No mutual connections'}
                           </p>
                         </div>
 

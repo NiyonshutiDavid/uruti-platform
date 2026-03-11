@@ -238,8 +238,8 @@ export function VentureActivitySection({
             <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-[#76B947] to-transparent" />
             
             <div className="space-y-6">
-              {activities.map((activity) => {
-                const config = activityTypeConfig[activity.type];
+              {activities.filter((activity) => activity && activity.type && activity.title && activity.date).map((activity) => {
+                const config = activityTypeConfig[activity.type as keyof typeof activityTypeConfig] ?? activityTypeConfig['update'];
                 const Icon = config.icon;
                 
                 return (

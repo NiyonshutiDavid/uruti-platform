@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
-from typing import List, Optional
+from typing import Dict, List, Optional, Set
 from datetime import datetime, timedelta
 from ..database import get_db
 from ..models import User, Connection, ConnectionRequest, NotificationType
@@ -332,6 +332,56 @@ def get_connections(
             })
     
     return result
+
+
+@router.get("/mutual-counts", response_model=Dict[str, int])
+def get_mutual_connection_counts(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Return mutual connection counts keyed by user ID.
+
+    For each candidate user in the network, this reports how many shared
+    connections they have with the current user.
+    """
+
+    # Build the current user's first-degree connection set.
+    current_rows = db.query(Connection).filter(
+        or_(
+            Connection.user1_id == current_user.id,
+            Connection.user2_id == current_user.id,
+        )
+    ).all()
+
+    my_connections: Set[int] = set()
+    for conn in current_rows:
+        other_id = conn.user2_id if conn.user1_id == current_user.id else conn.user1_id
+        my_connections.add(other_id)
+
+    if not my_connections:
+        return {}
+
+    # Find all edges touching my first-degree connections, then count overlaps
+    # with each candidate user.
+    neighborhood_rows = db.query(Connection).filter(
+        or_(
+            Connection.user1_id.in_(my_connections),
+            Connection.user2_id.in_(my_connections),
+        )
+    ).all()
+
+    counts: Dict[int, int] = {}
+    for conn in neighborhood_rows:
+        u1 = int(conn.user1_id)
+        u2 = int(conn.user2_id)
+
+        if u1 in my_connections and u2 != current_user.id:
+            counts[u2] = counts.get(u2, 0) + 1
+        if u2 in my_connections and u1 != current_user.id:
+            counts[u1] = counts.get(u1, 0) + 1
+
+    # JSON object keys are strings.
+    return {str(user_id): count for user_id, count in counts.items() if count > 0}
 
 
 @router.get("/online-ids", response_model=List[int])

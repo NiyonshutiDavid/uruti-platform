@@ -1188,6 +1188,12 @@ class ApiClient {
     return data.count;
   }
 
+  async getMutualConnectionCounts(): Promise<Record<string, number>> {
+    return this.request<Record<string, number>>('/api/v1/connections/mutual-counts', {
+      requiresAuth: true,
+    });
+  }
+
   // Availability/Time Slots endpoints
   async getTimeSlots() {
     return this.request<any[]>('/api/v1/scheduling/time-slots', {
