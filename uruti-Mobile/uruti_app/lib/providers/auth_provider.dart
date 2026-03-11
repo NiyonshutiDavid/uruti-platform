@@ -56,6 +56,34 @@ class AuthProvider extends ChangeNotifier {
   String? get token => _token;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
   bool get isLoading => _status == AuthStatus.loading;
+  String get backendUrl => AppConstants.apiBaseUrl;
+
+  String _normalizeBackendUrl(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return trimmed;
+    final withScheme =
+        trimmed.startsWith('http://') || trimmed.startsWith('https://')
+        ? trimmed
+        : 'http://$trimmed';
+    final uri = Uri.tryParse(withScheme);
+    if (uri == null) return withScheme;
+    return uri.replace(path: '').toString().replaceAll(RegExp(r'/$'), '');
+  }
+
+  Future<void> setBackendUrl(String rawUrl) async {
+    final normalized = _normalizeBackendUrl(rawUrl);
+    if (normalized.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(AppConstants.backendUrlKey, normalized);
+
+    // Reconfigure API endpoints and clear stale auth state from prior backend.
+    AppConstants.configure(normalized, aiBackendUrl: normalized);
+    await _clearSession();
+    _status = AuthStatus.unauthenticated;
+    _error = null;
+    notifyListeners();
+  }
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -143,7 +171,7 @@ class AuthProvider extends ChangeNotifier {
       return false;
     } catch (e) {
       _error =
-          'Cannot reach server at ${AppConstants.apiBaseUrl}. Ensure backend is running and URL is correct.';
+          'Cannot reach server at ${AppConstants.apiBaseUrl}. Ensure backend is running and that the physical-device backend URL in main.dart matches your current LAN IP.';
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return false;

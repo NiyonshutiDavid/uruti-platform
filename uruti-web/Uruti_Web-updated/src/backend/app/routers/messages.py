@@ -271,13 +271,10 @@ async def signal_call_event(
         },
     }
 
-    await realtime_hub.broadcast_to_user(current_user.id, event_payload)
-    if receiver_id != current_user.id:
-        await realtime_hub.broadcast_to_user(receiver_id, event_payload)
-
-    await notification_hub.broadcast_to_user(current_user.id, event_payload)
-    if receiver_id != current_user.id:
-        await notification_hub.broadcast_to_user(receiver_id, event_payload)
+    # Do not echo signaling to sender; sender already updates local state and
+    # self-echo can trigger duplicate incoming-call UI on some mobile builds.
+    await realtime_hub.broadcast_to_user(receiver_id, event_payload)
+    await notification_hub.broadcast_to_user(receiver_id, event_payload)
 
     return {"status": "ok", "call_id": call_id, "action": action}
 

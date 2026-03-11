@@ -261,6 +261,10 @@ CallSession? _callSessionFromMessage(RemoteMessage message) {
   final isInvite = action == 'invite' || event == 'incoming_call';
   if (!isInvite || callId.isEmpty || callerId.isEmpty) return null;
 
+  // Ignore malformed loopback payloads that can trigger self-calls.
+  final receiverId = data['receiver_id']?.toString() ?? '';
+  if (receiverId.isNotEmpty && receiverId == callerId) return null;
+
   final callerName =
       (data['caller_name'] ?? message.notification?.title ?? 'Uruti Call')
           .toString();

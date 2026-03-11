@@ -73,6 +73,9 @@ class WebRtcService {
 
     _listenForSignaling();
 
+    // Ensure renderers exist before local/remote streams are attached.
+    await initRenderers();
+
     await _createLocalStream(isVideo);
     await _createPeerConnection();
 
@@ -100,6 +103,9 @@ class WebRtcService {
     _isVideo = isVideo;
 
     _listenForSignaling();
+
+    // Ensure renderers exist before local/remote streams are attached.
+    await initRenderers();
 
     await _createLocalStream(isVideo);
     await _createPeerConnection();

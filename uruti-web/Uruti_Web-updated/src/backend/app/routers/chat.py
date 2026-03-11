@@ -196,6 +196,18 @@ def _gemini_chat_fallback(user_query: str, founder_profile: str, mode: str) -> t
 
 
 async def _advise_with_fallback(*, user_query: str, founder_profile: str, mode: str, selected_model: Optional[str]) -> dict:
+    # In production, prioritize Gemini when configured to avoid heavyweight
+    # local model startup failures from impacting chat availability.
+    if (settings.GEMINI_API_KEY or "").strip():
+        gemini_result, _ = await asyncio.to_thread(
+            _gemini_chat_fallback,
+            user_query,
+            founder_profile,
+            mode,
+        )
+        if gemini_result:
+            return gemini_result
+
     try:
         return await asyncio.wait_for(
             asyncio.to_thread(

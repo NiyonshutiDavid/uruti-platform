@@ -19,6 +19,7 @@ from .config import settings
 from .database import engine, Base
 from .routers import (
     auth,
+    ai,
     users,
     ventures,
     messages,
@@ -165,6 +166,7 @@ async def get_uploaded_message_file(filename: str):
 
 # Include routers
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
+app.include_router(ai.router, prefix=settings.API_V1_PREFIX)
 app.include_router(users.router, prefix=settings.API_V1_PREFIX)
 app.include_router(ventures.router, prefix=settings.API_V1_PREFIX)
 app.include_router(messages.router, prefix=settings.API_V1_PREFIX)

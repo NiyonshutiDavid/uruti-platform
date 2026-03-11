@@ -19,19 +19,52 @@ class AppConstants {
   }
 
   static String _deriveAiBaseUrl(String backendUrl) {
-    final uri = Uri.tryParse(backendUrl);
-    if (uri == null) {
-      return backendUrl;
+    // Default AI routing now lives on the same backend host/port.
+    // Use configure(..., aiBackendUrl: ...) only when a separate AI service is intended.
+    return backendUrl;
+  }
+
+  static bool _isLocalDevHost(String host) {
+    return host == 'localhost' || host == '127.0.0.1' || host == '10.0.2.2';
+  }
+
+  /// Normalizes media URLs so stale localhost ports don't break image loading.
+  static String? normalizeMediaUrl(String? rawUrl) {
+    if (rawUrl == null) return null;
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) return null;
+
+    final parsed = Uri.tryParse(trimmed);
+    if (parsed == null) return null;
+
+    if (!parsed.hasScheme) {
+      final path = trimmed.startsWith('/') ? trimmed : '/$trimmed';
+      return '$apiBaseUrl$path';
     }
 
-    final hasPort = uri.hasPort;
-    final targetPort = hasPort ? 8020 : null;
-    return uri.replace(port: targetPort).toString();
+    if (parsed.path.isEmpty || parsed.path == '/') {
+      return null;
+    }
+
+    final backendUri = Uri.tryParse(apiBaseUrl);
+    if (backendUri == null || !_isLocalDevHost(parsed.host)) {
+      return trimmed;
+    }
+
+    // Rewrite local development URLs to the backend currently selected at app start.
+    return parsed
+        .replace(
+          scheme: backendUri.scheme,
+          host: backendUri.host,
+          port: backendUri.hasPort ? backendUri.port : null,
+        )
+        .toString();
   }
 
   // Storage keys
   static const String tokenKey = 'uruti_token';
   static const String userKey = 'uruti_user';
+  static const String backendUrlKey = 'uruti_backend_url';
 
   // App info
   static const String appName = 'Uruti';
