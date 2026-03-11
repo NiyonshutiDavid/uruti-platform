@@ -274,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ElevatedButton.icon(
       onPressed: () => context.go('/advisory-tracks'),
       icon: const Icon(Icons.smart_toy_outlined),
-      label: const Text('Get AI Recommendations'),
+      label: const Text('Access advisory tracks'),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,

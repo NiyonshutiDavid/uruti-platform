@@ -63,25 +63,24 @@ class _CallFullscreenScreenState extends State<CallFullscreenScreen> {
     // Bind WebRTC service streams
     WebRtcService.instance.onLocalStreamChanged = () {
       if (!mounted) return;
+      final svc = WebRtcService.instance;
       _localRenderer.srcObject =
-          WebRtcService.instance.localRenderer?.srcObject;
+          svc.localRenderer?.srcObject ?? svc.localStream;
       setState(() {});
     };
     WebRtcService.instance.onRemoteStreamChanged = () {
       if (!mounted) return;
+      final svc = WebRtcService.instance;
       _remoteRenderer.srcObject =
-          WebRtcService.instance.remoteRenderer?.srcObject;
+          svc.remoteRenderer?.srcObject ?? svc.remoteStream;
       setState(() {});
     };
 
     // Attach existing streams (if already connected)
     final svc = WebRtcService.instance;
-    if (svc.localRenderer != null) {
-      _localRenderer.srcObject = svc.localRenderer!.srcObject;
-    }
-    if (svc.remoteRenderer != null) {
-      _remoteRenderer.srcObject = svc.remoteRenderer!.srcObject;
-    }
+    _localRenderer.srcObject = svc.localRenderer?.srcObject ?? svc.localStream;
+    _remoteRenderer.srcObject =
+        svc.remoteRenderer?.srcObject ?? svc.remoteStream;
 
     if (mounted) setState(() => _renderersReady = true);
   }
@@ -180,14 +179,6 @@ class _CallFullscreenScreenState extends State<CallFullscreenScreen> {
                 child: _TopCircleButton(
                   icon: Icons.call_received_rounded,
                   onTap: widget.onMinimize,
-                ),
-              ),
-              Positioned(
-                top: 12,
-                right: 12,
-                child: _TopCircleButton(
-                  icon: Icons.person_add_alt_1_rounded,
-                  onTap: () {},
                 ),
               ),
               Align(
@@ -332,18 +323,14 @@ class _CallFullscreenScreenState extends State<CallFullscreenScreen> {
                           active: widget.muted,
                           onTap: widget.onToggleMute,
                         ),
-                        _CallControl(
-                          icon: widget.videoEnabled
-                              ? Icons.videocam_rounded
-                              : Icons.videocam_off_rounded,
-                          active: widget.videoEnabled,
-                          onTap: widget.onToggleVideo,
-                        ),
-                        _CallControl(
-                          icon: Icons.more_horiz_rounded,
-                          active: false,
-                          onTap: () {},
-                        ),
+                        if (widget.session.isVideo)
+                          _CallControl(
+                            icon: widget.videoEnabled
+                                ? Icons.videocam_rounded
+                                : Icons.videocam_off_rounded,
+                            active: widget.videoEnabled,
+                            onTap: widget.onToggleVideo,
+                          ),
                       ],
                     ),
                   ),

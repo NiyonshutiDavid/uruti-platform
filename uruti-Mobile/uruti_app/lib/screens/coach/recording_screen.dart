@@ -369,7 +369,8 @@ class _RecordingScreenState extends State<RecordingScreen>
     final clarity = _metricPercent('clarity');
     final confidence = _metricPercent('confidence');
     final engagement = _metricPercent('engagement');
-    final durationLabel = '${_recordedDurationSeconds ~/ 60}:${(_recordedDurationSeconds % 60).toString().padLeft(2, '0')}';
+    final durationLabel =
+        '${_recordedDurationSeconds ~/ 60}:${(_recordedDurationSeconds % 60).toString().padLeft(2, '0')}';
 
     await showDialog<void>(
       context: context,

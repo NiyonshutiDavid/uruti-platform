@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -17,12 +18,37 @@ Color _chatAccent(BuildContext context) =>
 
 const _fallbackModels = [
   {
+    'id': 'gemini',
+    'name': 'Gemini',
+    'type': 'chatbot',
+    'requires_venture_context': false,
+    'fixed_prompt': null,
+    'is_default': true,
+    'available': false,
+    'status': 'offline',
+    'offline_reason': 'Model is not loaded yet.',
+  },
+  {
     'id': 'uruti-ai',
     'name': 'Uruti AI',
     'type': 'chatbot',
     'requires_venture_context': false,
     'fixed_prompt': null,
-    'is_default': true,
+    'is_default': false,
+    'available': false,
+    'status': 'offline',
+    'offline_reason': 'Model is not loaded yet.',
+  },
+  {
+    'id': 'venture-mlop',
+    'name': 'Uruti-Investor_Intelligence_and_Ranker',
+    'type': 'analysis',
+    'requires_venture_context': true,
+    'fixed_prompt': 'analyse my venture',
+    'is_default': false,
+    'available': false,
+    'status': 'offline',
+    'offline_reason': 'Model is not loaded yet.',
   },
 ];
 
@@ -42,7 +68,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   bool _speechReady = false;
   bool _isListening = false;
   String? _sessionId;
-  String _selectedModel = 'uruti-ai';
+  String _selectedModel = 'gemini';
   List<Map<String, dynamic>> _models = List<Map<String, dynamic>>.from(
     _fallbackModels,
   );
@@ -99,6 +125,21 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final isAnalysisModel = model['type']?.toString() == 'analysis';
     final requiresVentureContext =
         model['requires_venture_context'] == true || isAnalysisModel;
+    final isModelOffline =
+        model['available'] == false ||
+        model['status']?.toString() == 'offline' ||
+        model['status']?.toString() == 'initializing';
+
+    if (isModelOffline) {
+      final reason =
+          model['offline_reason']?.toString().trim().isNotEmpty == true
+          ? model['offline_reason'].toString().trim()
+          : 'Selected model is offline.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(reason)));
+      return;
+    }
 
     if (requiresVentureContext && _activeContext == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -188,25 +229,49 @@ class _AiChatScreenState extends State<AiChatScreen> {
           .where(
             (model) => (model['id']?.toString().trim().isNotEmpty ?? false),
           )
+          .where((model) => model['type']?.toString() != 'coach')
           .map((model) {
             final normalized = Map<String, dynamic>.from(model);
             final rawName = normalized['name']?.toString() ?? '';
             if (rawName.trim().isNotEmpty) {
               normalized['name'] = _sanitizeModelName(rawName);
             }
+            normalized['available'] = normalized['available'] != false;
+            normalized['status'] =
+                normalized['status']?.toString().trim().isNotEmpty == true
+                ? normalized['status']
+                : (normalized['available'] == true ? 'online' : 'offline');
             return normalized;
           })
           .toList();
-      if (parsed.isEmpty) return;
 
-      final defaultModel = parsed.firstWhere(
+      final mergedById = <String, Map<String, dynamic>>{};
+      for (final fallback in _fallbackModels) {
+        mergedById[fallback['id']!.toString()] = Map<String, dynamic>.from(
+          fallback,
+        );
+      }
+      for (final model in parsed) {
+        final id = model['id']?.toString();
+        if (id == null || id.trim().isEmpty) continue;
+        final baseline = mergedById[id] ?? <String, dynamic>{};
+        mergedById[id] = {...baseline, ...model};
+      }
+
+      final merged = mergedById.values.toList();
+      if (merged.isEmpty) return;
+
+      final defaultModel = merged.firstWhere(
         (model) => model['is_default'] == true,
-        orElse: () => parsed.first,
+        orElse: () => merged.first,
       );
 
       setState(() {
-        _models = parsed;
-        if (!_models.any((model) => model['id'] == _selectedModel)) {
+        _models = merged;
+        final shouldResetToDefault =
+            !_models.any((model) => model['id'] == _selectedModel) ||
+            _selectedModel == 'uruti-ai';
+        if (shouldResetToDefault) {
           _selectedModel = defaultModel['id'].toString();
         }
       });
@@ -273,9 +338,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
     try {
       final model = _selectedModelConfig;
       final name = model['name']?.toString().trim() ?? '';
-      if (name.isNotEmpty) return name;
+      final offline =
+          model['available'] == false ||
+          model['status']?.toString() == 'offline' ||
+          model['status']?.toString() == 'initializing';
+      if (name.isNotEmpty) return offline ? '$name (offline)' : name;
       final id = model['id']?.toString().trim() ?? '';
-      return id.isNotEmpty ? id : 'Uruti AI';
+      final label = id.isNotEmpty ? id : 'Uruti AI';
+      return offline ? '$label (offline)' : label;
     } catch (_) {
       return 'Uruti AI';
     }
@@ -417,6 +487,26 @@ class _AiChatScreenState extends State<AiChatScreen> {
             ..._models.map((m) {
               final selected = m['id']?.toString() == _selectedModel;
               final requiresContext = m['requires_venture_context'] == true;
+              final status =
+                  m['status']?.toString() ??
+                  (m['available'] == false ? 'offline' : 'online');
+              final isOffline =
+                  m['available'] == false ||
+                  status == 'offline' ||
+                  status == 'initializing';
+              final reason = m['offline_reason']?.toString();
+              final subtitleParts = <String>[];
+              if (requiresContext) {
+                subtitleParts.add('Requires venture context');
+              }
+              if (isOffline) {
+                subtitleParts.add(
+                  status == 'initializing' ? 'Initializing' : 'Offline',
+                );
+                if (reason != null && reason.trim().isNotEmpty) {
+                  subtitleParts.add(reason.trim());
+                }
+              }
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(
@@ -432,9 +522,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                   ),
                 ),
-                subtitle: requiresContext
+                subtitle: subtitleParts.isNotEmpty
                     ? Text(
-                        'Requires venture context',
+                        subtitleParts.join(' • '),
                         style: TextStyle(
                           color: context.colors.textSecondary,
                           fontSize: 11,
@@ -447,10 +537,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
                         color: _chatAccent(context),
                       )
                     : null,
-                onTap: () {
-                  setState(() => _selectedModel = m['id'].toString());
-                  Navigator.pop(context);
-                },
+                onTap: isOffline
+                    ? null
+                    : () {
+                        setState(() => _selectedModel = m['id'].toString());
+                        Navigator.pop(context);
+                      },
               );
             }),
           ],
@@ -894,17 +986,42 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     itemCount: _messages.length + (_loading ? 1 : 0),
                     itemBuilder: (_, i) {
                       if (i >= _messages.length) {
-                        return Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              color: _chatAccent(context),
+                        return Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            constraints: const BoxConstraints(maxWidth: 320),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: context.colors.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: context.colors.cardBorder,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'AI is thinking',
+                                  style: TextStyle(
+                                    color: context.colors.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                _ThinkingDots(color: _chatAccent(context)),
+                              ],
                             ),
                           ),
                         );
                       }
                       final m = _messages[i];
                       final isUser = (m['role'] ?? '') == 'user';
+                      final content = (m['content'] ?? '').toString();
                       return Align(
                         alignment: isUser
                             ? Alignment.centerRight
@@ -925,10 +1042,46 @@ class _AiChatScreenState extends State<AiChatScreen> {
                               color: context.colors.cardBorder,
                             ),
                           ),
-                          child: Text(
-                            (m['content'] ?? '').toString(),
-                            style: TextStyle(color: Colors.white, height: 1.3),
-                          ),
+                          child: isUser
+                              ? Text(
+                                  content,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    height: 1.3,
+                                  ),
+                                )
+                              : MarkdownBody(
+                                  data: content,
+                                  styleSheet: MarkdownStyleSheet(
+                                    p: TextStyle(
+                                      color: Colors.white,
+                                      height: 1.35,
+                                      fontSize: 15,
+                                    ),
+                                    strong: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    listBullet: TextStyle(
+                                      color: context.colors.textSecondary,
+                                    ),
+                                    h1: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 18,
+                                    ),
+                                    h2: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 16,
+                                    ),
+                                    h3: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ),
                         ),
                       );
                     },
@@ -1031,6 +1184,61 @@ class _AiChatScreenState extends State<AiChatScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ThinkingDots extends StatefulWidget {
+  final Color color;
+  const _ThinkingDots({required this.color});
+
+  @override
+  State<_ThinkingDots> createState() => _ThinkingDotsState();
+}
+
+class _ThinkingDotsState extends State<_ThinkingDots>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, __) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (i) {
+            final delay = i / 3.0;
+            final t = (_controller.value - delay).clamp(0.0, 1.0);
+            final bounce = (t < 0.5 ? t * 2 : 2 - t * 2);
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              width: 7,
+              height: 7,
+              transform: Matrix4.translationValues(0, -5 * bounce, 0),
+              decoration: BoxDecoration(
+                color: widget.color,
+                shape: BoxShape.circle,
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }

@@ -237,6 +237,20 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                         onPressed: () async {
                           String fmt(TimeOfDay t) =>
                               '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+                          final startMinutes =
+                              startTime.hour * 60 + startTime.minute;
+                          final endMinutes = endTime.hour * 60 + endTime.minute;
+                          if (endMinutes <= startMinutes) {
+                            TopNotification.show(
+                              ctx,
+                              message:
+                                  'End time must be after start time (e.g., 09:00 - 10:00).',
+                              isError: true,
+                            );
+                            return;
+                          }
+
                           try {
                             await ApiService.instance.createAvailabilitySlot({
                               'day_of_week': dayOfWeek,

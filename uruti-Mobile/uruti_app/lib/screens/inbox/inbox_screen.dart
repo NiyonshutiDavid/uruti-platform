@@ -454,17 +454,26 @@ class _MessagesHomeState extends State<_MessagesHome> {
                             final otherUserId = int.tryParse(uid) ?? 0;
                             if (otherUserId > 0) {
                               try {
-                                await ApiService.instance.deleteMessageThread(otherUserId);
+                                await ApiService.instance.deleteMessageThread(
+                                  otherUserId,
+                                );
                               } catch (_) {
                                 messenger.showSnackBar(
-                                  const SnackBar(content: Text('Failed to delete conversation on server')),
+                                  const SnackBar(
+                                    content: Text(
+                                      'Failed to delete conversation on server',
+                                    ),
+                                  ),
                                 );
                               }
                             }
                             if (!mounted) return;
                             setState(() {
                               _conversations.removeWhere((conversation) {
-                                final other = (conversation['other_user'] as Map?)?.cast<String, dynamic>() ?? {};
+                                final other =
+                                    (conversation['other_user'] as Map?)
+                                        ?.cast<String, dynamic>() ??
+                                    {};
                                 return '${other['id'] ?? ''}' == uid;
                               });
                             });

@@ -6,11 +6,10 @@ import '../../core/app_constants.dart';
 import '../../core/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../screens/main_scaffold.dart';
+import '../../widgets/in_app_video_player_screen.dart';
 
 String? _mediaUrl(String? raw) {
-  if (raw == null || raw.trim().isEmpty) return null;
-  if (raw.startsWith('http')) return raw;
-  return '${AppConstants.apiBaseUrl}$raw';
+  return AppConstants.normalizeMediaUrl(raw);
 }
 
 Uri? _externalUri(String? raw) {
@@ -267,6 +266,7 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
         final score = (venture['uruti_score'] as num?)?.toInt() ?? 0;
         final pitchDeckUrl = _s(venture['pitch_deck_url']);
         final demoVideoUrl = _s(venture['demo_video_url']);
+        final demoVideoMediaUrl = _mediaUrl(demoVideoUrl);
         final founderId = (venture['founder_id'] as num?)?.toInt();
         final logoUrl = _mediaUrl(venture['logo_url'] as String?);
         final bannerUrl = _mediaUrl(venture['banner_url'] as String?);
@@ -545,16 +545,21 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
                     fontSize: 13,
                   ),
                 ),
-              if (demoVideoUrl.isNotEmpty) ...[
+              if ((demoVideoMediaUrl ?? '').isNotEmpty) ...[
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
-                  onPressed: () => _openExternalUrl(
-                    ctx,
-                    demoVideoUrl,
-                    errorMessage: 'Unable to open demo video link',
-                  ),
-                  icon: const Icon(Icons.play_circle_outline_rounded),
-                  label: const Text('View Demo Video'),
+                  onPressed: () async {
+                    await Navigator.of(ctx).push(
+                      MaterialPageRoute(
+                        builder: (_) => InAppVideoPlayerScreen(
+                          videoUrl: demoVideoMediaUrl!,
+                          title: '$name Demo Video',
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.play_circle_fill_rounded),
+                  label: const Text('Play Demo Video'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: context.colors.accent,
                     side: BorderSide(
@@ -601,17 +606,11 @@ class _StartupDiscoveryScreenState extends State<StartupDiscoveryScreen> {
         ),
         title: Text(
           'Startup Discovery',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
         actions: [
           IconButton(
-            icon: Icon(
-              Icons.emoji_events_outlined,
-              color: Colors.white,
-            ),
+            icon: Icon(Icons.emoji_events_outlined, color: Colors.white),
             onPressed: () => context.go('/leaderboard'),
           ),
         ],

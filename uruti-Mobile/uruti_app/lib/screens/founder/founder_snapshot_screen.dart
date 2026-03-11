@@ -215,7 +215,7 @@ class _FounderSnapshotScreenState extends State<FounderSnapshotScreen> {
                   ElevatedButton.icon(
                     onPressed: () => context.go('/advisory-tracks'),
                     icon: const Icon(Icons.smart_toy_outlined),
-                    label: const Text('Get AI Recommendations'),
+                    label: const Text('get advisory tracksations'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: context.colors.accent,
                       foregroundColor: Colors.white,
@@ -263,7 +263,7 @@ Widget _sectionTitle(BuildContext context, String title, {String? subtitle}) =>
 String _timeAgo(String? iso) {
   if (iso == null) return '';
   try {
-    final dt = DateTime.parse(iso);
+    final dt = DateTime.parse(iso).toLocal();
     final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
@@ -955,7 +955,7 @@ class _MilestoneTile extends StatelessWidget {
     final formatted = date != null
         ? (() {
             try {
-              final dt = DateTime.parse(date);
+              final dt = DateTime.parse(date).toLocal();
               return '${_monthShort(dt.month)} ${dt.day}, ${dt.year}';
             } catch (_) {
               return date;

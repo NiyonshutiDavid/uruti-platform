@@ -1384,6 +1384,17 @@ class _BookSessionSheetState extends State<_BookSessionSheet> {
     final expected = _dayOfWeekIndex(day);
     final slots = _availability
         .where((slot) => (slot['day_of_week'] as int?) == expected)
+        .where((slot) {
+          final start = _timeFromSlotValue(
+            slot['start_time'] as String? ?? '00:00',
+          );
+          final end = _timeFromSlotValue(
+            slot['end_time'] as String? ?? '00:00',
+          );
+          final startMinutes = start.hour * 60 + start.minute;
+          final endMinutes = end.hour * 60 + end.minute;
+          return endMinutes > startMinutes;
+        })
         .toList();
     slots.sort(
       (a, b) => (a['start_time'] as String? ?? '').compareTo(

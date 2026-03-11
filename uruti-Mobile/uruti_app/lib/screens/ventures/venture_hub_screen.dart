@@ -9,11 +9,10 @@ import '../../core/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../screens/main_scaffold.dart';
 import '../../widgets/top_notification.dart';
+import '../../widgets/in_app_video_player_screen.dart';
 
 String? _ventureMediaUrl(String? raw) {
-  if (raw == null || raw.trim().isEmpty) return null;
-  if (raw.startsWith('http')) return raw;
-  return '${AppConstants.apiBaseUrl}$raw';
+  return AppConstants.normalizeMediaUrl(raw);
 }
 
 Uri? _externalUri(String? raw) {
@@ -311,6 +310,7 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
         final score = (venture['uruti_score'] as num?)?.toDouble() ?? 0.0;
         final pitchDeckUrl = venture['pitch_deck_url'] as String?;
         final demoVideoUrl = venture['demo_video_url'] as String?;
+        final demoVideoMediaUrl = _ventureMediaUrl(demoVideoUrl);
         final iconLogoUrl = _ventureMediaUrl(venture['logo_url'] as String?);
         final bannerUrl = _ventureMediaUrl(venture['banner_url'] as String?);
         final status = _stageToStatus(stage, context);
@@ -494,26 +494,20 @@ class _VentureHubScreenState extends State<VentureHubScreen> {
                   ),
                 ),
               const SizedBox(height: 8),
-              if ((demoVideoUrl ?? '').trim().isNotEmpty)
+              if ((demoVideoMediaUrl ?? '').trim().isNotEmpty)
                 OutlinedButton.icon(
                   onPressed: () async {
-                    final uri = _externalUri(demoVideoUrl);
-                    if (uri != null && await canLaunchUrl(uri)) {
-                      await launchUrl(
-                        uri,
-                        mode: LaunchMode.externalApplication,
-                      );
-                      return;
-                    }
-                    if (!ctx.mounted) return;
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(
-                        content: Text('Unable to open demo video link'),
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => InAppVideoPlayerScreen(
+                          videoUrl: demoVideoMediaUrl!,
+                          title: '$name Demo Video',
+                        ),
                       ),
                     );
                   },
-                  icon: const Icon(Icons.play_circle_outline_rounded, size: 16),
-                  label: const Text('View Demo Video'),
+                  icon: const Icon(Icons.play_circle_fill_rounded, size: 16),
+                  label: const Text('Play Demo Video'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: context.colors.accent,
                     side: BorderSide(

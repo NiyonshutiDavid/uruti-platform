@@ -22,6 +22,9 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _textSlide;
   late Animation<double> _ringScale;
   late Animation<double> _ringOpacity;
+  bool _minimumDisplayElapsed = false;
+  bool _navigated = false;
+  AuthProvider? _authProvider;
 
   @override
   void initState() {
@@ -77,12 +80,32 @@ class _SplashScreenState extends State<SplashScreen>
     _textController.forward();
     await Future.delayed(const Duration(milliseconds: 1800));
     if (!mounted) return;
-    _navigate();
+    _minimumDisplayElapsed = true;
+    _maybeNavigate();
   }
 
-  void _navigate() {
-    if (!mounted) return;
-    final auth = context.read<AuthProvider>();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final provider = context.read<AuthProvider>();
+    if (!identical(_authProvider, provider)) {
+      _authProvider?.removeListener(_maybeNavigate);
+      _authProvider = provider;
+      _authProvider?.addListener(_maybeNavigate);
+    }
+    _maybeNavigate();
+  }
+
+  void _maybeNavigate() {
+    if (!mounted || _navigated || !_minimumDisplayElapsed) return;
+
+    final auth = _authProvider ?? context.read<AuthProvider>();
+    if (auth.status == AuthStatus.initial ||
+        auth.status == AuthStatus.loading) {
+      return;
+    }
+
+    _navigated = true;
     if (auth.isAuthenticated) {
       context.go('/home');
     } else {
@@ -92,6 +115,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    _authProvider?.removeListener(_maybeNavigate);
     _logoController.dispose();
     _textController.dispose();
     _ringController.dispose();

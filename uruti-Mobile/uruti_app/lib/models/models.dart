@@ -71,15 +71,11 @@ class UserModel {
   /// Returns a fully-qualified URL for the avatar.
   /// The backend may return a relative path like /uploads/avatar.jpg.
   String? get resolvedAvatarUrl {
-    if (avatarUrl == null) return null;
-    if (avatarUrl!.startsWith('http')) return avatarUrl;
-    return '${AppConstants.apiBaseUrl}$avatarUrl';
+    return AppConstants.normalizeMediaUrl(avatarUrl);
   }
 
   String? get resolvedCoverImageUrl {
-    if (coverImageUrl == null) return null;
-    if (coverImageUrl!.startsWith('http')) return coverImageUrl;
-    return '${AppConstants.apiBaseUrl}$coverImageUrl';
+    return AppConstants.normalizeMediaUrl(coverImageUrl);
   }
 
   String get initials {

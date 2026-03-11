@@ -624,7 +624,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(dlg, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.redAccent),
+            ),
           ),
         ],
       ),
@@ -638,14 +641,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       setState(() {
         _messages.removeWhere((m) => '${m['id'] ?? ''}' == '$messageId');
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Message deleted')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Message deleted')));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to delete message')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to delete message')));
     }
   }
 
