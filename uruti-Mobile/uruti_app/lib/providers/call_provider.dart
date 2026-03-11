@@ -164,7 +164,10 @@ class CallProvider extends ChangeNotifier {
       }
 
       final peerId = int.tryParse(_peerUserId ?? '');
-      if (peerId != null && peerId > 0 && _session != null && _pendingOffer != null) {
+      if (peerId != null &&
+          peerId > 0 &&
+          _session != null &&
+          _pendingOffer != null) {
         final offer = Map<String, dynamic>.from(_pendingOffer!);
         _pendingOffer = null;
         unawaited(() async {

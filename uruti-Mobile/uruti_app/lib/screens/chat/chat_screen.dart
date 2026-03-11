@@ -21,6 +21,64 @@ class _ChatScreenState extends State<ChatScreen> {
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
   final Set<String> _deletedIds = {};
 
+  String _asText(dynamic value) {
+    if (value == null) return '';
+    return value.toString().trim();
+  }
+
+  String _messagePreviewText(Map<String, dynamic> message) {
+    final body = _asText(message['body']);
+    if (body.isNotEmpty) return body;
+    final attachments = message['attachments'];
+    if (attachments is List && attachments.isNotEmpty) {
+      return 'Attachment';
+    }
+    return 'New message';
+  }
+
+  Future<void> _handleMessageCreated(dynamic rawData) async {
+    if (rawData is! Map) return;
+
+    final message = Map<String, dynamic>.from(rawData.cast<dynamic, dynamic>());
+    final meId = context.read<AuthProvider>().user?.id ?? 0;
+    final senderId = int.tryParse('${message['sender_id'] ?? 0}') ?? 0;
+    final receiverId = int.tryParse('${message['receiver_id'] ?? 0}') ?? 0;
+    if (senderId <= 0 ||
+        receiverId <= 0 ||
+        (senderId != meId && receiverId != meId)) {
+      return;
+    }
+
+    final otherUserId = senderId == meId ? receiverId : senderId;
+    final index = _conversations.indexWhere((conversation) {
+      final other =
+          (conversation['other_user'] as Map?)?.cast<String, dynamic>() ?? {};
+      return int.tryParse('${other['id'] ?? 0}') == otherUserId;
+    });
+
+    if (index < 0) {
+      await _load(showLoading: false);
+      return;
+    }
+
+    final conversation = Map<String, dynamic>.from(_conversations[index]);
+    final currentUnread =
+        int.tryParse('${conversation['unread_count'] ?? 0}') ?? 0;
+    final isIncoming = receiverId == meId;
+    final updatedConversation = {
+      ...conversation,
+      'last_message': _messagePreviewText(message),
+      'last_message_time': _asText(message['created_at']),
+      'unread_count': isIncoming ? currentUnread + 1 : 0,
+    };
+
+    if (!mounted) return;
+    setState(() {
+      _conversations.removeAt(index);
+      _conversations.insert(0, updatedConversation);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -28,7 +86,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     _realtimeSub = RealtimeService.instance.events.listen((event) {
       if (!mounted || event['event'] != 'message_created') return;
-      _load();
+      unawaited(_handleMessageCreated(event['data']));
     });
 
     final token = (context.read<AuthProvider>().token ?? '').trim();
@@ -43,16 +101,22 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool showLoading = true}) async {
+    if (showLoading && mounted) {
+      setState(() => _loading = true);
+    }
     try {
       final token = context.read<AuthProvider>().token ?? '';
       final data = await ApiService.instance.getConversations(token);
+      if (!mounted) return;
       setState(() {
         _conversations = List<Map<String, dynamic>>.from(data);
         _loading = false;
       });
     } catch (_) {
-      setState(() => _loading = false);
+      if (mounted && showLoading) {
+        setState(() => _loading = false);
+      }
     }
   }
 

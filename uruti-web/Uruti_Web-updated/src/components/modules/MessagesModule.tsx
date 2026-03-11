@@ -158,6 +158,50 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
     return parseServerDate(timestamp);
   };
 
+  const previewFromRealtimeMessage = (payload: any): string => {
+    const body = String(payload?.body ?? '').trim();
+    if (body) return body;
+    if (Array.isArray(payload?.attachments) && payload.attachments.length > 0) {
+      return 'Attachment';
+    }
+    return 'New message';
+  };
+
+  const applyRealtimeConversationUpdate = (payload: any) => {
+    const currentUserId = Number(user?.id);
+    if (!currentUserId) return;
+
+    const senderId = Number(payload?.sender_id ?? 0);
+    const receiverId = Number(payload?.receiver_id ?? 0);
+    if (!senderId || !receiverId) return;
+    if (senderId !== currentUserId && receiverId !== currentUserId) return;
+
+    const otherUserId = senderId === currentUserId ? receiverId : senderId;
+    const incomingForCurrentUser = receiverId === currentUserId;
+    const isActiveThread = selectedConversation?.userId === otherUserId;
+
+    setConversations((prev) => {
+      const index = prev.findIndex((conversation) => conversation.userId === otherUserId);
+      if (index < 0) {
+        void loadConversations(false);
+        return prev;
+      }
+
+      const base = prev[index];
+      const updated: Conversation = {
+        ...base,
+        lastMessage: previewFromRealtimeMessage(payload),
+        timestamp: String(payload?.created_at || new Date().toISOString()),
+        unread: incomingForCurrentUser && !isActiveThread ? base.unread + 1 : 0,
+      };
+
+      const next = [...prev];
+      next.splice(index, 1);
+      next.unshift(updated);
+      return next;
+    });
+  };
+
   useEffect(() => {
     void loadConversations(true);
   }, [user?.id]);
@@ -172,9 +216,15 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
       try {
         const parsed = JSON.parse(event.data);
         if (parsed?.event === 'message_created') {
-          void loadConversations(false);
-          if (selectedConversation?.userId) {
-            void loadThreadMessages(selectedConversation.userId);
+          const payload = parsed?.data ?? parsed;
+          applyRealtimeConversationUpdate(payload);
+
+          const currentUserId = Number(user?.id);
+          const senderId = Number(payload?.sender_id ?? 0);
+          const receiverId = Number(payload?.receiver_id ?? 0);
+          const otherUserId = senderId === currentUserId ? receiverId : senderId;
+          if (selectedConversation?.userId && selectedConversation.userId === otherUserId) {
+            void loadThreadMessages(otherUserId);
           }
         }
       } catch {
@@ -191,21 +241,6 @@ export function MessagesModule({ userType = 'founder' }: MessagesModuleProps) {
     return () => {
       window.clearInterval(ping);
       socket.close();
-    };
-  }, [selectedConversation?.userId, user?.id]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const timer = window.setInterval(() => {
-      void loadConversations(false);
-      if (selectedConversation?.userId) {
-        void loadThreadMessages(selectedConversation.userId);
-      }
-    }, 2500);
-
-    return () => {
-      window.clearInterval(timer);
     };
   }, [selectedConversation?.userId, user?.id]);
 

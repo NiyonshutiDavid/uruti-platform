@@ -54,6 +54,59 @@ class _MessagesHomeState extends State<_MessagesHome> {
     return value;
   }
 
+  String _messagePreviewText(Map<String, dynamic> message) {
+    final body = _asText(message['body']);
+    if (body.isNotEmpty) return body;
+    final attachments = message['attachments'];
+    if (attachments is List && attachments.isNotEmpty) {
+      return 'Attachment';
+    }
+    return 'New message';
+  }
+
+  Future<void> _handleMessageCreated(dynamic rawData) async {
+    if (rawData is! Map) return;
+
+    final message = Map<String, dynamic>.from(rawData.cast<dynamic, dynamic>());
+    final meId = context.read<AuthProvider>().user?.id ?? 0;
+    final senderId = int.tryParse('${message['sender_id'] ?? 0}') ?? 0;
+    final receiverId = int.tryParse('${message['receiver_id'] ?? 0}') ?? 0;
+    if (senderId <= 0 ||
+        receiverId <= 0 ||
+        (senderId != meId && receiverId != meId)) {
+      return;
+    }
+
+    final otherUserId = senderId == meId ? receiverId : senderId;
+    final index = _conversations.indexWhere((conversation) {
+      final other =
+          (conversation['other_user'] as Map?)?.cast<String, dynamic>() ?? {};
+      return int.tryParse('${other['id'] ?? 0}') == otherUserId;
+    });
+
+    if (index < 0) {
+      await _load(showLoading: false);
+      return;
+    }
+
+    final conversation = Map<String, dynamic>.from(_conversations[index]);
+    final currentUnread =
+        int.tryParse('${conversation['unread_count'] ?? 0}') ?? 0;
+    final isIncoming = receiverId == meId;
+    final updatedConversation = {
+      ...conversation,
+      'last_message': _messagePreviewText(message),
+      'last_message_time': _asText(message['created_at']),
+      'unread_count': isIncoming ? currentUnread + 1 : 0,
+    };
+
+    if (!mounted) return;
+    setState(() {
+      _conversations.removeAt(index);
+      _conversations.insert(0, updatedConversation);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -66,7 +119,7 @@ class _MessagesHomeState extends State<_MessagesHome> {
 
       // Handle new messages
       if (eventType == 'message_created') {
-        _load();
+        unawaited(_handleMessageCreated(event['data']));
         return;
       }
 
@@ -149,8 +202,10 @@ class _MessagesHomeState extends State<_MessagesHome> {
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _load({bool showLoading = true}) async {
+    if (showLoading && mounted) {
+      setState(() => _loading = true);
+    }
     try {
       final token = context.read<AuthProvider>().token ?? '';
       final data = await ApiService.instance.getConversations(token);
@@ -160,7 +215,7 @@ class _MessagesHomeState extends State<_MessagesHome> {
         _loading = false;
       });
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      if (showLoading && mounted) setState(() => _loading = false);
     }
   }
 

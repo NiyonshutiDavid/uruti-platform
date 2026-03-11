@@ -174,9 +174,9 @@ class _PitchPerformanceScreenState extends State<PitchPerformanceScreen> {
       return true;
     } catch (_) {
       if (!mounted) return false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to delete session')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to delete session')));
       return false;
     } finally {
       if (mounted) {
@@ -696,13 +696,18 @@ class _PitchPerformanceScreenState extends State<PitchPerformanceScreen> {
                     ),
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.symmetric(horizontal: 18),
-                    child: const Icon(Icons.delete_outline, color: Colors.white),
+                    child: const Icon(
+                      Icons.delete_outline,
+                      color: Colors.white,
+                    ),
                   ),
                   confirmDismiss: (_) => _confirmAndDeleteSession(s),
                   onDismissed: (_) {
                     if (!mounted) return;
                     setState(() {
-                      _sessions.removeWhere((item) => _sessionId(item) == _sessionId(s));
+                      _sessions.removeWhere(
+                        (item) => _sessionId(item) == _sessionId(s),
+                      );
                     });
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Pitch session deleted')),
@@ -725,7 +730,9 @@ class _PitchPerformanceScreenState extends State<PitchPerformanceScreen> {
                             height: 48,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: _scoreColor(_score(s)).withValues(alpha: 0.15),
+                              color: _scoreColor(
+                                _score(s),
+                              ).withValues(alpha: 0.15),
                             ),
                             alignment: Alignment.center,
                             child: Text(
