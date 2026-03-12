@@ -58,10 +58,7 @@ class HelpSupportScreen extends StatelessWidget {
         ),
         title: Text(
           'Help & Support',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
       ),
       body: ListView(
@@ -103,7 +100,21 @@ class HelpSupportScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    _ContactBtn(Icons.email_outlined, 'Email Us', () {}),
+                    _ContactBtn(Icons.email_outlined, 'Email Us', () async {
+                      final contactUri = Uri.parse('https://uruti.rw/contact');
+                      if (await canLaunchUrl(contactUri)) {
+                        await launchUrl(
+                          contactUri,
+                          mode: LaunchMode.externalApplication,
+                        );
+                        return;
+                      }
+
+                      final emailUri = Uri.parse('mailto:support@uruti.rw');
+                      if (await canLaunchUrl(emailUri)) {
+                        await launchUrl(emailUri);
+                      }
+                    }),
                     const SizedBox(width: 12),
                     _ContactBtn(
                       Icons.chat_outlined,
@@ -188,7 +199,10 @@ class HelpSupportScreen extends StatelessWidget {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: context.colors.accent, width: 1.5),
+                borderSide: BorderSide(
+                  color: context.colors.accent,
+                  width: 1.5,
+                ),
               ),
             ),
           ),
@@ -226,7 +240,9 @@ class _ContactBtn extends StatelessWidget {
         decoration: BoxDecoration(
           color: context.colors.accent.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: context.colors.accent.withValues(alpha: 0.3)),
+          border: Border.all(
+            color: context.colors.accent.withValues(alpha: 0.3),
+          ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

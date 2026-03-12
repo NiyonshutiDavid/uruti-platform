@@ -454,8 +454,11 @@ class _QrScanPageState extends State<_QrScanPage> {
           ),
           title: Row(
             children: [
-              Icon(Icons.check_circle_rounded,
-                  color: context.colors.accent, size: 24),
+              Icon(
+                Icons.check_circle_rounded,
+                color: context.colors.accent,
+                size: 24,
+              ),
               const SizedBox(width: 10),
               Text(
                 'Logged In',

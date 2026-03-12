@@ -480,7 +480,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           _isRecordingVoiceNote = false;
           _recordingSeconds = 0;
           if (hasFile) {
-              final fileName = path.split('/').last;
+            final fileName = path.split('/').last;
             _attachedFilePath = path;
             _attachedFileName = fileName.isEmpty ? 'voice-note.m4a' : fileName;
           }
@@ -3082,17 +3082,17 @@ class _InputBar extends StatelessWidget {
     required this.sending,
     required this.recordingVoiceNote,
     this.recordingSeconds = 0,
-    });
+  });
 
-    static String _fmtSecs(int s) {
-      final m = s ~/ 60;
-      final sec = (s % 60).toString().padLeft(2, '0');
-      return '$m:$sec';
-    }
+  static String _fmtSecs(int s) {
+    final m = s ~/ 60;
+    final sec = (s % 60).toString().padLeft(2, '0');
+    return '$m:$sec';
+  }
 
-    @override
-    Widget build(BuildContext context) {
-      return Container(
+  @override
+  Widget build(BuildContext context) {
+    return Container(
       padding: const EdgeInsets.fromLTRB(0, 6, 0, 0),
       decoration: BoxDecoration(
         color: context.colors.card,
