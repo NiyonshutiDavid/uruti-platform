@@ -37,6 +37,8 @@ from .routers import (
 )
 from .services.pitch_coach_engine import pitch_coach_engine
 from .services.venture_scorer import venture_scorer
+from .routers.messages import realtime_hub as message_realtime_hub
+from .routers.notifications import notification_hub as notification_realtime_hub
 
 logger = logging.getLogger(__name__)
 
@@ -201,6 +203,13 @@ async def _warmup_optional_models() -> None:
             logger.warning("pitch_coach warmup failed: %s", exc)
 
     asyncio.create_task(_ordered_warmup())
+
+
+@app.on_event("startup")
+async def _init_realtime_hubs() -> None:
+    """Attempt to connect both realtime hubs to Redis for cross-worker broadcast."""
+    await message_realtime_hub._try_init_redis()
+    await notification_realtime_hub._try_init_redis()
 
 
 if __name__ == "__main__":

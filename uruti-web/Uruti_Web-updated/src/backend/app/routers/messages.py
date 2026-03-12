@@ -4,6 +4,9 @@ from sqlalchemy import or_, desc
 from typing import List, Dict, Set, Any, Optional
 from pathlib import Path
 import uuid
+import asyncio
+import json
+import logging
 from jose import JWTError, jwt
 from ..database import get_db
 from ..config import settings
@@ -23,12 +26,72 @@ router = APIRouter(prefix="/messages", tags=["Messages"])
 CALL_SIGNAL_KIND = "call_event"
 
 
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Optional Redis import – degrades gracefully if redis package not installed
+# or if Redis server is unreachable.
+# ---------------------------------------------------------------------------
+try:
+    import redis.asyncio as aioredis  # type: ignore[import-not-found]
+    _REDIS_AVAILABLE = True
+except ImportError:
+    aioredis = None  # type: ignore[assignment]
+    _REDIS_AVAILABLE = False
+
+
 class _MessageRealtimeHub:
     def __init__(self):
         self._connections: Dict[int, Set[WebSocket]] = {}
+        self._redis: Any = None
+        self._pubsub: Any = None
+        self._listener_task: Any = None
+
+    async def _try_init_redis(self) -> bool:
+        """Attempt to connect to Redis. Returns True on success."""
+        if not _REDIS_AVAILABLE:
+            return False
+        redis_url = getattr(settings, "REDIS_URL", None) or "redis://localhost:6379/0"
+        try:
+            r = aioredis.from_url(redis_url, decode_responses=True, socket_connect_timeout=2)
+            await r.ping()
+            self._redis = r
+            logger.info("MessageRealtimeHub: Redis connected at %s", redis_url)
+            return True
+        except Exception as exc:
+            logger.debug("MessageRealtimeHub: Redis unavailable (%s). Using in-process hub.", exc)
+            return False
+
+    async def start_redis_listener(self):
+        """Subscribe to all user channels and push payloads to local sockets."""
+        if self._redis is None:
+            return
+        try:
+            self._pubsub = self._redis.pubsub()
+            await self._pubsub.psubscribe("msg:user:*")
+            async for raw in self._pubsub.listen():
+                if raw["type"] != "pmessage":
+                    continue
+                channel: str = raw.get("channel", "")
+                try:
+                    user_id = int(channel.split(":")[-1])
+                except (ValueError, IndexError):
+                    continue
+                try:
+                    payload = json.loads(raw["data"])
+                except Exception:
+                    continue
+                await self._local_broadcast(user_id, payload)
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            logger.error("MessageRealtimeHub Redis listener error: %s", exc)
 
     async def connect(self, user_id: int, websocket: WebSocket):
         self._connections.setdefault(user_id, set()).add(websocket)
+        # Start Redis listener on first connection if not running
+        if self._redis is not None and (self._listener_task is None or self._listener_task.done()):
+            self._listener_task = asyncio.create_task(self.start_redis_listener())
 
     async def disconnect(self, user_id: int, websocket: WebSocket):
         user_sockets = self._connections.get(user_id)
@@ -43,7 +106,8 @@ class _MessageRealtimeHub:
         """Return the set of user IDs with at least one active WebSocket."""
         return {uid for uid, sockets in self._connections.items() if sockets}
 
-    async def broadcast_to_user(self, user_id: int, payload: Dict[str, Any]):
+    async def _local_broadcast(self, user_id: int, payload: Dict[str, Any]):
+        """Deliver payload to WebSocket connections in this process."""
         sockets = list(self._connections.get(user_id, set()))
         if not sockets:
             return
@@ -62,6 +126,18 @@ class _MessageRealtimeHub:
                     user_sockets.discard(socket)
                 if not user_sockets:
                     self._connections.pop(user_id, None)
+
+    async def broadcast_to_user(self, user_id: int, payload: Dict[str, Any]):
+        """Broadcast to user – via Redis pub/sub if available, otherwise in-process."""
+        if self._redis is not None:
+            try:
+                channel = f"msg:user:{user_id}"
+                await self._redis.publish(channel, json.dumps(payload))
+                return
+            except Exception as exc:
+                logger.warning("MessageRealtimeHub Redis publish failed (%s). Fallback to local.", exc)
+        # Fallback: direct in-process delivery
+        await self._local_broadcast(user_id, payload)
 
 
 realtime_hub = _MessageRealtimeHub()

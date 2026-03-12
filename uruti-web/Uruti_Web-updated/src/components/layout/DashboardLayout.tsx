@@ -109,12 +109,17 @@ function DraggableCallBanner({
 export function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout: authLogout } = useAuth();
+  const { user, token, logout: authLogout } = useAuth();
   const [activeModule, setActiveModule] = useState('');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [aiChatContext, setAiChatContext] = useState<{ name: string; description: string } | undefined>();
   const [aiAnalysisContext, setAiAnalysisContext] = useState<any>(undefined);
   const remindedMeetingKeys = useRef<Set<string>>(new Set());
+  const notifWsRef = useRef<ReturnType<typeof apiClient.createNotificationsWebSocket> | null>(null);
+  // Track current path via ref so WS message handlers always read the latest value
+  const currentPathRef = useRef(location.pathname);
+  useEffect(() => { currentPathRef.current = location.pathname; }, [location.pathname]);
+
   const {
     callState,
     localStream,
@@ -143,6 +148,100 @@ export function DashboardLayout() {
       window.focus();
       navigate('/dashboard/calendar');
     };
+  }, [navigate]);
+
+  // Global notifications WebSocket – open for every dashboard page so that
+  // new messages and other notifications surface as browser/OS alerts even
+  // when the user is not on the Messages route.
+  useEffect(() => {
+    if (!user || !token) return;
+
+    // Clean up any previous socket before opening a new one
+    if (notifWsRef.current) {
+      notifWsRef.current.close();
+      notifWsRef.current = null;
+    }
+
+    const ws = apiClient.createNotificationsWebSocket(token);
+    notifWsRef.current = ws;
+
+    let pingInterval: ReturnType<typeof setInterval> | null = null;
+
+    ws.onopen = () => {
+      pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send('ping');
+        }
+      }, 20000);
+    };
+
+    ws.onmessage = async (event: MessageEvent) => {
+      let msg: { event?: string; data?: Record<string, unknown> };
+      try {
+        msg = JSON.parse(event.data as string);
+      } catch {
+        return;
+      }
+
+      const evtName = msg?.event;
+
+      // message_created – skip if user is already viewing the Messages page
+      if (evtName === 'message_created' && !currentPathRef.current.startsWith('/dashboard/messages')) {
+        const data = msg.data ?? {};
+        const senderId = data.sender_id as number | undefined;
+        if (senderId && senderId !== user.id) {
+          const senderName = (data.sender_full_name ?? data.sender_name ?? 'Someone') as string;
+          const preview = (data.body as string | undefined)?.slice(0, 80) ?? 'New message';
+          toast.info(`💬 ${senderName}: ${preview}`, {
+            action: { label: 'Open', onClick: () => navigate('/dashboard/messages') },
+          });
+          await showBrowserNotification(`Message from ${senderName}`, preview, '/dashboard/messages');
+        }
+      }
+
+      // notification_created – general platform notification
+      if (evtName === 'notification_created') {
+        const data = msg.data ?? {};
+        const title = (data.title as string | undefined) ?? 'New notification';
+        const body = (data.message as string | undefined) ?? '';
+        toast.info(`🔔 ${title}${body ? `: ${body.slice(0, 80)}` : ''}`, {
+          action: { label: 'View', onClick: () => navigate('/dashboard/notifications') },
+        });
+        await showBrowserNotification(title, body, '/dashboard/notifications');
+      }
+    };
+
+    ws.onerror = () => { /* silent – reconnect handled by close handler */ };
+
+    ws.onclose = () => {
+      if (pingInterval) clearInterval(pingInterval);
+      // Schedule reconnect after 5 s unless the component has unmounted
+      const timer = setTimeout(() => {
+        // Re-run the effect by closing the stale ref so the cleanup runs on next render
+        notifWsRef.current = null;
+      }, 5000);
+      return () => clearTimeout(timer);
+    };
+
+    return () => {
+      if (pingInterval) clearInterval(pingInterval);
+      ws.close();
+      notifWsRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, token]);
+
+  const showBrowserNotification = useCallback(async (title: string, body: string, targetPath: string) => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+
+    if (Notification.permission === 'default') {
+      try { await Notification.requestPermission(); } catch { return; }
+    }
+
+    if (Notification.permission !== 'granted') return;
+
+    const n = new Notification(title, { body });
+    n.onclick = () => { window.focus(); navigate(targetPath); };
   }, [navigate]);
 
   // Keep module state synced with URL and enforce role-based access

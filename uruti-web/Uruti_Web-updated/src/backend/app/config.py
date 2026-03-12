@@ -96,5 +96,9 @@ class Settings(BaseSettings):
     # Push Notifications (Firebase Cloud Messaging)
     FCM_SERVICE_ACCOUNT_PATH: Optional[str] = os.getenv("FCM_SERVICE_ACCOUNT_PATH")
     FCM_SERVICE_ACCOUNT_JSON: Optional[str] = os.getenv("FCM_SERVICE_ACCOUNT_JSON")
+
+    # Redis (optional – used for cross-worker WebSocket pub/sub broadcast)
+    # Leave unset to use the in-process fallback (single-worker deployments).
+    REDIS_URL: Optional[str] = os.getenv("REDIS_URL", None)
     
 settings = Settings()

@@ -3,6 +3,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import List, Dict, Set, Any, Optional
 from datetime import datetime
+import asyncio
+import json
+import logging
 from jose import JWTError, jwt
 from ..database import get_db
 from ..database import SessionLocal
@@ -15,6 +18,16 @@ from ..services.push_notifications import send_push_notification
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
 
+logger = logging.getLogger(__name__)
+
+try:
+    import redis.asyncio as aioredis  # type: ignore[import-not-found]
+    _REDIS_AVAILABLE = True
+except ImportError:
+    aioredis = None  # type: ignore[assignment]
+    _REDIS_AVAILABLE = False
+
+
 def _is_transient_call_notification(notification: Notification) -> bool:
     data = notification.data or {}
     return isinstance(data, dict) and data.get("kind") == "call_event"
@@ -23,9 +36,52 @@ def _is_transient_call_notification(notification: Notification) -> bool:
 class _NotificationRealtimeHub:
     def __init__(self):
         self._connections: Dict[int, Set[WebSocket]] = {}
+        self._redis: Any = None
+        self._pubsub: Any = None
+        self._listener_task: Any = None
+
+    async def _try_init_redis(self) -> bool:
+        if not _REDIS_AVAILABLE:
+            return False
+        redis_url = getattr(settings, "REDIS_URL", None) or "redis://localhost:6379/0"
+        try:
+            r = aioredis.from_url(redis_url, decode_responses=True, socket_connect_timeout=2)
+            await r.ping()
+            self._redis = r
+            logger.info("NotificationRealtimeHub: Redis connected at %s", redis_url)
+            return True
+        except Exception as exc:
+            logger.debug("NotificationRealtimeHub: Redis unavailable (%s). Using in-process hub.", exc)
+            return False
+
+    async def start_redis_listener(self):
+        if self._redis is None:
+            return
+        try:
+            self._pubsub = self._redis.pubsub()
+            await self._pubsub.psubscribe("notif:user:*")
+            async for raw in self._pubsub.listen():
+                if raw["type"] != "pmessage":
+                    continue
+                channel: str = raw.get("channel", "")
+                try:
+                    user_id = int(channel.split(":")[-1])
+                except (ValueError, IndexError):
+                    continue
+                try:
+                    payload = json.loads(raw["data"])
+                except Exception:
+                    continue
+                await self._local_broadcast(user_id, payload)
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            logger.error("NotificationRealtimeHub Redis listener error: %s", exc)
 
     async def connect(self, user_id: int, websocket: WebSocket):
         self._connections.setdefault(user_id, set()).add(websocket)
+        if self._redis is not None and (self._listener_task is None or self._listener_task.done()):
+            self._listener_task = asyncio.create_task(self.start_redis_listener())
 
     async def disconnect(self, user_id: int, websocket: WebSocket):
         sockets = self._connections.get(user_id)
@@ -40,7 +96,7 @@ class _NotificationRealtimeHub:
         """Return the set of user IDs with at least one active WebSocket."""
         return {uid for uid, sockets in self._connections.items() if sockets}
 
-    async def broadcast_to_user(self, user_id: int, payload: Dict[str, Any]):
+    async def _local_broadcast(self, user_id: int, payload: Dict[str, Any]):
         sockets = list(self._connections.get(user_id, set()))
         if not sockets:
             return
@@ -59,6 +115,15 @@ class _NotificationRealtimeHub:
                     current.discard(socket)
                 if not current:
                     self._connections.pop(user_id, None)
+
+    async def broadcast_to_user(self, user_id: int, payload: Dict[str, Any]):
+        if self._redis is not None:
+            try:
+                await self._redis.publish(f"notif:user:{user_id}", json.dumps(payload))
+                return
+            except Exception as exc:
+                logger.warning("NotificationRealtimeHub Redis publish failed (%s). Fallback to local.", exc)
+        await self._local_broadcast(user_id, payload)
 
 
 notification_hub = _NotificationRealtimeHub()
