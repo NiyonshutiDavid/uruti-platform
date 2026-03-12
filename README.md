@@ -22,6 +22,100 @@ The platform models are deployed on Hugging Face:
 - Chatbot model (GGUF, CPU-friendly): https://huggingface.co/NiyonshutiDavid/uruti-qwen2_5-7b-instruct-q4_k_m-gguf
 - Chatbot model (Tensor/large variant): https://huggingface.co/NiyonshutiDavid/uruti-advisory-model-best
 
+### Investor Ranker And Analyzer (What It Scores)
+
+Model family and deployment bundle:
+
+- Inference pipeline: XGBoost-based `Pipeline` (loaded from `uruti_bundle.joblib`)
+- Classes:
+    - `not_ready`
+    - `mentorship_needed`
+    - `investment_ready`
+
+What it analyzes at inference time:
+
+- Structured model features (10 canonical fields):
+    - `funding_total_usd`
+    - `funding_rounds`
+    - `founded_year`
+    - `rd_spend`
+    - `administration_spend`
+    - `marketing_spend`
+    - `profit`
+    - `state_code`
+    - `category_code`
+    - `source`
+- Uruti readiness heuristics used for calibrated score blending:
+    - team strength (`team_size`)
+    - traction (`user_base` vs target market)
+    - growth (`monthly_growth_pct`)
+    - partnerships
+    - sector boost
+    - startup stage
+    - optional platform score (`mlp_score`) when available
+
+Score bands used in output:
+
+- High Readiness (80-100)
+- Strong Seed Readiness (70-79)
+- Mentorship-to-Seed Transition (60-69)
+- Mentorship Needed (50-59)
+- Early Stage / Not Ready (<50)
+
+Current performance (latest documented training artifacts):
+
+- Best model: XGBoost Classifier
+- Weighted F1 score: 83.82%
+- Evaluation/training scale: 55,000+ startup records
+
+### Pitch Coach (Session Handling, Actions, Rewards)
+
+How the scoring and coaching session is handled:
+
+- Score endpoint model:
+    - Reward MLP takes 9 real-time pitch features and predicts a continuous score.
+- Coaching endpoint policy:
+    - RL agent takes a 12-dimensional state vector:
+        - 9 multimodal features
+        - 3 session-context fields: `slide_index`, `time_remaining`, `time_on_slide`
+
+Core 9 pitch features analyzed:
+
+- `eye_contact_score`
+- `smile_rate`
+- `head_stability`
+- `pitch_variance`
+- `rms_energy`
+- `pause_ratio`
+- `speech_rate`
+- `readability_score`
+- `filler_ratio`
+
+Action space (Discrete(6)):
+
+- `0`: Increase Energy
+- `1`: Improve Eye Contact
+- `2`: Reduce Fillers
+- `3`: Slow Down
+- `4`: Clarify Point / Slide Alignment
+- `5`: Smile / Stronger Hook
+
+Reward design used during RL training:
+
+- Base reward: score improvement delta (`current_score - last_score`) scaled by `4.0`
+- Maintenance bonus: `+2.0` when score remains above `85`
+- Pacing penalty: subtract over-time penalty when `time_on_slide` exceeds expected slide time
+- Terminal bonus: `+50.0` when session ends with final score `>= 85`
+
+Current performance (latest notebook run + exported artifacts):
+
+- Reward model validation: target reached at epoch 135 with `Val R^2 = 0.9512`
+- RL algorithm comparison (mean final score):
+    - DQN: `57.79/100` (best)
+    - PPO: `57.74/100`
+    - TRPO: `54.17/100`
+- Deployed policy artifact currently marked best: `DQN`
+
 ## Datasets Used
 
 Primary datasets and data assets used in this repository:
