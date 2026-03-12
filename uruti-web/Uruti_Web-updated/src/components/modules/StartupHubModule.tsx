@@ -710,6 +710,9 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
                 solution: updatedVenture.solution || undefined,
                 target_market: updatedVenture.targetMarket || undefined,
                 business_model: updatedVenture.competitiveEdge || undefined,
+                demo_video_url: updatedVenture.pitchVideoUrl?.trim()
+                  ? updatedVenture.pitchVideoUrl.trim()
+                  : null,
               };
 
               const ventureId = Number(updatedVenture.id);

@@ -23,15 +23,18 @@ import {
   ArrowLeft,
   Sparkles,
   Bookmark,
+  Trash2,
   Loader2,
   LayoutGrid,
   List
 } from 'lucide-react';
 import { VentureDetailView } from '../VentureDetailView';
 import { apiClient } from '../../lib/api-client';
+import { useAuth } from '../../lib/auth-context';
 import { toast } from 'sonner';
 
 export function StartupDiscoveryModule() {
+  const { user } = useAuth();
   const { confirm } = useConfirmDialog();
   const navigate = useNavigate();
   const [ventures, setVentures] = useState<any[]>([]);
@@ -42,12 +45,15 @@ export function StartupDiscoveryModule() {
   const [selectedVenture, setSelectedVenture] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'leaderboard'>('grid');
   const [bookmarkedVentures, setBookmarkedVentures] = useState<Set<number>>(new Set());
+  const isAdmin = user?.role === 'admin';
 
   // Load ventures from backend
   useEffect(() => {
     loadVentures();
-    loadBookmarks();
-  }, []);
+    if (!isAdmin) {
+      loadBookmarks();
+    }
+  }, [isAdmin]);
 
   useEffect(() => {
     const handleVentureVideoUpdated = (event: Event) => {
@@ -174,6 +180,32 @@ export function StartupDiscoveryModule() {
     } catch (error) {
       console.error('Error toggling bookmark:', error);
       toast.error('Failed to update bookmark');
+    }
+  };
+
+  const handleDeleteVenture = async (ventureId: number, ventureName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    const confirmed = await confirm({
+      title: 'Delete Startup',
+      description: `Delete "${ventureName}"? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+
+    try {
+      await apiClient.deleteVenture(ventureId);
+      setVentures((prev) => prev.filter((venture) => Number(venture.id) !== ventureId));
+      setBookmarkedVentures((prev) => {
+        const next = new Set(prev);
+        next.delete(ventureId);
+        return next;
+      });
+      toast.success('Startup deleted');
+    } catch (error: any) {
+      console.error('Error deleting venture:', error);
+      toast.error(error?.message || 'Failed to delete startup');
     }
   };
 
@@ -501,14 +533,27 @@ export function StartupDiscoveryModule() {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={`hover:bg-[#76B947]/10 ${isBookmarked ? 'text-[#76B947]' : ''}`}
-                              onClick={(e: React.MouseEvent) => toggleBookmark(venture.id, e)}
-                            >
-                              <Bookmark className={`h-4 w-4 ${isBookmarked ? 'fill-[#76B947]' : ''}`} />
-                            </Button>
+                            {isAdmin ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="hover:bg-destructive/10 text-destructive"
+                                onClick={(e: React.MouseEvent) =>
+                                  handleDeleteVenture(venture.id, venture.name || 'this startup', e)
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={`hover:bg-[#76B947]/10 ${isBookmarked ? 'text-[#76B947]' : ''}`}
+                                onClick={(e: React.MouseEvent) => toggleBookmark(venture.id, e)}
+                              >
+                                <Bookmark className={`h-4 w-4 ${isBookmarked ? 'fill-[#76B947]' : ''}`} />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -544,19 +589,30 @@ export function StartupDiscoveryModule() {
                     </div>
                   )}
                   
-                  {/* Bookmark Button */}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className={`absolute top-2 right-2 ${
-                      bookmarkedVentures.has(venture.id)
-                        ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
-                        : 'bg-black/50 hover:bg-black/70 text-white backdrop-blur-sm'
-                    }`}
-                    onClick={(e) => toggleBookmark(venture.id, e)}
-                  >
-                    <Bookmark className={`h-4 w-4 ${bookmarkedVentures.has(venture.id) ? 'fill-current' : ''}`} />
-                  </Button>
+                  {/* Admin delete button or investor bookmark button */}
+                  {isAdmin ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="absolute top-2 right-2 bg-red-600/90 hover:bg-red-700 text-white backdrop-blur-sm"
+                      onClick={(e) => handleDeleteVenture(venture.id, venture.name || 'this startup', e)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className={`absolute top-2 right-2 ${
+                        bookmarkedVentures.has(venture.id)
+                          ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                          : 'bg-black/50 hover:bg-black/70 text-white backdrop-blur-sm'
+                      }`}
+                      onClick={(e) => toggleBookmark(venture.id, e)}
+                    >
+                      <Bookmark className={`h-4 w-4 ${bookmarkedVentures.has(venture.id) ? 'fill-current' : ''}`} />
+                    </Button>
+                  )}
 
                   {/* Uruti Score Badge */}
                   {venture.uruti_score && (

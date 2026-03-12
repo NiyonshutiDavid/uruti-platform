@@ -412,7 +412,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ],
 
-                    if (_currentStep == 3 && _userType == 'investor')
+                    if (_currentStep == 3 && _userType == 'investor') ...[
                       _PrimaryButton(
                         label: _isSubmitting
                             ? 'Creating Account…'
@@ -420,6 +420,25 @@ class _SignupScreenState extends State<SignupScreen> {
                         icon: Icons.check_circle_outline_rounded,
                         onPressed: _isSubmitting ? null : () => _handleSubmit(),
                       ),
+                      const SizedBox(height: 10),
+                      OutlinedButton(
+                        onPressed: _isSubmitting
+                            ? null
+                            : () => _handleSubmit(skipProfile: true),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: context.colors.accent),
+                          foregroundColor: context.colors.accent,
+                          minimumSize: const Size.fromHeight(50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Skip for Now',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 20),
                   ],
@@ -844,12 +863,14 @@ class _StepIndicator extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: labels
               .map(
-                (l) => Text(
-                  l,
-                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                (l) => Expanded(
+                  child: Text(
+                    l,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
                 ),
               )
               .toList(),

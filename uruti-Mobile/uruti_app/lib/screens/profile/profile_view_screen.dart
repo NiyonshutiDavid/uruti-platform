@@ -836,9 +836,23 @@ class _LinkRow extends StatelessWidget {
       target = 'https://$target';
     }
     final uri = Uri.tryParse(target);
-    if (uri != null && await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
+    if (uri == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Could not open link')));
+      }
+      return;
+    }
+
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Could not open link')));
+      }
+    } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,

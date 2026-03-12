@@ -1000,26 +1000,26 @@ export function PitchCoachModule() {
               )}
 
               {isRecording && (
-                <div className="absolute top-16 right-4 w-[min(90vw,24rem)] rounded-xl bg-[#76B947]/18 p-3 backdrop-blur-md border border-[#76B947]/40 shadow-[0_8px_20px_rgba(0,0,0,0.25)]">
-                  <p className="text-xs font-semibold text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>
+                <div className="absolute top-16 right-4 w-[min(90vw,24rem)] rounded-xl bg-[#76B947]/18 p-3 text-[#76B947] backdrop-blur-md border border-[#76B947]/40 shadow-[0_8px_20px_rgba(0,0,0,0.25)]">
+                  <p className="text-xs font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>
                     Live AI Feedback
                   </p>
                   <div className="mt-1 flex items-center gap-2">
-                    <span className="text-[10px] px-2 py-0.5 rounded-full border text-[#76B947] border-[#76B947]/70 bg-black/45">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full border border-[#76B947]/70 bg-black/45">
                       Engine: {liveModelStatus?.backend || 'loading'}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-[#b7f08f] drop-shadow-sm" style={{ fontFamily: 'var(--font-body)' }}>
+                  <p className="mt-1 text-xs drop-shadow-sm" style={{ fontFamily: 'var(--font-body)' }}>
                     {liveFeedback[0]?.message || 'Analyzing delivery, pacing, and confidence...'}
                   </p>
-                  <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-[#9be06a]" style={{ fontFamily: 'var(--font-body)' }}>
+                  <div className="mt-2 grid grid-cols-2 gap-1 text-[11px]" style={{ fontFamily: 'var(--font-body)' }}>
                     <span>Pacing: {pitchMetrics.pacing}%</span>
                     <span>Clarity: {pitchMetrics.clarity}%</span>
                     <span>Confidence: {pitchMetrics.confidence}%</span>
                     <span>Engagement: {pitchMetrics.engagement}%</span>
                   </div>
                   {isNonAiScoring && (
-                    <div className="mt-2 rounded-md border border-yellow-300/50 bg-yellow-900/35 px-2 py-1 text-[11px] text-yellow-100" style={{ fontFamily: 'var(--font-body)' }}>
+                    <div className="mt-2 rounded-md border border-[#76B947]/50 bg-black/35 px-2 py-1 text-[11px]" style={{ fontFamily: 'var(--font-body)' }}>
                       AI pitch coach is currently unavailable. Current scores are running in non-AI fallback mode.
                     </div>
                   )}
