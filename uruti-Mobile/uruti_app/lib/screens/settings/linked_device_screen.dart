@@ -443,11 +443,48 @@ class _QrScanPageState extends State<_QrScanPage> {
         _status = 'Device linked successfully!';
       });
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Web login approved')));
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogCtx) => AlertDialog(
+          backgroundColor: context.colors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.check_circle_rounded,
+                  color: context.colors.accent, size: 24),
+              const SizedBox(width: 10),
+              Text(
+                'Logged In',
+                style: TextStyle(
+                  color: context.colors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'Web login approved successfully. The browser is now linked to your account.',
+            style: TextStyle(color: context.colors.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: Text(
+                'OK',
+                style: TextStyle(
+                  color: context.colors.accent,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
 
-      await Future.delayed(const Duration(seconds: 1));
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;

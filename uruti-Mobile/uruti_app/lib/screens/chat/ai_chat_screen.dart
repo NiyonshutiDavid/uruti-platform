@@ -1046,7 +1046,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                               ? Text(
                                   content,
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: context.colors.textPrimary,
                                     height: 1.3,
                                   ),
                                 )
@@ -1054,29 +1054,29 @@ class _AiChatScreenState extends State<AiChatScreen> {
                                   data: content,
                                   styleSheet: MarkdownStyleSheet(
                                     p: TextStyle(
-                                      color: Colors.white,
+                                      color: context.colors.textPrimary,
                                       height: 1.35,
                                       fontSize: 15,
                                     ),
-                                    strong: const TextStyle(
-                                      color: Colors.white,
+                                    strong: TextStyle(
+                                      color: context.colors.textPrimary,
                                       fontWeight: FontWeight.w700,
                                     ),
                                     listBullet: TextStyle(
                                       color: context.colors.textSecondary,
                                     ),
-                                    h1: const TextStyle(
-                                      color: Colors.white,
+                                    h1: TextStyle(
+                                      color: context.colors.textPrimary,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 18,
                                     ),
-                                    h2: const TextStyle(
-                                      color: Colors.white,
+                                    h2: TextStyle(
+                                      color: context.colors.textPrimary,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 16,
                                     ),
-                                    h3: const TextStyle(
-                                      color: Colors.white,
+                                    h3: TextStyle(
+                                      color: context.colors.textPrimary,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 15,
                                     ),
@@ -1123,7 +1123,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     Expanded(
                       child: TextField(
                         controller: _msgCtrl,
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(color: context.colors.textPrimary),
                         decoration: InputDecoration(
                           hintText: 'Ask Uruti AI...',
                           hintStyle: TextStyle(color: context.colors.textMuted),

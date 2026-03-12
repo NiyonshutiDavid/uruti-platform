@@ -14,12 +14,12 @@ class PitchCoachScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: context.colors.appBarBg,
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: Colors.white),
+          icon: Icon(Icons.menu_rounded, color: context.colors.textPrimary),
           onPressed: () => MainScaffold.scaffoldKey.currentState?.openDrawer(),
         ),
         title: Text(
           'Pitch Coach',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+          style: TextStyle(color: context.colors.textPrimary, fontWeight: FontWeight.w700),
         ),
       ),
       body: Stack(
@@ -49,7 +49,7 @@ class PitchCoachScreen extends StatelessWidget {
                     Text(
                       'AI Pitch Coach',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: context.colors.textPrimary,
                         fontSize: 28,
                         fontWeight: FontWeight.w900,
                       ),
@@ -109,7 +109,7 @@ class PitchCoachScreen extends StatelessWidget {
                       child: Text(
                         'Recent Sessions',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: context.colors.textPrimary,
                           fontWeight: FontWeight.w700,
                           fontSize: 15,
                         ),

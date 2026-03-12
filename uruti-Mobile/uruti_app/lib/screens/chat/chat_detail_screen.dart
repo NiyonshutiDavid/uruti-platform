@@ -43,6 +43,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   String? _attachedFilePath;
   bool _sending = false;
   bool _isRecordingVoiceNote = false;
+  int _recordingSeconds = 0;
+  Timer? _recordTimer;
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
   Timer? _onlineRefreshTimer;
   final AudioRecorder _audioRecorder = AudioRecorder();
@@ -89,6 +91,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     MessageNotificationHandler.instance.activeConversationUserId = null;
     _realtimeSub?.cancel();
     _onlineRefreshTimer?.cancel();
+    _recordTimer?.cancel();
     if (_isRecordingVoiceNote) {
       try {
         _audioRecorder.stop();
@@ -467,20 +470,28 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (_sending) return;
 
     if (_isRecordingVoiceNote) {
+      _recordTimer?.cancel();
+      _recordTimer = null;
       try {
         final path = await _audioRecorder.stop();
         if (!mounted) return;
+        final hasFile = path != null && path.isNotEmpty;
         setState(() {
           _isRecordingVoiceNote = false;
-          if (path != null && path.isNotEmpty) {
-            final fileName = path.split('/').last;
+          _recordingSeconds = 0;
+          if (hasFile) {
+              final fileName = path.split('/').last;
             _attachedFilePath = path;
             _attachedFileName = fileName.isEmpty ? 'voice-note.m4a' : fileName;
           }
         });
+        if (hasFile) _send();
       } catch (_) {
         if (!mounted) return;
-        setState(() => _isRecordingVoiceNote = false);
+        setState(() {
+          _isRecordingVoiceNote = false;
+          _recordingSeconds = 0;
+        });
       }
       return;
     }
@@ -506,12 +517,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       );
 
       if (!mounted) return;
-      setState(() => _isRecordingVoiceNote = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Recording voice note... tap mic again to stop.'),
-        ),
-      );
+      setState(() {
+        _isRecordingVoiceNote = true;
+        _recordingSeconds = 0;
+      });
+      _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _recordingSeconds++);
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() => _isRecordingVoiceNote = false);
@@ -1273,6 +1285,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             hasAttachment: _hasPendingAttachments(),
             sending: _sending,
             recordingVoiceNote: _isRecordingVoiceNote,
+            recordingSeconds: _recordingSeconds,
           ),
         ],
       ),
@@ -3059,6 +3072,7 @@ class _InputBar extends StatelessWidget {
   final bool hasAttachment;
   final bool sending;
   final bool recordingVoiceNote;
+  final int recordingSeconds;
   const _InputBar({
     required this.ctrl,
     required this.onSend,
@@ -3067,11 +3081,18 @@ class _InputBar extends StatelessWidget {
     required this.hasAttachment,
     required this.sending,
     required this.recordingVoiceNote,
-  });
+    this.recordingSeconds = 0,
+    });
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
+    static String _fmtSecs(int s) {
+      final m = s ~/ 60;
+      final sec = (s % 60).toString().padLeft(2, '0');
+      return '$m:$sec';
+    }
+
+    @override
+    Widget build(BuildContext context) {
+      return Container(
       padding: const EdgeInsets.fromLTRB(0, 6, 0, 0),
       decoration: BoxDecoration(
         color: context.colors.card,
@@ -3093,28 +3114,61 @@ class _InputBar extends StatelessWidget {
                 children: [
                   const SizedBox(width: 4),
                   Expanded(
-                    child: TextField(
-                      controller: ctrl,
-                      onSubmitted: (_) {
-                        if (canSend && !sending) {
-                          onSend();
-                        }
-                      },
-                      style: TextStyle(color: context.colors.textPrimary),
-                      decoration: InputDecoration(
-                        hintText: 'Message',
-                        hintStyle: TextStyle(
-                          color: context.colors.textSecondary.withValues(
-                            alpha: 0.7,
+                    child: recordingVoiceNote
+                        ? Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 9,
+                                  height: 9,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.redAccent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  _fmtSecs(recordingSeconds),
+                                  style: TextStyle(
+                                    color: context.colors.textPrimary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Recording…',
+                                  style: TextStyle(
+                                    color: context.colors.textSecondary,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : TextField(
+                            controller: ctrl,
+                            onSubmitted: (_) {
+                              if (canSend && !sending) {
+                                onSend();
+                              }
+                            },
+                            style: TextStyle(color: context.colors.textPrimary),
+                            decoration: InputDecoration(
+                              hintText: 'Message',
+                              hintStyle: TextStyle(
+                                color: context.colors.textSecondary.withValues(
+                                  alpha: 0.7,
+                                ),
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                            ),
                           ),
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                      ),
-                    ),
                   ),
                   IconButton(
                     icon: Icon(

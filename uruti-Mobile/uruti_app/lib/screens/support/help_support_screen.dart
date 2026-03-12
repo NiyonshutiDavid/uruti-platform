@@ -148,7 +148,7 @@ class HelpSupportScreen extends StatelessWidget {
           Text(
             'Frequently Asked Questions',
             style: TextStyle(
-              color: Colors.white,
+              color: context.colors.textPrimary,
               fontWeight: FontWeight.w700,
               fontSize: 16,
             ),
@@ -162,7 +162,7 @@ class HelpSupportScreen extends StatelessWidget {
           Text(
             'Send Feedback',
             style: TextStyle(
-              color: Colors.white,
+              color: context.colors.textPrimary,
               fontWeight: FontWeight.w700,
               fontSize: 16,
             ),
@@ -170,7 +170,7 @@ class HelpSupportScreen extends StatelessWidget {
           const SizedBox(height: 12),
           TextField(
             maxLines: 4,
-            style: TextStyle(color: Colors.white),
+            style: TextStyle(color: context.colors.textPrimary),
             decoration: InputDecoration(
               hintText: 'Tell us how we can improve...',
               hintStyle: TextStyle(
