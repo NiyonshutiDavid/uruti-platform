@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -20,7 +20,6 @@ import {
   Upload
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiClient } from '../lib/api-client';
 
 interface EditVentureDialogProps {
   open: boolean;
@@ -55,7 +54,6 @@ export function EditVentureDialog({ open, onOpenChange, venture, onSave }: EditV
     fundingTarget: venture?.fundingTarget || '',
     expectedUsers: venture?.expectedUsers || '',
     expectedGrowth: venture?.expectedGrowth || '',
-    pitchVideoUrl: venture?.pitchVideoUrl || venture?.demo_video_url || '',
     
     milestones: venture?.milestones || [
       { title: '', description: '', status: 'planned' as const, imageUrl: '' },
@@ -63,53 +61,6 @@ export function EditVentureDialog({ open, onOpenChange, venture, onSave }: EditV
       { title: '', description: '', status: 'planned' as const, imageUrl: '' }
     ]
   });
-
-  const [pitchRecordings, setPitchRecordings] = useState<Array<{
-    id: string;
-    label: string;
-    videoUrl: string;
-  }>>([]);
-  const [selectedRecordingId, setSelectedRecordingId] = useState<string>('');
-
-  useEffect(() => {
-    const loadPitchRecordings = async () => {
-      if (!open || !venture?.id) return;
-
-      try {
-        const sessions = await apiClient.getPitchAnalyses();
-        const ventureId = Number(venture.id);
-
-        const recordings = (sessions || [])
-          .filter((session: any) => {
-            const sessionVentureId = Number(
-              session?.venture_id ?? session?.ventureId ?? session?.venture?.id,
-            );
-            return sessionVentureId === ventureId && !!session?.video_url;
-          })
-          .map((session: any) => {
-            const createdAt = session?.created_at
-              ? new Date(session.created_at).toLocaleDateString()
-              : 'Unknown date';
-            const score = session?.overall_score != null
-              ? ` • Score ${Math.round(Number(session.overall_score))}`
-              : '';
-
-            return {
-              id: String(session.id),
-              label: `${session?.title || 'Pitch Recording'} (${createdAt}${score})`,
-              videoUrl: String(session.video_url),
-            };
-          });
-
-        setPitchRecordings(recordings);
-      } catch (error) {
-        console.error('Failed to load pitch recordings:', error);
-        setPitchRecordings([]);
-      }
-    };
-
-    void loadPitchRecordings();
-  }, [open, venture?.id]);
 
   const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -477,64 +428,14 @@ export function EditVentureDialog({ open, onOpenChange, venture, onSave }: EditV
               />
             </div>
 
-            <div className="space-y-3 p-4 glass-card rounded-lg border border-black/5 dark:border-white/10">
-              <Label htmlFor="pitchVideoUrl">Pitch Video</Label>
-              <Input
-                id="pitchVideoUrl"
-                value={formData.pitchVideoUrl}
-                onChange={(e) => handleChange('pitchVideoUrl', e.target.value)}
-                placeholder="Paste pitch video URL"
-                className="glass-card"
-              />
-
-              {pitchRecordings.length > 0 && (
-                <>
-                  <Label htmlFor="recordingSelect" className="text-xs text-muted-foreground">
-                    Or choose from your Pitch Coach recordings
-                  </Label>
-                  <select
-                    id="recordingSelect"
-                    value={selectedRecordingId}
-                    onChange={(e) => setSelectedRecordingId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg glass-card border border-black/10 dark:border-white/10 bg-transparent dark:text-white"
-                  >
-                    <option value="">Select a recording</option>
-                    {pitchRecordings.map((recording) => (
-                      <option key={recording.id} value={recording.id}>
-                        {recording.label}
-                      </option>
-                    ))}
-                  </select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    disabled={!selectedRecordingId}
-                    onClick={() => {
-                      const selected = pitchRecordings.find((r) => r.id === selectedRecordingId);
-                      if (!selected) return;
-                      handleChange('pitchVideoUrl', selected.videoUrl);
-                      toast.success('Selected pitch recording applied');
-                    }}
-                  >
-                    Use Selected Recording
-                  </Button>
-                </>
-              )}
-
-              {formData.pitchVideoUrl && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full text-destructive border-destructive/40 hover:bg-destructive/10"
-                  onClick={() => {
-                    handleChange('pitchVideoUrl', '');
-                    toast.success('Pitch video removed');
-                  }}
-                >
-                  Remove Pitch Video
-                </Button>
-              )}
+            <div className="space-y-2 p-4 glass-card rounded-lg border border-black/5 dark:border-white/10">
+              <Label>Pitch Video</Label>
+              <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                Pitch video is selected automatically from your highest-scoring Pitch Coach recording for this startup.
+              </p>
+              <p className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                To change it, record a better scoring pitch in Pitch Coach and save it to this venture.
+              </p>
             </div>
 
             <div className="space-y-3">

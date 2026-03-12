@@ -246,6 +246,60 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
     return matchesSearch && matchesSector;
   });
 
+  const handleSaveEditedVenture = async (updatedVenture: any) => {
+    try {
+      const payload = {
+        name: updatedVenture.name,
+        tagline: updatedVenture.tagline || undefined,
+        logo_url: updatedVenture.iconLogoUrl || undefined,
+        banner_url: updatedVenture.landscapeLogoUrl || undefined,
+        industry: mapIndustryToEnum(updatedVenture.sector),
+        stage: updatedVenture.stage || undefined,
+        problem_statement: updatedVenture.problem || undefined,
+        solution: updatedVenture.solution || undefined,
+        target_market: updatedVenture.targetMarket || undefined,
+        business_model: updatedVenture.competitiveEdge || undefined,
+      };
+
+      const ventureId = Number(updatedVenture.id);
+      let savedVenture = await apiClient.updateVenture(ventureId, payload);
+
+      if (updatedVenture.iconLogoFile instanceof File) {
+        savedVenture = await apiClient.uploadVentureLogo(ventureId, updatedVenture.iconLogoFile);
+      }
+
+      if (updatedVenture.landscapeLogoFile instanceof File) {
+        savedVenture = await apiClient.uploadVentureBanner(ventureId, updatedVenture.landscapeLogoFile);
+      }
+
+      const mapped = mapVentureToStartup(savedVenture);
+      setStartups(prev => prev.map(s => s.id === mapped.id ? mapped : s));
+
+      // Keep detail view in sync after saving while user stays on that page.
+      setViewingStartup((prev: any) => {
+        if (!prev || Number(prev.id) !== Number(mapped.id)) return prev;
+        return {
+          ...prev,
+          name: savedVenture.name || prev.name,
+          sector: savedVenture.industry || prev.sector,
+          tagline: savedVenture.tagline || '',
+          problem: savedVenture.problem_statement || prev.problem,
+          solution: savedVenture.solution || prev.solution,
+          targetMarket: savedVenture.target_market || prev.targetMarket,
+          competitiveEdge: savedVenture.competitive_edge || prev.competitiveEdge,
+          stage: savedVenture.stage || prev.stage,
+          pitchVideoUrl: savedVenture.demo_video_url || '',
+          thumbnailUrl: savedVenture.banner_url || prev.thumbnailUrl,
+        };
+      });
+
+      toast.success('Venture updated successfully');
+    } catch (error: any) {
+      console.error('Failed to update venture:', error);
+      toast.error(error?.message || 'Failed to update venture');
+    }
+  };
+
   // If viewing a startup in full-page mode, show VentureDetailView
   if (viewingStartup) {
     return (
@@ -266,6 +320,23 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
             const startupForEdit = startups.find(s => s.id === viewingStartup.id);
             if (startupForEdit) {
               handleEditVenture(startupForEdit);
+            } else {
+              // Fallback to detail payload to ensure edit dialog always opens.
+              handleEditVenture({
+                id: String(viewingStartup.id),
+                name: viewingStartup.name || '',
+                logoUrl: viewingStartup.thumbnailUrl || '',
+                bannerUrl: viewingStartup.thumbnailUrl || '',
+                sector: viewingStartup.sector || '',
+                problemStatement: viewingStartup.problem || '',
+                solutionHypothesis: viewingStartup.solution || '',
+                targetMarket: viewingStartup.targetMarket || '',
+                readinessScore: Number(viewingStartup.urutiScore || 0),
+                developmentTrack: viewingStartup.stage || '',
+                createdDate: new Date().toISOString(),
+                status: 'development',
+                urutiScore: Number(viewingStartup.urutiScore || 0),
+              });
             }
           }}
           onAddActivity={async (activity) => {
@@ -303,6 +374,15 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
             }
           }}
         />
+
+        {selectedStartup && (
+          <EditVentureDialog
+            open={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
+            venture={selectedStartup}
+            onSave={handleSaveEditedVenture}
+          />
+        )}
       </div>
     );
   }
@@ -697,43 +777,7 @@ export function StartupHubModule({ onOpenAIChat }: { onOpenAIChat?: (context: { 
           open={isEditDialogOpen} 
           onOpenChange={setIsEditDialogOpen}
           venture={selectedStartup}
-          onSave={async (updatedVenture) => {
-            try {
-              const payload = {
-                name: updatedVenture.name,
-                tagline: updatedVenture.tagline || undefined,
-                logo_url: updatedVenture.iconLogoUrl || undefined,
-                banner_url: updatedVenture.landscapeLogoUrl || undefined,
-                industry: mapIndustryToEnum(updatedVenture.sector),
-                stage: updatedVenture.stage || undefined,
-                problem_statement: updatedVenture.problem || undefined,
-                solution: updatedVenture.solution || undefined,
-                target_market: updatedVenture.targetMarket || undefined,
-                business_model: updatedVenture.competitiveEdge || undefined,
-                demo_video_url: updatedVenture.pitchVideoUrl?.trim()
-                  ? updatedVenture.pitchVideoUrl.trim()
-                  : null,
-              };
-
-              const ventureId = Number(updatedVenture.id);
-              let savedVenture = await apiClient.updateVenture(ventureId, payload);
-
-              if (updatedVenture.iconLogoFile instanceof File) {
-                savedVenture = await apiClient.uploadVentureLogo(ventureId, updatedVenture.iconLogoFile);
-              }
-
-              if (updatedVenture.landscapeLogoFile instanceof File) {
-                savedVenture = await apiClient.uploadVentureBanner(ventureId, updatedVenture.landscapeLogoFile);
-              }
-
-              const mapped = mapVentureToStartup(savedVenture);
-              setStartups(prev => prev.map(s => s.id === mapped.id ? mapped : s));
-              toast.success('Venture updated successfully');
-            } catch (error: any) {
-              console.error('Failed to update venture:', error);
-              toast.error(error?.message || 'Failed to update venture');
-            }
-          }}
+          onSave={handleSaveEditedVenture}
         />
       )}
     </div>
