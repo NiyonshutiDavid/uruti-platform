@@ -502,16 +502,20 @@ async def chat(
         if pitch_status.get("load_error"):
             inference_error = str(pitch_status.get("load_error"))
     elif model == GEMINI_MODEL_ID:
+        # Pass user_content (includes any appended file excerpt) rather than the
+        # bare payload.message.  Also pass only the *previous* turns in history —
+        # _build_gemini_prompt already appends "User: {user_text}" at the end, so
+        # including the current message in history would duplicate it in the prompt.
         ai_text, gemini_error = await asyncio.to_thread(
             _gemini_fallback_response,
-            payload.message,
+            user_content,
             ctx,
-            history + [{"role": "user", "content": user_content}],
+            history,
         )
         if ai_text:
             inference_backend = "gemini"
         else:
-            ai_text = _fallback_response(payload.message, ctx, history)
+            ai_text = _fallback_response(user_content, ctx, history)
             fallback_used = True
             inference_backend = "rule-fallback"
             inference_error = gemini_error
