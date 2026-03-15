@@ -135,6 +135,7 @@ Supporting data archives in `Notebooks/Data/`:
 - `50 startups.zip`
 - `Crunchbase Investment Data (Kaggle).zip`
 - `Startup Success Prediction.zip`
+- CMU MOSEI Dataset, donwloadabe from kaggle: https://www.kaggle.com/datasets/samarwarsi/cmu-mosei
 
 ## Notebooks And What They Do
 
@@ -257,22 +258,16 @@ Environment recommendation:
 - Local Jupyter is supported mainly for lightweight/demo runs.
 
 
-
-## Testing Results 
-
-
-
 ## Analysis 
-
-
+- Models were relying on the labeled data, especially the MLOP and reward model of the pitch coach module
+- CMU MOSEI Data which were used to analyse the camera feed for the pitch coach module were directly cleaned but very big to use in the training because of time needed and resource constraint.
 
 ## Discussion 
-
+- Through this research I found that these big startup accelerators doesn't disclose or fail to record the previous data of the successful startups in Rwanda, this hinders the analysis and making high precise decisions and building of solution stall, since we rely on the western data from Europe and USA in order to make informed decisions and build AI and tech solutions for Africa
+- Model hosting was very big issue and very expensive, where in order to host the best finetuned model requires a very big budget that is not suitable for the student's pocket making us to use the available cheap or free hosting services and the this makes the model repond to the user in more than 10 minutes for just a simple WHO ARE YOU prompt.
 
 
 ## Recommendations And Future Work 
-
-
 Future improvement plan (including hardware constraints):
 
 - Hardware resilience:
@@ -302,10 +297,18 @@ Future improvement plan (including hardware constraints):
 ## Demo Screenshots
 
 - Core dashboard demo image:
-    `[INSERT IMAGE OR LINK HERE]`
+    Admin
+  `[INSERT IMAGE OR LINK HERE]`
+    Founder
+  `[INSERT IMAGE OR LINK HERE]`
+    Investor
+`[INSERT IMAGE OR LINK HERE]`
 
-- Startup creation and management demo image:
-    `[INSERT IMAGE OR LINK HERE]`
+- Startup creation and startup discovery
+    Founder startups hub
+  `[INSERT IMAGE OR LINK HERE]`
+    Investor Startup discovery
+  `[INSERT IMAGE OR LINK HERE]`
 
 - Advisory/chatbot demo image:
     `[INSERT IMAGE OR LINK HERE]`
