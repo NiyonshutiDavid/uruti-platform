@@ -298,7 +298,7 @@ Future improvement plan (including hardware constraints):
 
 - Core dashboard demo image:
     Admin
-  `[INSERT IMAGE OR LINK HERE]`
+  
     Founder
   `[INSERT IMAGE OR LINK HERE]`
     Investor
