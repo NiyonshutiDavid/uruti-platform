@@ -4,7 +4,7 @@ from sqlalchemy import or_, and_
 from typing import Dict, List, Optional, Set
 from datetime import datetime, timedelta
 from ..database import get_db
-from ..models import User, Connection, ConnectionRequest, NotificationType
+from ..models import User, Connection, ConnectionRequest, NotificationType, UserRole
 from ..schemas import ConnectionResponse, ConnectionRequestCreate, ConnectionRequestResponse
 from ..auth import get_current_active_user
 from .notifications import create_notification, publish_notification
@@ -51,6 +51,9 @@ async def send_connection_request(
     target_user = db.query(User).filter(User.id == request_data.user_id).first()
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    if target_user.role == UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Cannot connect with admin accounts")
     
     # Can't send request to yourself
     if target_user.id == current_user.id:
@@ -313,7 +316,8 @@ def get_connections(
         other_user = db.query(User).filter(User.id == other_user_id).first()
         
         # Skip admin users in connections list
-        if other_user and other_user.role != "admin":
+        other_role = other_user.role.value if hasattr(other_user.role, "value") else str(other_user.role)
+        if other_user and other_role != "admin":
             result.append({
                 "id": other_user.id,
                 "display_name": other_user.display_name,

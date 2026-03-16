@@ -891,7 +891,7 @@ export function PitchCoachModule() {
                     className="max-h-full max-w-full h-auto w-auto rounded-sm shadow-[0_0_0_1px_rgba(255,255,255,0.08)]"
                   />
 
-                  <div className="absolute top-2 left-2 bg-black/65 backdrop-blur-sm rounded-lg px-3 py-1 flex items-center space-x-2 max-w-[70%]">
+                  <div className="absolute top-2 left-2 bg-black rounded-lg px-3 py-1 flex items-center space-x-2 max-w-[70%] border border-white/15">
                     <FileText className="h-3 w-3 text-[#76B947] shrink-0" />
                     <span className="text-white text-xs truncate" style={{ fontFamily: 'var(--font-body)' }}>
                       {deckFileName}
@@ -901,7 +901,7 @@ export function PitchCoachModule() {
                     </button>
                   </div>
 
-                  <div className="absolute top-2 right-2 bg-black/65 backdrop-blur-sm rounded-lg px-2 py-1">
+                  <div className="absolute top-2 right-2 bg-black rounded-lg px-2 py-1 border border-white/15">
                     <span className="text-white text-xs min-w-[80px] text-center block" style={{ fontFamily: 'var(--font-heading)' }}>
                       {currentSlide}/{Math.max(totalSlides, 1)}
                     </span>
@@ -1000,7 +1000,7 @@ export function PitchCoachModule() {
               )}
 
               {isRecording && (
-                <div className="absolute top-16 right-4 w-[min(90vw,24rem)] rounded-xl bg-[#76B947]/18 p-3 text-[#76B947] backdrop-blur-md border border-[#76B947]/40 shadow-[0_8px_20px_rgba(0,0,0,0.25)]">
+                <div className="absolute top-16 right-4 w-[min(90vw,24rem)] rounded-xl bg-black p-3 text-[#76B947] border border-[#76B947]/40 shadow-[0_8px_20px_rgba(0,0,0,0.45)]">
                   <p className="text-xs font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>
                     Live AI Feedback
                   </p>
@@ -1029,7 +1029,7 @@ export function PitchCoachModule() {
               {/* Recording Indicator */}
               {isRecording && (
                 <div className="absolute top-4 right-4">
-                  <div className="glass-panel bg-red-500/20 backdrop-blur-md rounded-full px-4 py-2 flex items-center space-x-2">
+                  <div className="rounded-full px-4 py-2 flex items-center space-x-2 bg-black border border-red-400/40">
                     <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
                     <span className="text-white text-sm" style={{ fontFamily: 'var(--font-heading)' }}>
                       {formatTime(recordingTime)}
@@ -1396,7 +1396,7 @@ export function PitchCoachModule() {
               <TabsTrigger value="tips">Tips</TabsTrigger>
             </TabsList>
             <TabsContent value="feedback" className="mt-4">
-              <Card className="glass-card border-black/5">
+              <Card className="glass-card border-black/5 bg-black text-white">
                 <CardContent className="pt-6">
                   {isNonAiScoring && (
                     <div className="mb-3 rounded-lg border border-yellow-300/40 bg-yellow-100/70 px-3 py-2 text-xs text-yellow-900 dark:bg-yellow-900/25 dark:text-yellow-100" style={{ fontFamily: 'var(--font-body)' }}>
@@ -1407,7 +1407,7 @@ export function PitchCoachModule() {
                     {liveFeedback.map((feedback) => (
                       <div
                         key={feedback.id}
-                        className="p-3 rounded-lg bg-[#76B947]/10"
+                        className="p-3 rounded-lg bg-[#111111] border border-[#76B947]/35"
                       >
                         <div className="flex items-start space-x-2">
                           <div className="w-2 h-2 rounded-full mt-1.5 bg-[#76B947]"></div>
@@ -1425,20 +1425,20 @@ export function PitchCoachModule() {
               </Card>
             </TabsContent>
             <TabsContent value="tips" className="mt-4">
-              <Card className="glass-card border-black/5">
+              <Card className="glass-card border-black/5 bg-black text-white">
                 <CardContent className="pt-6">
                   <div className="space-y-3">
                     {liveModelTips.length > 0 ? (
                       liveModelTips.map((tip, index) => (
                         <div key={`${tip}-${index}`} className="p-3 rounded-lg bg-[#76B947]/10 border border-[#76B947]/20">
-                          <p className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>
+                          <p className="text-sm text-white" style={{ fontFamily: 'var(--font-body)' }}>
                             {tip}
                           </p>
                         </div>
                       ))
                     ) : (
-                      <div className="p-3 rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
-                        <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                      <div className="p-3 rounded-lg bg-[#111111] border border-white/15">
+                        <p className="text-sm text-gray-300" style={{ fontFamily: 'var(--font-body)' }}>
                           Model-generated tips will appear once live feedback starts.
                         </p>
                       </div>

@@ -28,6 +28,10 @@ def get_users(
     """Get list of users with optional filtering"""
     query = db.query(User)
 
+    # Non-admin users should not see admin accounts in discovery/connect flows.
+    if current_user.role != UserRole.ADMIN:
+        query = query.filter(User.role != UserRole.ADMIN)
+
     if role:
         try:
             role_enum = UserRole(role)
@@ -267,6 +271,11 @@ def get_user(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Hide admin profiles from non-admin callers.
+    if user.role == UserRole.ADMIN and current_user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=404, detail="User not found")
+
     return user
 
 

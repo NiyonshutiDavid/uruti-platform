@@ -325,6 +325,10 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
 
   // Filter users
   const filteredUsers = users.filter(user => {
+    if ((user.role || '').toLowerCase() === 'admin') {
+      return false;
+    }
+
     const matchesSearch = user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.company?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -336,6 +340,10 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
 
   // Filter connections
   const filteredConnections = connections.filter(conn => {
+    if ((conn.role || '').toLowerCase() === 'admin') {
+      return false;
+    }
+
     return conn.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
            conn.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
            conn.company?.toLowerCase().includes(searchTerm.toLowerCase());
