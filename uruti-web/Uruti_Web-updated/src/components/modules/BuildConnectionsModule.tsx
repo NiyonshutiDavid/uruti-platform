@@ -1,3 +1,4 @@
+  // Filter connections for display (exclude admin, apply search)
 import { useState, useEffect } from 'react';
 import { useConfirmDialog } from '../ui/confirm-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -57,7 +58,7 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
   const [recipientName, setRecipientName] = useState('');
   const [directMessageDialog, setDirectMessageDialog] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
-  const [displayedCount, setDisplayedCount] = useState(8); // Pagination state
+  const [displayedConnectionsCount, setDisplayedConnectionsCount] = useState(9); // Pagination for connections
   
   // Call state
   const [callDialog, setCallDialog] = useState(false);
@@ -338,57 +339,70 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
     return matchesSearch && matchesRole;
   });
 
-  // Filter connections
-  const filteredConnections = connections.filter(conn => {
-    if ((conn.role || '').toLowerCase() === 'admin') {
-      return false;
-    }
-
-    return conn.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           conn.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           conn.company?.toLowerCase().includes(searchTerm.toLowerCase());
-  });
-
-  // Filter directory to show only users not connected to and exclude self
-  const directoryUsers = filteredUsers.filter((candidate) => {
-    const isSelf = Number(candidate.id) === Number(user?.id);
-    const hasConnection = connections.some(c => Number(c.id) === Number(candidate.id));
-    return !isSelf && !hasConnection;
-  });
-
-  // Helper to find sent request ID by user ID
-  const findSentRequestIdByUserId = (userId: number): number => {
-    const request = pendingRequests.find(r => r.receiver_id === userId && r.requester_id === user?.id);
-    return request?.id || 0;
-  };
-
-  const resolveRequest = (request: any) => {
-    const currentUserId = Number(user?.id);
-    const requesterId = Number(request.requester_id);
-    const receiverId = Number(request.receiver_id);
-    const otherUserId = requesterId === currentUserId ? receiverId : requesterId;
-    const matchedUser = users.find((candidate) => Number(candidate.id) === otherUserId);
-    const counterpart = request.counterpart || null;
-
-    const resolvedName =
-      counterpart?.full_name ||
-      counterpart?.display_name ||
-      request.name ||
-      matchedUser?.full_name ||
-      matchedUser?.display_name;
-
-    return {
-      ...request,
-      name: resolvedName,
-      avatar:
-        counterpart?.avatar_url ||
-        request.avatar ||
-        matchedUser?.avatar_url ||
-        matchedUser?.avatar,
-      counterpartUserId: Number(counterpart?.id || otherUserId),
-      status: request.status || 'pending',
-      direction:
-        request.direction ||
+        {/* My Connections Tab */}
+        <TabsContent value="connections" className="space-y-4">
+          {filteredConnections.length === 0 ? (
+            <Card className="glass-card border-black/5 dark:border-white/10">
+              <CardContent className="py-16">
+                <div className="text-center">
+                  <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-lg font-semibold mb-2 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                    No connections yet
+                  </p>
+                  <p className="text-sm text-muted-foreground mb-4" style={{ fontFamily: 'var(--font-body)' }}>
+                    Start building your network by connecting with {userType === 'founder' ? 'investors and mentors' : 'founders'}
+                  </p>
+                  <Button
+                    onClick={() => document.querySelector('[value="discover"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))}
+                    className="bg-[#76B947] text-white hover:bg-[#5a8f35]"
+                  >
+                    <Search className="h-4 w-4 mr-2" />
+                    Discover People
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredConnections.slice(0, displayedConnectionsCount).map((conn) => (
+                  <Card key={conn.id} className="glass-card border-black/5 dark:border-white/10">
+                    <CardContent className="pt-6">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-4 flex-1">
+                          <Avatar className="h-14 w-14">
+                            <AvatarImage src={conn.avatar_url || conn.avatar} />
+                            <AvatarFallback className="bg-[#76B947]/20 text-[#76B947]">
+                              {conn.full_name.split(' ').map(n => n[0]).join('')}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between mb-1">
+                              <div>
+                                {/* ...existing code... */}
+                              </div>
+                            </div>
+                            {/* ...existing code... */}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              {displayedConnectionsCount < filteredConnections.length && (
+                <div className="flex justify-center pt-4">
+                  <Button
+                    onClick={() => setDisplayedConnectionsCount(prev => Math.min(prev + 9, filteredConnections.length))}
+                    className="bg-[#76B947] hover:bg-[#5a8f35] text-white dark:bg-green-600 dark:hover:bg-green-700"
+                  >
+                    Load More Connections
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </TabsContent>
         (requesterId === currentUserId ? 'sent' : 'received'),
     };
   };
@@ -735,84 +749,96 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
               </CardContent>
             </Card>
           ) : (
-            filteredConnections.map((conn) => (
-              <Card key={conn.id} className="glass-card border-black/5 dark:border-white/10">
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-4 flex-1">
-                      <Avatar className="h-14 w-14">
-                        <AvatarImage src={conn.avatar_url || conn.avatar} />
-                        <AvatarFallback className="bg-[#76B947]/20 text-[#76B947]">
-                          {conn.full_name.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between mb-1">
-                          <div>
-                            <h3 className="font-semibold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                              {conn.full_name}
-                            </h3>
-                            <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                              {conn.email}
-                            </p>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredConnections.slice(0, displayedConnectionsCount).map((conn) => (
+                  <Card key={conn.id} className="glass-card border-black/5 dark:border-white/10">
+                    <CardContent className="pt-6">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-4 flex-1">
+                          <Avatar className="h-14 w-14">
+                            <AvatarImage src={conn.avatar_url || conn.avatar} />
+                            <AvatarFallback className="bg-[#76B947]/20 text-[#76B947]">
+                              {conn.full_name.split(' ').map(n => n[0]).join('')}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between mb-1">
+                              <div>
+                                <h3 className="font-semibold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                                  {conn.full_name}
+                                </h3>
+                                <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                                  {conn.email}
+                                </p>
+                              </div>
+                              <Badge variant="outline" className={`${getRoleColor(conn.role)} flex items-center space-x-1`}>
+                                {getRoleIcon(conn.role)}
+                                <span className="capitalize text-xs">{conn.role}</span>
+                              </Badge>
+                            </div>
+                            <div className="flex items-center space-x-2 mt-3">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
+                                onClick={() => handleViewProfile(conn.id)}
+                              >
+                                View Profile
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
+                                onClick={() => handleBookSession(conn.id, conn.full_name)}
+                              >
+                                <Calendar className="h-4 w-4 mr-2" />
+                                Book Session
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="bg-[#76B947] text-white hover:bg-[#5a8f35]"
+                                onClick={() => handleInitiateCall(conn, 'video')}
+                              >
+                                <Video className="h-4 w-4 mr-2" />
+                                Video Call
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
+                                onClick={() => handleInitiateCall(conn, 'voice')}
+                              >
+                                <Phone className="h-4 w-4 mr-2" />
+                                Voice Call
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="bg-[#76B947] text-white hover:bg-[#5a8f35]"
+                                onClick={() => handleSendMessage(conn)}
+                              >
+                                <MessageCircle className="h-4 w-4 mr-2" />
+                                Message
+                              </Button>
+                            </div>
                           </div>
-                          <Badge variant="outline" className={`${getRoleColor(conn.role)} flex items-center space-x-1`}>
-                            {getRoleIcon(conn.role)}
-                            <span className="capitalize text-xs">{conn.role}</span>
-                          </Badge>
-                        </div>
-
-                        <div className="flex items-center space-x-2 mt-3">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
-                            onClick={() => handleViewProfile(conn.id)}
-                          >
-                            View Profile
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
-                            onClick={() => handleBookSession(conn.id, conn.full_name)}
-                          >
-                            <Calendar className="h-4 w-4 mr-2" />
-                            Book Session
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="bg-[#76B947] text-white hover:bg-[#5a8f35]"
-                            onClick={() => handleInitiateCall(conn, 'video')}
-                          >
-                            <Video className="h-4 w-4 mr-2" />
-                            Video Call
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
-                            onClick={() => handleInitiateCall(conn, 'voice')}
-                          >
-                            <Phone className="h-4 w-4 mr-2" />
-                            Voice Call
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="bg-[#76B947] text-white hover:bg-[#5a8f35]"
-                            onClick={() => handleSendMessage(conn)}
-                          >
-                            <MessageCircle className="h-4 w-4 mr-2" />
-                            Message
-                          </Button>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              {displayedConnectionsCount < filteredConnections.length && (
+                <div className="flex justify-center pt-4">
+                  <Button
+                    onClick={() => setDisplayedConnectionsCount(prev => Math.min(prev + 9, filteredConnections.length))}
+                    className="bg-[#76B947] hover:bg-[#5a8f35] text-white dark:bg-green-600 dark:hover:bg-green-700"
+                  >
+                    Load More Connections
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </TabsContent>
 
