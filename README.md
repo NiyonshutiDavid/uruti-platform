@@ -189,7 +189,7 @@ npm install
 npm run dev
 ```
 
-Frontend runs on `http://localhost:5173`.
+Frontend runs on `http://localhost:3000`.
 
 ### 3. Start Backend Services (Core + AI Modules)
 
@@ -256,6 +256,73 @@ Environment recommendation:
 
 - Recommended: Google Colab for reproducible setup and better GPU availability.
 - Local Jupyter is supported mainly for lightweight/demo runs.
+
+### 6. Run Automated Tests
+
+You can run tests per component, or use the unified root test runner.
+
+#### Option A: Run Tests Per Component
+
+Web frontend tests (Vitest):
+
+```bash
+cd uruti-web/Uruti_Web-updated
+npm test
+```
+
+Web frontend production build check:
+
+```bash
+cd uruti-web/Uruti_Web-updated
+npm run build
+```
+
+Backend unit tests (pytest):
+
+```bash
+cd uruti-web/Uruti_Web-updated/src/backend
+source .venv/bin/activate
+python -m pytest -v
+```
+
+Backend live smoke tests:
+
+```bash
+cd uruti-web/Uruti_Web-updated/src/backend
+source .venv/bin/activate
+python -m pytest -v live_tests/test_live_backend.py
+```
+
+Mobile widget tests (Flutter):
+
+```bash
+cd uruti-Mobile/uruti_app
+flutter test
+```
+
+#### Option B: Unified Test Menu (Recommended)
+
+From repository root:
+
+```bash
+python3 test_menu.py
+```
+
+Menu options include:
+
+- Web frontend tests
+- Web frontend build
+- Backend tests (unit + live smoke)
+- Mobile tests
+- All components (single run summary)
+- View recent logs
+
+The test menu now reports:
+
+- Pass/fail counts (for example: `PASSED (13/13)` or `PASSED (10/10)`)
+- What was tested under each component (test names/modules)
+- Per-run logs under `test_logs/`
+- All-components summary logs with per-component breakdown
 
 
 ## Analysis 

@@ -58,6 +58,7 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
   const [recipientName, setRecipientName] = useState('');
   const [directMessageDialog, setDirectMessageDialog] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [displayedCount, setDisplayedCount] = useState(8);
   const [displayedConnectionsCount, setDisplayedConnectionsCount] = useState(9); // Pagination for connections
   
   // Call state
@@ -339,73 +340,50 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
     return matchesSearch && matchesRole;
   });
 
-        {/* My Connections Tab */}
-        <TabsContent value="connections" className="space-y-4">
-          {filteredConnections.length === 0 ? (
-            <Card className="glass-card border-black/5 dark:border-white/10">
-              <CardContent className="py-16">
-                <div className="text-center">
-                  <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg font-semibold mb-2 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                    No connections yet
-                  </p>
-                  <p className="text-sm text-muted-foreground mb-4" style={{ fontFamily: 'var(--font-body)' }}>
-                    Start building your network by connecting with {userType === 'founder' ? 'investors and mentors' : 'founders'}
-                  </p>
-                  <Button
-                    onClick={() => document.querySelector('[value="discover"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))}
-                    className="bg-[#76B947] text-white hover:bg-[#5a8f35]"
-                  >
-                    <Search className="h-4 w-4 mr-2" />
-                    Discover People
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredConnections.slice(0, displayedConnectionsCount).map((conn) => (
-                  <Card key={conn.id} className="glass-card border-black/5 dark:border-white/10">
-                    <CardContent className="pt-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-4 flex-1">
-                          <Avatar className="h-14 w-14">
-                            <AvatarImage src={conn.avatar_url || conn.avatar} />
-                            <AvatarFallback className="bg-[#76B947]/20 text-[#76B947]">
-                              {conn.full_name.split(' ').map(n => n[0]).join('')}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <div className="flex items-start justify-between mb-1">
-                              <div>
-                                {/* ...existing code... */}
-                              </div>
-                            </div>
-                            {/* ...existing code... */}
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-              {displayedConnectionsCount < filteredConnections.length && (
-                <div className="flex justify-center pt-4">
-                  <Button
-                    onClick={() => setDisplayedConnectionsCount(prev => Math.min(prev + 9, filteredConnections.length))}
-                    className="bg-[#76B947] hover:bg-[#5a8f35] text-white dark:bg-green-600 dark:hover:bg-green-700"
-                  >
-                    Load More Connections
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
-        </TabsContent>
-        (requesterId === currentUserId ? 'sent' : 'received'),
-    };
-  };
+      const currentUserId = user?.id;
+
+      const directoryUsers = filteredUsers.filter((candidate) => {
+        if (candidate.id === currentUserId) {
+          return false;
+        }
+        return !connections.some((connection) => connection.id === candidate.id);
+      });
+
+      const filteredConnections = connections.filter((connection) => {
+        if ((connection.role || '').toLowerCase() === 'admin') {
+          return false;
+        }
+
+        const matchesSearch = connection.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          connection.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          connection.company?.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesRole = filterRole === 'all' || connection.role === filterRole;
+
+        return matchesSearch && matchesRole;
+      });
+
+      const findSentRequestIdByUserId = (userId: number) => {
+        const request = pendingRequests.find((pendingRequest) =>
+          pendingRequest.user_id === userId || pendingRequest.receiver_id === userId || pendingRequest.requester_id === userId,
+        );
+        return request?.id;
+      };
+
+      const resolveRequest = (request: any) => {
+        const counterpart = request?.counterpart || {};
+        const requesterId = Number(request?.requester_id ?? request?.requester?.id ?? 0);
+        const receiverId = Number(request?.receiver_id ?? request?.receiver?.id ?? 0);
+        const counterpartUserId = Number(counterpart.id ?? (requesterId === currentUserId ? receiverId : requesterId));
+
+        return {
+          ...request,
+          name: counterpart.full_name || counterpart.display_name || request?.name || 'Unknown user',
+          avatar: counterpart.avatar_url || request?.avatar || '',
+          counterpartUserId,
+          direction: request?.direction || (requesterId === currentUserId ? 'sent' : 'received'),
+        };
+      };
 
   const resolvedSentRequests = sentRequests
     .map(resolveRequest)
