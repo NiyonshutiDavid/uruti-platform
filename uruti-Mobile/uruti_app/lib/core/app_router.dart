@@ -125,6 +125,11 @@ GoRouter createRouter(AuthProvider authProvider) {
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
         builder: (context, state, child) {
+          // Guard: if auth state is still resolving or user just logged out,
+          // show a plain blank screen so the nav bar never appears without a user.
+          if (!authProvider.isAuthenticated) {
+            return const Scaffold(body: SizedBox.shrink());
+          }
           final loc = state.matchedLocation;
           final role = authProvider.user?.role.toLowerCase() ?? '';
           final isFounder = role == 'founder';

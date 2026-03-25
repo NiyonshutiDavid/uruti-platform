@@ -595,6 +595,13 @@ class _MainScaffoldState extends State<MainScaffold>
                             ),
                             _item(
                               context,
+                              Icons.mic_none_rounded,
+                              'Pitch Coach',
+                              '/coach',
+                              currentRoute,
+                            ),
+                            _item(
+                              context,
                               Icons.auto_awesome_outlined,
                               'Uruti AI Chat',
                               '/chat',
@@ -606,6 +613,14 @@ class _MainScaffoldState extends State<MainScaffold>
                               'Advisory Tracks',
                               '/advisory-tracks',
                               currentRoute,
+                            ),
+                            _item(
+                              context,
+                              Icons.chat_bubble_outline_rounded,
+                              'Messages',
+                              '/inbox',
+                              currentRoute,
+                              badgeCount: _inboxUnreadCount,
                             ),
                             _item(
                               context,
@@ -635,21 +650,6 @@ class _MainScaffoldState extends State<MainScaffold>
                               '/availability',
                               currentRoute,
                             ),
-                            _item(
-                              context,
-                              Icons.mic_none_rounded,
-                              'Pitch Coach',
-                              '/coach',
-                              currentRoute,
-                            ),
-                            _item(
-                              context,
-                              Icons.chat_bubble_outline_rounded,
-                              'Messages',
-                              '/inbox',
-                              currentRoute,
-                              badgeCount: _inboxUnreadCount,
-                            ),
                           ] else if (isInvestor) ...[
                             _item(
                               context,
@@ -674,13 +674,6 @@ class _MainScaffoldState extends State<MainScaffold>
                             ),
                             _item(
                               context,
-                              Icons.people_outline_rounded,
-                              'Build Connections',
-                              '/connections',
-                              currentRoute,
-                            ),
-                            _item(
-                              context,
                               Icons.auto_awesome_outlined,
                               'Uruti AI Chat',
                               '/chat',
@@ -691,6 +684,21 @@ class _MainScaffoldState extends State<MainScaffold>
                               Icons.trending_up_rounded,
                               'Deal Flow',
                               '/deal-flow',
+                              currentRoute,
+                            ),
+                            _item(
+                              context,
+                              Icons.chat_bubble_outline_rounded,
+                              'Messages',
+                              '/inbox',
+                              currentRoute,
+                              badgeCount: _inboxUnreadCount,
+                            ),
+                            _item(
+                              context,
+                              Icons.people_outline_rounded,
+                              'Build Connections',
+                              '/connections',
                               currentRoute,
                             ),
                             _item(
@@ -713,14 +721,6 @@ class _MainScaffoldState extends State<MainScaffold>
                               'Availability & Booking',
                               '/availability',
                               currentRoute,
-                            ),
-                            _item(
-                              context,
-                              Icons.chat_bubble_outline_rounded,
-                              'Messages',
-                              '/inbox',
-                              currentRoute,
-                              badgeCount: _inboxUnreadCount,
                             ),
                           ] else ...[
                             _item(

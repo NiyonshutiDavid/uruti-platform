@@ -40,6 +40,7 @@ export function SignupPage({ onNavigate, onSignupComplete }: SignupPageProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [userType, setUserType] = useState<'founder' | 'investor' | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -83,6 +84,33 @@ export function SignupPage({ onNavigate, onSignupComplete }: SignupPageProps) {
   };
 
   const handleNext = () => {
+    setSubmitError(null);
+    if (currentStep === 3) {
+      if (!formData.fullName.trim()) {
+        setSubmitError('Full name is required.');
+        return;
+      }
+      if (!formData.email.trim() || !formData.email.includes('@')) {
+        setSubmitError('A valid email address is required.');
+        return;
+      }
+      if (formData.password.length < 8) {
+        setSubmitError('Password must be at least 8 characters.');
+        return;
+      }
+      if (formData.password !== formData.confirmPassword) {
+        setSubmitError('Passwords do not match.');
+        return;
+      }
+      if (!formData.phone.trim()) {
+        setSubmitError('Phone number is required.');
+        return;
+      }
+      if (!formData.location.trim()) {
+        setSubmitError('Location is required.');
+        return;
+      }
+    }
     setCurrentStep(prev => prev + 1);
   };
 
@@ -168,7 +196,7 @@ export function SignupPage({ onNavigate, onSignupComplete }: SignupPageProps) {
     }
   };
 
-  const totalSteps = 3;
+  const totalSteps = 4;
 
   return (
     <div className="min-h-screen bg-background dark:bg-gray-950 flex items-center justify-center p-4 py-12">
@@ -195,30 +223,37 @@ export function SignupPage({ onNavigate, onSignupComplete }: SignupPageProps) {
         {/* Progress Bar */}
         {userType && (
           <div className="mb-8">
-            <div className="flex items-center justify-between mb-2">
-              {[1, 2, 3].map((step) => (
-                <div key={step} className="flex items-center flex-1">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                    currentStep > step 
-                      ? 'bg-[#76B947] text-white' 
-                      : currentStep === step 
-                      ? 'bg-[#76B947] text-white ring-4 ring-[#76B947]/20' 
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-400'
-                  }`}>
-                    {currentStep > step ? <CheckCircle2 className="h-5 w-5" /> : step}
+            <div className="flex items-start justify-center gap-0">
+              {[
+                { step: 1, label: 'Account Type' },
+                { step: 2, label: 'Agreement' },
+                { step: 3, label: 'Basic Info' },
+                { step: 4, label: userType === 'founder' ? 'Profile Details' : 'Investment Profile' },
+              ].map(({ step, label }, idx) => (
+                <div key={step} className="flex items-start">
+                  <div className="flex flex-col items-center" style={{ width: '72px' }}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
+                      currentStep > step
+                        ? 'bg-[#76B947] text-white'
+                        : currentStep === step
+                        ? 'bg-[#76B947] text-white ring-4 ring-[#76B947]/20'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-400'
+                    }`}>
+                      {currentStep > step ? <CheckCircle2 className="h-4 w-4" /> : step}
+                    </div>
+                    <span className={`text-xs mt-1 text-center w-full leading-tight px-1 ${
+                      currentStep === step ? 'text-[#76B947] font-semibold' : 'text-muted-foreground'
+                    }`} style={{ fontFamily: 'var(--font-body)' }}>
+                      {label}
+                    </span>
                   </div>
-                  {step < 3 && (
-                    <div className={`flex-1 h-1 mx-2 ${
+                  {idx < 3 && (
+                    <div className={`w-12 sm:w-16 h-1 mt-5 shrink-0 ${
                       currentStep > step ? 'bg-[#76B947]' : 'bg-gray-200 dark:bg-gray-700'
                     }`}></div>
                   )}
                 </div>
               ))}
-            </div>
-            <div className="flex justify-between text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-              <span>Account Type</span>
-              <span>Basic Info</span>
-              <span>{userType === 'founder' ? 'Profile Details' : 'Investment Profile'}</span>
             </div>
           </div>
         )}
@@ -302,8 +337,78 @@ export function SignupPage({ onNavigate, onSignupComplete }: SignupPageProps) {
                 </div>
               )}
 
-              {/* Step 2: Basic Information */}
+              {/* Step 2: Terms & Privacy Consent */}
               {currentStep === 2 && userType && (
+                <div className="space-y-6">
+                  <div className="text-center mb-6">
+                    <h2 className="text-2xl font-bold mb-2 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+                      {userType === 'founder' ? 'Founder Terms & Privacy' : 'Investor Terms & Privacy'}
+                    </h2>
+                    <p className="text-muted-foreground text-sm" style={{ fontFamily: 'var(--font-body)' }}>
+                      Please read and agree to the following before continuing
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-black/10 dark:border-white/10 bg-gray-50 dark:bg-gray-900/40 p-6">
+                    <h3 className="text-base font-bold dark:text-white mb-4" style={{ fontFamily: 'var(--font-heading)' }}>
+                        {userType === 'founder' ? 'Terms for Founders' : 'Terms for Investors'}
+                      </h3>
+
+                    <ol className="space-y-3">
+                      {(userType === 'founder' ? [
+                        'You must be 18 years of age or older to use this platform.',
+                        'Provide accurate information about yourself and your startup — do not misrepresent business metrics or achievements.',
+                        'Respect the intellectual property rights of all platform members.',
+                        'Engage professionally and in good faith with investors, mentors, and community members.',
+                        'Comply with applicable securities and investment laws in Rwanda and your jurisdiction.',
+                        'AI-powered features (advisory tracks, pitch coach) are for guidance only — not professional financial, legal, or business advice.',
+                        'You retain ownership of your content; by posting you grant Uruti a limited license to display it within the platform.',
+                        'The platform may collect and use your data to provide and improve our services.',
+                        'Uruti may send you platform activity and service update notifications.',
+                        'Violation of these terms may result in account suspension or permanent termination.',
+                      ] : [
+                        'You must be 18 years of age or older to use this platform.',
+                        'Conduct your own independent due diligence on all investment opportunities presented on the platform.',
+                        'Uruti is NOT a registered investment advisor or broker-dealer, and makes no guarantees of investment returns.',
+                        'The Uruti Score is an informational metric only and must NOT be used as the sole basis for any investment decision.',
+                        'Do not share confidential information about founders obtained through the platform with third parties.',
+                        'Respect founders\' intellectual property and trade secrets you gain access to via the platform.',
+                        'Engage with founders and other users professionally, ethically, and in good faith at all times.',
+                        'Comply with all applicable investment and securities regulations in Rwanda and your jurisdiction.',
+                        'Uruti is not a party to any investment transaction and accepts no liability for investment outcomes.',
+                        'The platform may collect and use your data to provide and improve our services.',
+                        'Violation of these terms may result in account suspension or permanent termination.',
+                      ]).map((point, i) => (
+                        <li key={i} className="flex items-start gap-3">
+                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[#76B947]/15 text-[#76B947] text-xs font-bold flex items-center justify-center mt-0.5">
+                            {i + 1}
+                          </span>
+                          <span className="text-sm text-muted-foreground leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>
+                            {point}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+
+                  <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 text-center">
+                    <p className="text-sm text-blue-700 dark:text-blue-300" style={{ fontFamily: 'var(--font-body)' }}>
+                      Read the full{' '}
+                      <a href="/terms-of-service" target="_blank" rel="noopener noreferrer" className="font-semibold underline hover:text-[#76B947]">
+                        Terms of Service
+                      </a>{' '}
+                      and{' '}
+                      <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="font-semibold underline hover:text-[#76B947]">
+                        Privacy Policy
+                      </a>{' '}
+                      for the complete legal agreement.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Basic Information */}
+              {currentStep === 3 && userType && (
                 <div className="space-y-6">
                   <div className="text-center mb-8">
                     <h2 className="text-2xl font-bold mb-2 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
@@ -378,15 +483,24 @@ export function SignupPage({ onNavigate, onSignupComplete }: SignupPageProps) {
                         <Lock className="h-4 w-4 text-[#76B947]" />
                         <span>Confirm Password *</span>
                       </Label>
-                      <Input
-                        id="confirmPassword"
-                        type="password"
-                        placeholder="Re-enter password"
-                        value={formData.confirmPassword}
-                        onChange={(e) => handleChange('confirmPassword', e.target.value)}
-                        required
-                        className="glass-card border-black/10 dark:border-white/10"
-                      />
+                      <div className="relative">
+                        <Input
+                          id="confirmPassword"
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          placeholder="Re-enter password"
+                          value={formData.confirmPassword}
+                          onChange={(e) => handleChange('confirmPassword', e.target.value)}
+                          required
+                          className="glass-card border-black/10 dark:border-white/10 pr-12"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-[#76B947]"
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -425,8 +539,8 @@ export function SignupPage({ onNavigate, onSignupComplete }: SignupPageProps) {
                 </div>
               )}
 
-              {/* Step 3a: Founder Profile Details */}
-              {currentStep === 3 && userType === 'founder' && (
+              {/* Step 4a: Founder Profile Details */}
+              {currentStep === 4 && userType === 'founder' && (
                 <div className="space-y-6">
                   <div className="text-center mb-8">
                     <h2 className="text-2xl font-bold mb-2 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
@@ -518,8 +632,8 @@ export function SignupPage({ onNavigate, onSignupComplete }: SignupPageProps) {
                 </div>
               )}
 
-              {/* Step 3b: Investor Details */}
-              {currentStep === 3 && userType === 'investor' && (
+              {/* Step 4b: Investor Details */}
+              {currentStep === 4 && userType === 'investor' && (
                 <div className="space-y-6">
                   <div className="text-center mb-8">
                     <h2 className="text-2xl font-bold mb-2 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
@@ -650,17 +764,41 @@ export function SignupPage({ onNavigate, onSignupComplete }: SignupPageProps) {
               {/* Navigation Buttons */}
               {currentStep > 1 && (
                 <div className="flex gap-4 mt-8 pt-6 border-t border-black/5 dark:border-white/10">
+                  {/* Back button — always present except on consent where it returns to role selection */}
                   <Button
                     type="button"
                     variant="outline"
                     onClick={handleBack}
                     disabled={isSubmitting}
-                    className="flex-1 border-black/10 dark:border-white/20"
+                    className="flex-shrink-0 border-black/10 dark:border-white/20"
                   >
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Back
                   </Button>
-                  {currentStep < totalSteps ? (
+
+                  {/* Consent step: Disagree → home, Agree → step 3 */}
+                  {currentStep === 2 ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => navigate('/home')}
+                        className="flex-1 border-red-400 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        style={{ fontFamily: 'var(--font-body)' }}
+                      >
+                        I Disagree
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleNext}
+                        className="flex-1 bg-[#76B947] text-white hover:bg-[#76B947]/90"
+                        style={{ fontFamily: 'var(--font-body)' }}
+                      >
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        I Agree – Continue
+                      </Button>
+                    </>
+                  ) : currentStep < totalSteps ? (
                     <Button
                       type="button"
                       onClick={handleNext}

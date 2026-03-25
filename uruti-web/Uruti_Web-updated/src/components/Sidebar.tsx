@@ -24,25 +24,25 @@ const founderNavItems = [
   { id: 'profile', label: 'My Profile', icon: User },
   { id: 'startups', label: 'Startup Hub', icon: Lightbulb },
   { id: 'pitch-performance', label: 'Pitch Performance', icon: TrendingUp },
+  { id: 'pitch-coach', label: 'Pitch Coach', icon: Mic },
   { id: 'ai-chat', label: 'Uruti AI Chat', icon: Sparkles },
   { id: 'advisory-tracks', label: 'Advisory Tracks', icon: BookOpen },
+  { id: 'messages', label: 'Messages', icon: MessageSquare },
   { id: 'connections', label: 'Build Connections', icon: Users },
   { id: 'calendar', label: 'Readiness Calendar', icon: Calendar },
   { id: 'availability', label: 'My Availability', icon: Clock },
-  { id: 'pitch-coach', label: 'Pitch Coach', icon: Mic },
-  { id: 'messages', label: 'Messages', icon: MessageSquare },
 ];
 
 const investorMenuItems = [
   { id: 'investor-dashboard', label: 'Investor Dashboard', icon: Home },
   { id: 'profile', label: 'My Profile', icon: User },
   { id: 'startup-discovery', label: 'Startup Discovery', icon: Target },
-  { id: 'connections', label: 'Build Connections', icon: Users },
   { id: 'ai-chat', label: 'Uruti AI Chat', icon: Sparkles },
   { id: 'deal-flow', label: 'Deal Flow', icon: TrendingUp },
+  { id: 'messages', label: 'Messages', icon: MessageSquare },
+  { id: 'connections', label: 'Build Connections', icon: Users },
   { id: 'calendar', label: 'Meeting Calendar', icon: Calendar },
   { id: 'availability', label: 'Availability & Booking', icon: Clock },
-  { id: 'messages', label: 'Messages', icon: MessageSquare },
 ];
 
 const adminMenuItems = [
