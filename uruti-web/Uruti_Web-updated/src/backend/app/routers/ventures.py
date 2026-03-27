@@ -169,11 +169,11 @@ def get_ventures(
 ):
     """Get list of ventures with filtering and search"""
     
-    query = db.query(Venture).filter(Venture.is_published == True)
-    
-    # Apply filters
     if founder_id is not None:
-        query = query.filter(Venture.founder_id == founder_id)
+        # When filtering by a specific founder, show all their ventures regardless of publish status
+        query = db.query(Venture).filter(Venture.founder_id == founder_id)
+    else:
+        query = db.query(Venture).filter(Venture.is_published == True)
 
     if stage:
         query = query.filter(Venture.stage == stage)

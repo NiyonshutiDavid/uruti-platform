@@ -29,6 +29,7 @@ import { toast } from 'sonner';
 import { apiClient } from '../../lib/api-client';
 import { useAuth } from '../../lib/auth-context';
 import { BookingWeekDialog } from '../BookingWeekDialog';
+import { VentureDetailView } from '../VentureDetailView';
 
 interface ProfileViewModuleProps {
   userId: number;
@@ -69,6 +70,8 @@ export function ProfileViewModule({ userId, onBack, onModuleChange }: ProfileVie
   const [connectionStatus, setConnectionStatus] = useState<'none' | 'pending' | 'connected'>('none');
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [ventures, setVentures] = useState<any[]>([]);
+  const [selectedVenture, setSelectedVenture] = useState<any | null>(null);
+  const [isLoadingVentureDetail, setIsLoadingVentureDetail] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -202,10 +205,64 @@ export function ProfileViewModule({ userId, onBack, onModuleChange }: ProfileVie
     );
   }
 
+  const handleViewVentureDetails = async (venture: any) => {
+    try {
+      setIsLoadingVentureDetail(true);
+      const fullVenture = await apiClient.getVentureById(venture.id);
+      const mapped = {
+        id: String(fullVenture.id),
+        name: fullVenture.name || '',
+        sector: fullVenture.industry || '',
+        tagline: fullVenture.tagline || '',
+        problem: fullVenture.problem_statement || '',
+        solution: fullVenture.solution || '',
+        targetMarket: fullVenture.target_market || '',
+        urutiScore: fullVenture.uruti_score || 0,
+        activeUsers: fullVenture.customers || 0,
+        monthlyGrowth: 0,
+        highlights: fullVenture.highlights || [],
+        teamBackground: fullVenture.team_background || '',
+        competitiveEdge: fullVenture.competitive_edge || '',
+        fundingPlans: fullVenture.funding_plans || '',
+        milestones: fullVenture.milestones || [],
+        activities: fullVenture.activities || [],
+        pitchDeckUrl: fullVenture.pitch_deck_url || '',
+        pitchVideoUrl: fullVenture.demo_video_url || '',
+        thumbnailUrl: fullVenture.banner_url || '',
+        stage: fullVenture.stage || '',
+        founderId: fullVenture.founder_id || 0,
+      };
+      setSelectedVenture(mapped);
+    } catch (error) {
+      toast.error('Failed to load venture details');
+    } finally {
+      setIsLoadingVentureDetail(false);
+    }
+  };
+
   const isFounder = profile.role === 'founder';
   const isInvestor = profile.role === 'investor';
   const roleColor = isFounder ? 'bg-blue-500' : isInvestor ? 'bg-purple-500' : 'bg-gray-500';
   const roleLabel = profile.role.charAt(0).toUpperCase() + profile.role.slice(1);
+
+  if (selectedVenture) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <VentureDetailView
+          venture={selectedVenture}
+          isPublic={true}
+          isOwner={false}
+          onViewFounder={() => setSelectedVenture(null)}
+        />
+        <div className="px-6 pb-6">
+          <Button variant="outline" onClick={() => setSelectedVenture(null)} className="hover:bg-[#76B947]/10 hover:border-[#76B947]">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Profile
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col p-6 space-y-6 overflow-y-auto">
@@ -585,7 +642,7 @@ export function ProfileViewModule({ userId, onBack, onModuleChange }: ProfileVie
                   )}
 
                   {/* Badges row */}
-                  <div className="flex flex-wrap gap-1.5 mt-auto">
+                  <div className="flex flex-wrap gap-1.5">
                     {venture.industry && (
                       <Badge variant="secondary" className="text-xs dark:bg-gray-800 dark:text-gray-300">
                         <Briefcase className="h-3 w-3 mr-1" />
@@ -605,6 +662,17 @@ export function ProfileViewModule({ userId, onBack, onModuleChange }: ProfileVie
                       </Badge>
                     )}
                   </div>
+
+                  {/* View Details button */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full mt-auto hover:bg-[#76B947]/10 hover:border-[#76B947] dark:border-gray-700 dark:text-gray-300 dark:hover:border-green-600"
+                    onClick={() => handleViewVentureDetails(venture)}
+                    disabled={isLoadingVentureDetail}
+                  >
+                    View Details
+                  </Button>
                 </div>
               ))}
             </div>
