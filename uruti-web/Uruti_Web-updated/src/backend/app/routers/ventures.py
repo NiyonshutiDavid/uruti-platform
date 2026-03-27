@@ -163,6 +163,7 @@ def get_ventures(
     is_seeking_funding: Optional[bool] = None,
     min_score: Optional[float] = None,
     search: Optional[str] = None,
+    founder_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -171,6 +172,9 @@ def get_ventures(
     query = db.query(Venture).filter(Venture.is_published == True)
     
     # Apply filters
+    if founder_id is not None:
+        query = query.filter(Venture.founder_id == founder_id)
+
     if stage:
         query = query.filter(Venture.stage == stage)
     

@@ -347,25 +347,6 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
         formattedHistory.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
         setChatHistories(formattedHistory);
-
-        // Open the latest conversation by default so users land on newest messages.
-        if (formattedHistory.length > 0 && !currentChatId && messages.length === 0) {
-          const latest = formattedHistory[0];
-          setCurrentChatId(latest.id);
-          try {
-            const messagesData = await apiClient.getAiSessionMessages(latest.id);
-            const formattedMessages: Message[] = messagesData.map((msg: any) => ({
-              id: String(msg.id),
-              role: msg.role,
-              content: msg.content,
-              timestamp: parseServerDate(msg.created_at),
-              startup: undefined,
-            }));
-            setMessages(formattedMessages);
-          } catch {
-            // Keep app usable even if a session fetch fails.
-          }
-        }
       } catch (error) {
         // Silently handle error - AI chat endpoints might not be implemented yet
         setChatHistories([]);
@@ -964,7 +945,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
       <div className="flex-1 flex min-h-0 flex-col overflow-hidden">
         
         {/* Chat Header - Always pinned */}
-        <div className="sticky top-0 z-20 flex-shrink-0 border-b border-slate-200 dark:border-slate-800 p-4 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur">
+        <div className="flex-shrink-0 border-b border-slate-200 dark:border-slate-800 p-4 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur z-10">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">

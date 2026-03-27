@@ -430,6 +430,13 @@ class ApiClient {
     return (ventures || []).map((venture) => this.normalizeVentureMedia(venture));
   }
 
+  async getVenturesByFounderId(founderId: number) {
+    const ventures = await this.request<any[]>(`/api/v1/ventures/?founder_id=${founderId}`, {
+      requiresAuth: true,
+    });
+    return (ventures || []).map((venture) => this.normalizeVentureMedia(venture));
+  }
+
   async updateVenture(ventureId: number, data: any) {
     const venture = await this.request<any>(`/api/v1/ventures/${ventureId}`, {
       method: 'PUT',

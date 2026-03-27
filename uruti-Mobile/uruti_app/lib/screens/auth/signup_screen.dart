@@ -747,7 +747,8 @@ class _SignupScreenState extends State<SignupScreen> {
           hint: 'Re-enter password',
           controller: _confirmPasswordCtrl,
           showPassword: _showConfirmPassword,
-          onToggle: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
+          onToggle: () =>
+              setState(() => _showConfirmPassword = !_showConfirmPassword),
         ),
         const SizedBox(height: 14),
 

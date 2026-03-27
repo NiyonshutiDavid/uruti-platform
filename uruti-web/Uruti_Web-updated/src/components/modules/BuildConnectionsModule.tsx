@@ -579,13 +579,13 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
                   return (
                     <div
                       key={`directory-${person.id}`}
-                      className="glass-card rounded-lg border border-black/5 dark:border-white/10 bg-white/80 dark:bg-slate-900/70 overflow-hidden hover:shadow-lg dark:hover:shadow-lg dark:hover:shadow-green-600/20 transition-all duration-200"
+                      className="glass-card rounded-lg border border-black/5 dark:border-white/10 bg-white/80 dark:bg-slate-900/70 overflow-hidden hover:shadow-lg dark:hover:shadow-lg dark:hover:shadow-green-600/20 transition-all duration-200 flex flex-col"
                     >
                       {/* Uruti Banner - Black to Green Gradient */}
-                      <div className="bg-gradient-to-r from-black via-green-800 to-green-600 h-24 relative"></div>
+                      <div className="bg-gradient-to-r from-black via-green-800 to-green-600 h-24 shrink-0"></div>
 
-                      {/* Card content */}
-                      <div className="px-4 pb-4">
+                      {/* Card content — flex-1 so it fills remaining height */}
+                      <div className="px-4 pb-4 flex-1 flex flex-col">
                         {/* Avatar overlapping banner */}
                         <div className="flex justify-center -mt-12 mb-3 relative z-10">
                           <Avatar className="h-24 w-24 border-4 border-white dark:border-slate-900 shadow-lg">
@@ -612,25 +612,24 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
                           </Badge>
                         </div>
 
-                        {/* Subtitle/Title */}
-                        {person.bio && (
-                          <p className="text-xs text-center text-muted-foreground line-clamp-2 mb-2 dark:text-gray-400" style={{ fontFamily: 'var(--font-body)' }}>
-                            {person.bio}
-                          </p>
-                        )}
+                        {/* Bio — fixed 2-line clamp, always occupies space */}
+                        <p className="text-xs text-center text-muted-foreground line-clamp-2 mb-2 min-h-[2.5rem] dark:text-gray-400" style={{ fontFamily: 'var(--font-body)' }}>
+                          {person.bio || ''}
+                        </p>
 
                         {/* Location and company */}
-                        {(person.company || person.location) && (
-                          <div className="text-xs text-center text-muted-foreground mb-3 space-y-1 dark:text-gray-400" style={{ fontFamily: 'var(--font-body)' }}>
-                            {person.company && <p>{person.company}</p>}
-                            {person.location && (
-                              <p className="flex items-center justify-center">
-                                <MapPin className="h-3 w-3 mr-1" />
-                                {person.location}
-                              </p>
-                            )}
-                          </div>
-                        )}
+                        <div className="text-xs text-center text-muted-foreground min-h-[2rem] mb-2 space-y-0.5 dark:text-gray-400" style={{ fontFamily: 'var(--font-body)' }}>
+                          {person.company && <p>{person.company}</p>}
+                          {person.location && (
+                            <p className="flex items-center justify-center">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              {person.location}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Spacer pushes mutual connections + buttons to bottom */}
+                        <div className="flex-1" />
 
                         {/* Mutual connections */}
                         <div className="mb-4 py-3 border-t border-black/5 dark:border-white/10">
@@ -644,7 +643,6 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
 
                         {/* Action Buttons */}
                         <div className="flex flex-col gap-2">
-                          {/* Connect/Add or Cancel Request Button */}
                           {status === 'none' ? (
                             <Button
                               className="w-full bg-[#76B947] hover:bg-[#5a8f35] text-white font-semibold py-2 dark:bg-green-600 dark:hover:bg-green-700 transition-colors"
@@ -673,7 +671,6 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
                             </Button>
                           )}
 
-                          {/* View Profile Button - Always shown */}
                           <Button
                             variant="outline"
                             className="w-full hover:bg-[#76B947]/10 hover:border-[#76B947] dark:hover:bg-green-950/30 dark:hover:border-green-700 dark:border-gray-700 dark:text-gray-300 transition-colors"
@@ -731,76 +728,76 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredConnections.slice(0, displayedConnectionsCount).map((conn) => (
                   <Card key={conn.id} className="glass-card border-black/5 dark:border-white/10">
-                    <CardContent className="pt-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-4 flex-1">
-                          <Avatar className="h-14 w-14">
-                            <AvatarImage src={conn.avatar_url || conn.avatar} />
-                            <AvatarFallback className="bg-[#76B947]/20 text-[#76B947]">
-                              {conn.full_name.split(' ').map(n => n[0]).join('')}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <div className="flex items-start justify-between mb-1">
-                              <div>
-                                <h3 className="font-semibold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                                  {conn.full_name}
-                                </h3>
-                                <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                                  {conn.email}
-                                </p>
-                              </div>
-                              <Badge variant="outline" className={`${getRoleColor(conn.role)} flex items-center space-x-1`}>
-                                {getRoleIcon(conn.role)}
-                                <span className="capitalize text-xs">{conn.role}</span>
-                              </Badge>
+                    <CardContent className="pt-6 flex flex-col gap-4">
+                      {/* Card header: avatar + name/email + role badge */}
+                      <div className="flex items-start gap-3">
+                        <Avatar className="h-12 w-12 shrink-0">
+                          <AvatarImage src={conn.avatar_url || conn.avatar} />
+                          <AvatarFallback className="bg-[#76B947]/20 text-[#76B947]">
+                            {conn.full_name.split(' ').map(n => n[0]).join('')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 flex-wrap">
+                            <div className="min-w-0">
+                              <h3 className="font-semibold dark:text-white truncate" style={{ fontFamily: 'var(--font-heading)' }}>
+                                {conn.full_name}
+                              </h3>
+                              <p className="text-sm text-muted-foreground truncate" style={{ fontFamily: 'var(--font-body)' }}>
+                                {conn.email}
+                              </p>
                             </div>
-                            <div className="flex items-center space-x-2 mt-3">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
-                                onClick={() => handleViewProfile(conn.id)}
-                              >
-                                View Profile
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
-                                onClick={() => handleBookSession(conn.id, conn.full_name)}
-                              >
-                                <Calendar className="h-4 w-4 mr-2" />
-                                Book Session
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="bg-[#76B947] text-white hover:bg-[#5a8f35]"
-                                onClick={() => handleInitiateCall(conn, 'video')}
-                              >
-                                <Video className="h-4 w-4 mr-2" />
-                                Video Call
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="hover:bg-[#76B947]/10 hover:border-[#76B947]"
-                                onClick={() => handleInitiateCall(conn, 'voice')}
-                              >
-                                <Phone className="h-4 w-4 mr-2" />
-                                Voice Call
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="bg-[#76B947] text-white hover:bg-[#5a8f35]"
-                                onClick={() => handleSendMessage(conn)}
-                              >
-                                <MessageCircle className="h-4 w-4 mr-2" />
-                                Message
-                              </Button>
-                            </div>
+                            <Badge variant="outline" className={`${getRoleColor(conn.role)} flex items-center gap-1 shrink-0`}>
+                              {getRoleIcon(conn.role)}
+                              <span className="capitalize text-xs">{conn.role}</span>
+                            </Badge>
                           </div>
                         </div>
+                      </div>
+                      {/* Action buttons */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="hover:bg-[#76B947]/10 hover:border-[#76B947] w-full"
+                          onClick={() => handleViewProfile(conn.id)}
+                        >
+                          View Profile
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="hover:bg-[#76B947]/10 hover:border-[#76B947] w-full"
+                          onClick={() => handleBookSession(conn.id, conn.full_name)}
+                        >
+                          <Calendar className="h-4 w-4 mr-1 shrink-0" />
+                          Book Session
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="bg-[#76B947] text-white hover:bg-[#5a8f35] w-full"
+                          onClick={() => handleInitiateCall(conn, 'video')}
+                        >
+                          <Video className="h-4 w-4 mr-1 shrink-0" />
+                          Video Call
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="hover:bg-[#76B947]/10 hover:border-[#76B947] w-full"
+                          onClick={() => handleInitiateCall(conn, 'voice')}
+                        >
+                          <Phone className="h-4 w-4 mr-1 shrink-0" />
+                          Voice Call
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="col-span-2 bg-[#76B947] text-white hover:bg-[#5a8f35] w-full"
+                          onClick={() => handleSendMessage(conn)}
+                        >
+                          <MessageCircle className="h-4 w-4 mr-2" />
+                          Message
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>

@@ -1925,7 +1925,6 @@ export function AdvisoryTracksModule() {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-2">
-                    <span className="text-xl sm:text-2xl">{getCategoryIcon(track.category).icon}</span>
                     <CardTitle className="text-base sm:text-lg" style={{ fontFamily: 'var(--font-heading)' }}>{track.title}</CardTitle>
                   </div>
                   <CardDescription className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>

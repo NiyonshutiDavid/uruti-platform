@@ -21,7 +21,9 @@ import {
   UserPlus,
   X as XIcon,
   Globe,
-  Users
+  Users,
+  Rocket,
+  DollarSign
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '../../lib/api-client';
@@ -66,6 +68,7 @@ export function ProfileViewModule({ userId, onBack, onModuleChange }: ProfileVie
   const [profileError, setProfileError] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'none' | 'pending' | 'connected'>('none');
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
+  const [ventures, setVentures] = useState<any[]>([]);
 
   useEffect(() => {
     fetchProfile();
@@ -83,6 +86,10 @@ export function ProfileViewModule({ userId, onBack, onModuleChange }: ProfileVie
         apiClient.getConnectionCount(userId).catch(() => 0),
       ]);
       setProfile({ ...data, connections: connCount });
+      if (data.role === 'founder') {
+        const founderVentures = await apiClient.getVenturesByFounderId(userId).catch(() => []);
+        setVentures(founderVentures);
+      }
     } catch (error) {
       console.error('Failed to fetch profile:', error);
       toast.error('Failed to load profile');
@@ -538,6 +545,72 @@ export function ProfileViewModule({ userId, onBack, onModuleChange }: ProfileVie
           </CardContent>
         </Card>
       </div>
+
+      {/* Founder Startups Section */}
+      {isFounder && ventures.length > 0 && (
+        <Card className="glass-card border-black/5 dark:border-white/10 dark:bg-slate-900/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+              <Rocket className="h-5 w-5 text-[#76B947]" />
+              Startups
+            </CardTitle>
+            <CardDescription className="dark:text-gray-400">
+              Ventures {profile.full_name.split(' ')[0]} is working on
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {ventures.map((venture) => (
+                <div
+                  key={venture.id}
+                  className="rounded-lg border border-black/5 dark:border-white/10 bg-white/60 dark:bg-slate-800/60 p-4 flex flex-col gap-3"
+                >
+                  {/* Venture name */}
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="font-semibold dark:text-white text-sm leading-tight" style={{ fontFamily: 'var(--font-heading)' }}>
+                      {venture.name}
+                    </h4>
+                    {venture.uruti_score != null && (
+                      <Badge className="shrink-0 bg-[#76B947]/10 text-[#76B947] dark:bg-green-900/30 dark:text-green-400 border-[#76B947]/30 text-xs">
+                        {Math.round(venture.uruti_score)}%
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Tagline */}
+                  {venture.tagline && (
+                    <p className="text-xs text-muted-foreground dark:text-gray-400 line-clamp-2" style={{ fontFamily: 'var(--font-body)' }}>
+                      {venture.tagline}
+                    </p>
+                  )}
+
+                  {/* Badges row */}
+                  <div className="flex flex-wrap gap-1.5 mt-auto">
+                    {venture.industry && (
+                      <Badge variant="secondary" className="text-xs dark:bg-gray-800 dark:text-gray-300">
+                        <Briefcase className="h-3 w-3 mr-1" />
+                        {venture.industry}
+                      </Badge>
+                    )}
+                    {venture.stage && (
+                      <Badge variant="outline" className="text-xs border-[#76B947]/50 text-[#76B947] dark:border-green-700 dark:text-green-400">
+                        <TrendingUp className="h-3 w-3 mr-1" />
+                        {venture.stage}
+                      </Badge>
+                    )}
+                    {venture.is_seeking_funding && (
+                      <Badge variant="outline" className="text-xs border-amber-400/50 text-amber-600 dark:border-amber-600 dark:text-amber-400">
+                        <DollarSign className="h-3 w-3 mr-1" />
+                        Seeking Funding
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <BookingWeekDialog
         open={bookingDialogOpen}
