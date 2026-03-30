@@ -759,9 +759,9 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
       {/* Chat History Sidebar (Right Drawer) */}
       {isSidebarOpen && (
       <aside
-        className="absolute inset-y-0 right-0 z-40 w-80 shrink-0 border-l border-slate-200/80 bg-white/95 dark:border-slate-800 dark:bg-slate-900/85 flex min-h-0 flex-col overflow-hidden backdrop-blur supports-[backdrop-filter]:bg-white/85 supports-[backdrop-filter]:dark:bg-slate-900/75"
+        className="absolute inset-y-0 right-0 z-40 w-80 shrink-0 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-900 flex min-h-0 flex-col overflow-hidden shadow-xl"
       >
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-900">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">
@@ -805,7 +805,7 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
           </div>
         </div>
 
-        <ScrollArea className="flex-1 min-h-0">
+        <ScrollArea className="flex-1 min-h-0 bg-white dark:bg-gray-900">
           {isLoadingChats ? (
             <div className="flex items-center justify-center p-8">
               <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
@@ -826,8 +826,8 @@ export function AIChatModule({ userType = 'founder', startupContext, analysisCon
                         void loadChatHistory(chat.id);
                       }
                     }}
-                    className={`glass-card cursor-pointer transition-all hover:scale-[1.02] hover:bg-[#76B947]/10 dark:hover:bg-[#76B947]/20 border-gray-200 dark:border-gray-700 ${
-                      currentChatId === chat.id ? 'bg-purple-100/50 dark:bg-purple-900/30 border-purple-400 dark:border-purple-500' : ''
+                    className={`bg-gray-50 dark:bg-gray-800 cursor-pointer transition-all hover:bg-[#76B947]/10 dark:hover:bg-[#76B947]/20 border border-gray-200 dark:border-gray-700 shadow-sm ${
+                      currentChatId === chat.id ? 'bg-purple-50 dark:bg-purple-900/30 border-purple-300 dark:border-purple-500' : ''
                     }`}
                   >
                   <CardContent className="p-3">
