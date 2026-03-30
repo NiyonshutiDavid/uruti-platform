@@ -58,7 +58,7 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
   const [recipientName, setRecipientName] = useState('');
   const [directMessageDialog, setDirectMessageDialog] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
-  const [displayedCount, setDisplayedCount] = useState(8);
+  const [displayedCount, setDisplayedCount] = useState(9);
   const [displayedConnectionsCount, setDisplayedConnectionsCount] = useState(9); // Pagination for connections
   
   // Call state
@@ -441,57 +441,6 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="glass-card border-black/5 dark:border-white/10">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                  Total Network
-                </p>
-                <p className="text-3xl mt-1 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                  {filteredUsers.length}
-                </p>
-              </div>
-              <Users className="h-8 w-8 text-[#76B947]" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-black/5 dark:border-white/10">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                  My Connections
-                </p>
-                <p className="text-3xl mt-1 text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>
-                  {connections.length}
-                </p>
-              </div>
-              <Check className="h-8 w-8 text-[#76B947]" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-black/5 dark:border-white/10">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                  Pending Requests
-                </p>
-                <p className="text-3xl mt-1 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                  {totalPendingCount}
-                </p>
-              </div>
-              <Clock className="h-8 w-8 text-orange-500" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Search and Filter */}
       <Card className="glass-card border-black/5 dark:border-white/10">
         <CardContent className="pt-6">
@@ -570,7 +519,7 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
                 </Button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {directoryUsers.slice(0, displayedCount).map((person) => {
                   const status = checkConnectionStatus(person.id);
                   const requestId = findSentRequestIdByUserId(person.id);
@@ -689,7 +638,7 @@ export function BuildConnectionsModule({ onModuleChange, userType = 'founder' }:
               {displayedCount < directoryUsers.length && (
                 <div className="flex justify-center pt-4">
                   <Button
-                    onClick={() => setDisplayedCount(prev => Math.min(prev + 8, directoryUsers.length))}
+                    onClick={() => setDisplayedCount(prev => Math.min(prev + 9, directoryUsers.length))}
                     className="bg-[#76B947] hover:bg-[#5a8f35] text-white dark:bg-green-600 dark:hover:bg-green-700"
                   >
                     Load More People
