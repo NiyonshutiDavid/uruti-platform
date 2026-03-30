@@ -1913,33 +1913,31 @@ export function AdvisoryTracksModule() {
         </TabsList>
       </Tabs>
 
-      {/* Track List - Full Width */}
-      <div className="space-y-4">
+      {/* Track Grid - 2 per row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredTracks.map((track) => (
           <Card 
             key={track.id} 
-            className="glass-card border-black/5 dark:border-white/10 cursor-pointer transition-all hover:shadow-lg hover:ring-2 hover:ring-[#76B947]/50"
+            className="glass-card border-black/5 dark:border-white/10 cursor-pointer transition-all hover:shadow-lg hover:ring-2 hover:ring-[#76B947]/50 flex flex-col"
             onClick={() => handleTrackClick(track)}
           >
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <CardTitle className="text-base sm:text-lg" style={{ fontFamily: 'var(--font-heading)' }}>{track.title}</CardTitle>
-                  </div>
-                  <CardDescription className="text-sm" style={{ fontFamily: 'var(--font-body)' }}>
+                  <CardTitle className="text-base sm:text-lg mb-2" style={{ fontFamily: 'var(--font-heading)' }}>{track.title}</CardTitle>
+                  <CardDescription className="text-sm line-clamp-2" style={{ fontFamily: 'var(--font-body)' }}>
                     {track.description}
                   </CardDescription>
                 </div>
-                <div className="ml-2">
+                <div className="ml-2 shrink-0">
                   {getStatusBadge(track.status)}
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 flex flex-col justify-end">
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-xs sm:text-sm">
-                  <div className="flex items-center space-x-2 sm:space-x-4 text-muted-foreground">
+                  <div className="flex items-center space-x-3 text-muted-foreground">
                     <span className="flex items-center" style={{ fontFamily: 'var(--font-body)' }}>
                       <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                       {track.modules} modules
