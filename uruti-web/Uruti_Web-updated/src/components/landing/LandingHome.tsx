@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -20,6 +21,84 @@ import {
 import { LandingHeader } from './LandingHeader';
 import { LandingFooter } from './LandingFooter';
 import { LiveChatWidget } from '../LiveChatWidget';
+
+import desktopMockup from '../../assets/mockup-desktop.png';
+import mobileMockup from '../../assets/mockup-mobile.png';
+
+const SLIDES = [
+  {
+    src: desktopMockup,
+    alt: 'Uruti platform on desktop — web dashboard',
+    label: 'Available on Web',
+  },
+  {
+    src: mobileMockup,
+    alt: 'Uruti app on mobile — iOS & Android',
+    label: 'Available on Mobile',
+  },
+];
+
+function HeroMockupCarousel() {
+  const [active, setActive] = useState(0);
+  const [fading, setFading] = useState(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFading(true);
+      setTimeout(() => {
+        setActive((prev) => (prev + 1) % SLIDES.length);
+        setFading(false);
+      }, 500);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="hidden lg:flex flex-col items-center justify-center relative select-none">
+      {/* Glow backdrop */}
+      <div className="absolute inset-0 flex items-center justify-center -z-10">
+        <div className="w-[520px] h-[520px] bg-gradient-to-b from-[#ddffc2] via-[#76b947] to-[#9bcf6e] blur-[120px] opacity-40" />
+      </div>
+
+      {/* Mockup image */}
+      <div
+        className="transition-opacity duration-500"
+        style={{ opacity: fading ? 0 : 1 }}
+      >
+        <img
+          src={SLIDES[active].src}
+          alt={SLIDES[active].alt}
+          className="w-full max-w-[540px] object-contain drop-shadow-2xl"
+          draggable={false}
+        />
+      </div>
+
+      {/* Label badge */}
+      <div
+        className="mt-4 transition-opacity duration-500"
+        style={{ opacity: fading ? 0 : 1 }}
+      >
+        <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#76B947]/10 border border-[#76B947]/30 text-[#76B947] text-sm font-medium">
+          <span className="w-2 h-2 rounded-full bg-[#76B947] animate-pulse" />
+          {SLIDES[active].label}
+        </span>
+      </div>
+
+      {/* Dot indicators */}
+      <div className="flex gap-2 mt-4">
+        {SLIDES.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => { setFading(true); setTimeout(() => { setActive(i); setFading(false); }, 500); }}
+            className={`w-2 h-2 rounded-full transition-all duration-300 ${
+              i === active ? 'bg-[#76B947] w-6' : 'bg-[#76B947]/30'
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface LandingHomeProps {
   onNavigate: (page: string) => void;
@@ -197,94 +276,11 @@ export function LandingHome({ onNavigate }: LandingHomeProps) {
                 </Button>
               </div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-4 max-w-md mx-auto lg:mx-0">
-                <div className="glass-card p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>2K+</div>
-                  <div className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>Founders</div>
-                </div>
-                <div className="glass-card p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>$12M+</div>
-                  <div className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>Funded</div>
-                </div>
-                <div className="glass-card p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-[#76B947]" style={{ fontFamily: 'var(--font-heading)' }}>350+</div>
-                  <div className="text-xs text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>Startups</div>
-                </div>
-              </div>
+
             </div>
 
-            {/* Right Side - Images Grid */}
-            <div className="hidden lg:grid grid-cols-2 gap-4 relative">
-              <div className="space-y-4">
-                {/* Card 1 with heavily blurred vertical gradient */}
-                <div className="relative">
-                  {/* Heavily blurred vertical gradient behind */}
-                  <div className="absolute inset-0 flex items-center justify-center -z-10 opacity-95">
-                    <div className="w-[647px] h-[647px] bg-gradient-to-b from-[#ddffc2] via-[#76b947] to-[#9bcf6e] blur-[120px]"></div>
-                  </div>
-                  <div className="glass-card rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform animate-card-rotate">
-                    <img 
-                      src="https://images.unsplash.com/photo-1655720357872-ce227e4164ba?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwZW50cmVwcmVuZXVyJTIwc3RhcnR1cCUyMHRlYW0lMjBtZWV0aW5nfGVufDF8fHx8MTc3MTE0ODY1MHww&ixlib=rb-4.1.0&q=80&w=1080" 
-                      alt="Entrepreneurs collaborating" 
-                      className="w-full h-64 object-cover"
-                    />
-                  </div>
-                </div>
-                
-                {/* Card 2 with heavily blurred vertical gradient */}
-                <div className="relative">
-                  {/* Heavily blurred vertical gradient behind */}
-                  <div className="absolute inset-0 flex items-center justify-center -z-10 opacity-95">
-                    <div className="w-[600px] h-[600px] bg-gradient-to-b from-[#ddffc2] via-[#76b947] to-[#9bcf6e] blur-[120px]"></div>
-                  </div>
-                  <div className="glass-card rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform animate-card-rotate" style={{ animationDelay: '2s' }}>
-                    <img 
-                      src="https://images.unsplash.com/photo-1689857538296-b6e1a392a91d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwbWFuJTIwdGVjaG5vbG9neSUyMGlubm92YXRpb24lMjBsYXB0b3B8ZW58MXx8fHwxNzcxMTQ4NjU2fDA&ixlib=rb-4.1.0&q=80&w=1080" 
-                      alt="Working on innovation" 
-                      className="w-full h-48 object-cover"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-4 pt-8">
-                {/* Card 3 with heavily blurred vertical gradient */}
-                <div className="relative">
-                  {/* Heavily blurred vertical gradient behind */}
-                  <div className="absolute inset-0 flex items-center justify-center -z-10 opacity-95">
-                    <div className="w-[600px] h-[600px] bg-gradient-to-b from-[#ddffc2] via-[#76b947] to-[#9bcf6e] blur-[120px]"></div>
-                  </div>
-                  <div className="glass-card rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform animate-card-rotate" style={{ animationDelay: '4s' }}>
-                    <img 
-                      src="https://images.unsplash.com/photo-1710778044102-56a3a6b69a1b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwd29tYW4lMjBlbnRyZXByZW5ldXIlMjBwcmVzZW50YXRpb24lMjBidXNpbmVzc3xlbnwxfHx8fDE3NzExNDg2NTN8MA&ixlib=rb-4.1.0&q=80&w=1080" 
-                      alt="Business presentation" 
-                      className="w-full h-48 object-cover"
-                    />
-                  </div>
-                </div>
-                
-                {/* Card 4 with heavily blurred vertical gradient */}
-                <div className="relative">
-                  {/* Heavily blurred vertical gradient behind */}
-                  <div className="absolute inset-0 flex items-center justify-center -z-10 opacity-95">
-                    <div className="w-[550px] h-[550px] bg-gradient-to-b from-[#ddffc2] via-[#76b947] to-[#9bcf6e] blur-[120px]"></div>
-                  </div>
-                  <div className="glass-card rounded-2xl overflow-hidden shadow-2xl p-6 bg-gradient-to-br from-[#76B947]/10 to-purple-500/10 animate-card-rotate" style={{ animationDelay: '6s' }}>
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-center">
-                        <Award className="h-12 w-12 text-[#76B947] mx-auto mb-3" />
-                        <p className="text-lg font-bold dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                          Investment Ready
-                        </p>
-                        <p className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                          AI-Powered Scoring
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Right Side - Mockup Carousel */}
+            <HeroMockupCarousel />
           </div>
 
           {/* Trusted By Section */}
