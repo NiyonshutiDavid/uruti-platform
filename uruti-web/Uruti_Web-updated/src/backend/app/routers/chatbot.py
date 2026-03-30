@@ -35,11 +35,19 @@ _CHATBOT_QUEUE_TIMEOUT_SECONDS = 2.0
 _GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
 _SYSTEM_PROMPT = (
-    "You are the Uruti AI Advisor - an expert startup advisor specialised in "
-    "early-stage companies in Rwanda and Sub-Saharan Africa. You help founders "
-    "with ideation, market sizing, GTM strategy, pitch preparation, fundraising, "
-    "and building investor-ready businesses. Be concrete, practical, and cite "
-    "Rwanda / African context where relevant."
+    "You are the Uruti AI Advisor — a focused startup advisor for early-stage companies "
+    "in Rwanda and Sub-Saharan Africa. You ONLY answer questions directly related to: "
+    "startups, entrepreneurship, business model design, market sizing, go-to-market strategy, "
+    "product validation, customer discovery, pitch preparation, fundraising, team building, "
+    "intellectual property for startups, legal/regulatory matters for businesses, and the "
+    "African/Rwandan business and investment ecosystem.\n"
+    "If the user's question is NOT related to any of these topics, respond ONLY with: "
+    "'I'm built for startup advisory only. I can help with business strategy, market validation, "
+    "fundraising, pitch prep, product-market fit, or your startup-specific questions — "
+    "what would you like to work on?'\n"
+    "Never answer general knowledge, coding help, recipes, entertainment, trivia, or any "
+    "question unrelated to startups and entrepreneurship. "
+    "Be concrete, practical, and cite Rwanda / African market context where relevant."
 )
 
 
@@ -153,11 +161,13 @@ def _build_gemini_prompt(user_text: str, context: dict | None, history: list[dic
     history_text = "\n".join(history_lines)
     return (
         f"{_SYSTEM_PROMPT}\n\n"
-        "Respond with concise, practical startup advice and clear next steps. "
+        "IMPORTANT: Answer the user's question directly and immediately. "
+        "Do not show a menu of capabilities — just answer. "
+        "If the question is off-topic, apply your refusal rule and stop. "
         "Prioritize East African market realities when relevant.\n\n"
         f"{context_text}\n"
         f"Conversation so far:\n{history_text}\n\n"
-        f"User: {user_text}\n"
+        f"User: {user_text}\nAssistant:"
     )
 
 
@@ -184,7 +194,7 @@ def _gemini_response(user_text: str, context: dict | None, history: list[dict]) 
     if not api_key:
         return None, "GEMINI_API_KEY not configured"
 
-    model = (settings.GEMINI_MODEL or "gemini-1.5-flash").strip() or "gemini-1.5-flash"
+    model = (settings.GEMINI_MODEL or "gemini-2.5-flash").strip() or "gemini-2.5-flash"
     prompt = _build_gemini_prompt(user_text, context, history)
     sdk_error: str | None = None
     try:

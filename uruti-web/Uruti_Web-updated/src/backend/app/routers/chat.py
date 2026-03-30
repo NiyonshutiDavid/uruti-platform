@@ -90,7 +90,7 @@ def _gemini_chat_fallback(user_query: str, founder_profile: str, mode: str) -> t
     if not api_key:
         return None, "GEMINI_API_KEY not configured"
 
-    model = (settings.GEMINI_MODEL or "gemini-1.5-flash").strip() or "gemini-1.5-flash"
+    model = (settings.GEMINI_MODEL or "gemini-2.5-flash").strip() or "gemini-2.5-flash"
     prompt = (
         "You are an expert startup advisor focused on Rwanda and Sub-Saharan Africa. "
         "Return ONLY strict JSON with keys: diagnosis, strategic_recommendations, risks, 30_day_plan, funding_advice. "

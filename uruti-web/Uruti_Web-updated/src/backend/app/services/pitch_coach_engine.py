@@ -254,7 +254,7 @@ class PitchCoachEngine:
         api_key = (settings.GEMINI_API_KEY or "").strip()
         if not api_key:
             return None
-        model = (settings.GEMINI_MODEL or "gemini-1.5-flash").strip() or "gemini-1.5-flash"
+        model = (settings.GEMINI_MODEL or "gemini-2.5-flash").strip() or "gemini-2.5-flash"
         prompt = (
             "You are an expert startup pitch coach. "
             f"The founder delivered a {pitch_type or 'general'} pitch "

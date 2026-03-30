@@ -314,7 +314,7 @@ def _gemini_fallback_response(user_text: str, context: dict | None, history: lis
     if not api_key:
         return None, "GEMINI_API_KEY not configured"
 
-    model = (settings.GEMINI_MODEL or "gemini-1.5-flash").strip() or "gemini-1.5-flash"
+    model = (settings.GEMINI_MODEL or "gemini-2.5-flash").strip() or "gemini-2.5-flash"
     prompt = _build_gemini_prompt(user_text, context, history)
     sdk_error: str | None = None
     try:
