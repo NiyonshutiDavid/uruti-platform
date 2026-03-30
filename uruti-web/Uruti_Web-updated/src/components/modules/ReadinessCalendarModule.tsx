@@ -255,7 +255,7 @@ export function ReadinessCalendarModule() {
           </Tabs>
           <Dialog open={isAddEventOpen} onOpenChange={setIsAddEventOpen}>
             <DialogTrigger asChild>
-              <Button className="glass-button bg-black text-white hover:bg-black/90">
+              <Button className="bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80">
                 <Plus className="mr-2 h-4 w-4" />
                 Add Event
               </Button>
