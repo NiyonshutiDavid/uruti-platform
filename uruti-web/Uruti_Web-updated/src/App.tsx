@@ -1,11 +1,10 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
-import { ThemeProvider } from './lib/theme-context';
 import { AuthProvider, useAuth } from './lib/auth-context';
+import { useAuthStore } from './lib/stores/auth-store';
 import { ConfirmDialogProvider } from './components/ui/confirm-dialog';
 import { SupportProvider } from './lib/support-context';
-import { AdvisoryProvider } from './lib/advisory-context';
 import { CallProvider } from './lib/call-context';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { LandingHome } from './components/landing/LandingHome';
@@ -25,8 +24,11 @@ import apiClient from './lib/api-client';
 
 function AppContent() {
   const { user, isAuthenticated } = useAuth();
+  const { initAuth } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => { initAuth(); }, []);
 
   const upsertMetaByName = (name: string, content: string) => {
     let tag = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
@@ -215,7 +217,7 @@ function AppContent() {
   }, [isAuthenticated, user]);
 
   return (
-    <ThemeProvider>
+    <>
       <ScrollToTop />
       <Toaster
         position="top-right"
@@ -265,7 +267,7 @@ function AppContent() {
         {/* Catch all - 404 page */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-    </ThemeProvider>
+    </>
   );
 }
 
@@ -274,11 +276,9 @@ export default function App() {
     <AuthProvider>
       <ConfirmDialogProvider>
         <SupportProvider>
-          <AdvisoryProvider>
-            <CallProvider>
-              <AppContent />
-            </CallProvider>
-          </AdvisoryProvider>
+          <CallProvider>
+            <AppContent />
+          </CallProvider>
         </SupportProvider>
       </ConfirmDialogProvider>
     </AuthProvider>

@@ -1,44 +1,9 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+// Migrated to Zustand — backward-compatibility shim.
+// All state logic lives in src/lib/stores/theme-store.ts
+import type { ReactNode } from 'react';
+export { useTheme, useThemeStore } from './stores/theme-store';
 
-type Theme = 'light' | 'dark';
-
-interface ThemeContextType {
-  theme: Theme;
-  toggleTheme: () => void;
-}
-
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
-
+// No-op provider so existing `import { ThemeProvider }` statements still compile
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const stored = localStorage.getItem('uruti-theme');
-    return (stored as Theme) || 'light';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('uruti-theme', theme);
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
-
-  return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  );
-}
-
-export function useTheme() {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useTheme must be used within ThemeProvider');
-  }
-  return context;
+  return <>{children}</>;
 }
