@@ -1041,7 +1041,8 @@ class _ConnectionPickerSheetState extends State<_ConnectionPickerSheet> {
                       final name = c['full_name'] ?? 'User';
                       final role = (c['role'] ?? '').toString();
                       final avatarUrl = AppConstants.normalizeMediaUrl(
-                          c['avatar_url']?.toString());
+                        c['avatar_url']?.toString(),
+                      );
                       final uid = c['id'].toString();
                       final initials = name
                           .toString()
