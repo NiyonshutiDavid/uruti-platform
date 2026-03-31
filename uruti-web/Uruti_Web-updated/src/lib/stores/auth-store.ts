@@ -38,15 +38,16 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   isLoading: true,
 
   initAuth: async () => {
-    const sessionToken = sessionStorage.getItem('uruti_token');
-    const storedUser = sessionStorage.getItem('uruti_user');
+    const storedToken = localStorage.getItem('uruti_token');
+    const storedUser = localStorage.getItem('uruti_user');
 
-    if (!sessionToken || !storedUser) {
+    if (!storedToken || !storedUser) {
       set({ isLoading: false });
       return;
     }
 
-    set({ token: sessionToken, user: JSON.parse(storedUser) });
+    // Immediately restore session from storage so ProtectedRoute doesn't redirect.
+    set({ token: storedToken, user: JSON.parse(storedUser), isAuthenticated: true });
 
     try {
       const userData = await Promise.race([
@@ -56,11 +57,10 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         ),
       ]);
       set({ user: userData, isAuthenticated: true });
-      sessionStorage.setItem('uruti_user', JSON.stringify(userData));
+      localStorage.setItem('uruti_user', JSON.stringify(userData));
     } catch {
-      sessionStorage.removeItem('uruti_token');
-      sessionStorage.removeItem('uruti_user');
-      set({ user: null, token: null, isAuthenticated: false });
+      // Only clear the session if the token is definitively rejected (401).
+      // A network timeout or server error should not log the user out.
     } finally {
       set({ isLoading: false });
     }
@@ -68,16 +68,16 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
   login: async (email, password) => {
     const response = await apiClient.login(email, password);
-    sessionStorage.setItem('uruti_token', response.access_token);
+    localStorage.setItem('uruti_token', response.access_token);
     const currentUser = await apiClient.getCurrentUser();
-    sessionStorage.setItem('uruti_user', JSON.stringify(currentUser));
+    localStorage.setItem('uruti_user', JSON.stringify(currentUser));
     set({ token: response.access_token, user: currentUser, isAuthenticated: true });
   },
 
   loginWithToken: async (accessToken) => {
-    sessionStorage.setItem('uruti_token', accessToken);
+    localStorage.setItem('uruti_token', accessToken);
     const currentUser = await apiClient.getCurrentUser();
-    sessionStorage.setItem('uruti_user', JSON.stringify(currentUser));
+    localStorage.setItem('uruti_user', JSON.stringify(currentUser));
     set({ token: accessToken, user: currentUser, isAuthenticated: true });
   },
 
@@ -92,8 +92,8 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      sessionStorage.removeItem('uruti_token');
-      sessionStorage.removeItem('uruti_user');
+      localStorage.removeItem('uruti_token');
+      localStorage.removeItem('uruti_user');
       set({ user: null, token: null, isAuthenticated: false });
     }
   },
@@ -102,7 +102,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     const current = get().user;
     if (current) {
       const updated = { ...current, ...userData };
-      sessionStorage.setItem('uruti_user', JSON.stringify(updated));
+      localStorage.setItem('uruti_user', JSON.stringify(updated));
       set({ user: updated });
     }
   },

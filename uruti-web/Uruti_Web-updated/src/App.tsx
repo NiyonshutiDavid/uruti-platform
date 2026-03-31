@@ -24,7 +24,7 @@ import apiClient from './lib/api-client';
 
 function AppContent() {
   const { user, isAuthenticated } = useAuth();
-  const { initAuth } = useAuthStore();
+  const { initAuth, isLoading } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -250,13 +250,23 @@ function AppContent() {
         <Route path="/admin" element={<AdminLoginPage onLogin={handleAdminLoginSuccess} onNavigateHome={() => navigate('/home')} />} />
 
         {/* Splash screen - shown after login/signup */}
-        <Route path="/splash" element={isAuthenticated ? <SplashScreen /> : <Navigate to="/login" replace />} />
+        <Route path="/splash" element={
+          isLoading ? (
+            <div className="min-h-screen flex items-center justify-center bg-background dark:bg-gray-950">
+              <div className="w-8 h-8 border-4 border-[#76B947] border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : isAuthenticated ? <SplashScreen /> : <Navigate to="/login" replace />
+        } />
 
         {/* Protected dashboard routes */}
         <Route 
           path="/dashboard/*" 
           element={
-            isAuthenticated ? (
+            isLoading ? (
+              <div className="min-h-screen flex items-center justify-center bg-background dark:bg-gray-950">
+                <div className="w-8 h-8 border-4 border-[#76B947] border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : isAuthenticated ? (
               <DashboardLayout />
             ) : (
               <Navigate to="/login" replace />

@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from './lib/auth-context';
+import { useAuthStore } from './lib/stores/auth-store';
 import { getDefaultRouteForRole } from './lib/router-config';
 import { LandingHome } from './components/landing/LandingHome';
 import { LandingAbout } from './components/landing/LandingAbout';
@@ -16,11 +17,21 @@ import { DashboardLayout } from './components/layout/DashboardLayout';
 // Protected route wrapper
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
-  
+  const { isLoading } = useAuthStore();
+
+  // While auth is being restored from storage, don't redirect yet.
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background dark:bg-gray-950">
+        <div className="w-8 h-8 border-4 border-[#76B947] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return children;
 }
 
