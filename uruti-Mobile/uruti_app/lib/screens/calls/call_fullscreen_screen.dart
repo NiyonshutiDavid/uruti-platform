@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../../core/app_colors.dart';
+import '../../core/app_constants.dart';
 import '../../models/call_session.dart';
 import '../../services/webrtc_service.dart';
 
@@ -222,7 +223,11 @@ class _CallFullscreenScreenState extends State<CallFullscreenScreen> {
                     backgroundColor: const Color(0xFF1E1E1E),
                     backgroundImage:
                         (widget.session.callerAvatarUrl?.isNotEmpty ?? false)
-                        ? NetworkImage(widget.session.callerAvatarUrl!)
+                        ? NetworkImage(
+                            AppConstants.normalizeMediaUrl(
+                              widget.session.callerAvatarUrl,
+                            )!,
+                          )
                         : null,
                     child: (widget.session.callerAvatarUrl?.isEmpty ?? true)
                         ? Text(

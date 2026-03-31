@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/app_colors.dart';
+import '../../core/app_constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/realtime_service.dart';
@@ -46,12 +47,7 @@ class _MessagesHomeState extends State<_MessagesHome> {
   String? _safeAvatarUrl(dynamic raw) {
     final value = _asText(raw);
     if (value.isEmpty) return null;
-    final uri = Uri.tryParse(value);
-    if (uri == null) return null;
-    if (uri.hasScheme && (uri.path.isEmpty || uri.path == '/')) {
-      return null;
-    }
-    return value;
+    return AppConstants.normalizeMediaUrl(value);
   }
 
   String _messagePreviewText(Map<String, dynamic> message) {
@@ -1044,7 +1040,8 @@ class _ConnectionPickerSheetState extends State<_ConnectionPickerSheet> {
                       final c = results[i];
                       final name = c['full_name'] ?? 'User';
                       final role = (c['role'] ?? '').toString();
-                      final avatarUrl = c['avatar_url']?.toString();
+                      final avatarUrl = AppConstants.normalizeMediaUrl(
+                          c['avatar_url']?.toString());
                       final uid = c['id'].toString();
                       final initials = name
                           .toString()

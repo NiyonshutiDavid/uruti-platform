@@ -37,9 +37,12 @@ class AppConstants {
     final parsed = Uri.tryParse(trimmed);
     if (parsed == null) return null;
 
-    if (!parsed.hasScheme) {
-      final path = trimmed.startsWith('/') ? trimmed : '/$trimmed';
-      return '$apiBaseUrl$path';
+    // Relative paths and bare file:// URIs (e.g. file:///api/v1/...) should
+    // be resolved against the configured backend base URL.
+    if (!parsed.hasScheme || parsed.scheme == 'file') {
+      final path = parsed.hasScheme ? parsed.path : trimmed;
+      final normalizedPath = path.startsWith('/') ? path : '/$path';
+      return '$apiBaseUrl$normalizedPath';
     }
 
     if (parsed.path.isEmpty || parsed.path == '/') {

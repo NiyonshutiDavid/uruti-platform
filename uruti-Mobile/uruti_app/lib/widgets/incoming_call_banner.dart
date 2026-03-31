@@ -3,6 +3,7 @@ import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../core/app_colors.dart';
+import '../core/app_constants.dart';
 import '../models/call_session.dart';
 
 class IncomingCallBanner extends StatefulWidget {
@@ -188,7 +189,11 @@ class _IncomingCallBannerState extends State<IncomingCallBanner> {
                 backgroundColor: context.colors.darkGreenMid,
                 backgroundImage:
                     (widget.session.callerAvatarUrl?.isNotEmpty ?? false)
-                    ? NetworkImage(widget.session.callerAvatarUrl!)
+                    ? NetworkImage(
+                        AppConstants.normalizeMediaUrl(
+                          widget.session.callerAvatarUrl,
+                        )!,
+                      )
                     : null,
                 child: (widget.session.callerAvatarUrl?.isEmpty ?? true)
                     ? Text(
