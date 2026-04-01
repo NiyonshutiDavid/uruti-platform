@@ -46,6 +46,9 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       return;
     }
 
+    // Sync to sessionStorage so api-client can attach the Authorization header.
+    sessionStorage.setItem('uruti_token', storedToken);
+
     // Immediately restore session from storage so ProtectedRoute doesn't redirect.
     set({ token: storedToken, user: JSON.parse(storedUser), isAuthenticated: true });
 
@@ -58,9 +61,20 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       ]);
       set({ user: userData, isAuthenticated: true });
       localStorage.setItem('uruti_user', JSON.stringify(userData));
-    } catch {
-      // Only clear the session if the token is definitively rejected (401).
-      // A network timeout or server error should not log the user out.
+    } catch (error) {
+      // Clear the stale session when the token is definitively rejected (401 / "Not authenticated").
+      // A network timeout or 5xx server error should not log the user out.
+      const message = error instanceof Error ? error.message : '';
+      const isAuthError =
+        message.includes('Not authenticated') ||
+        message.includes('401') ||
+        message.includes('Unauthorized');
+      if (isAuthError) {
+        localStorage.removeItem('uruti_token');
+        localStorage.removeItem('uruti_user');
+        sessionStorage.removeItem('uruti_token');
+        set({ token: null, user: null, isAuthenticated: false });
+      }
     } finally {
       set({ isLoading: false });
     }
@@ -69,6 +83,8 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   login: async (email, password) => {
     const response = await apiClient.login(email, password);
     localStorage.setItem('uruti_token', response.access_token);
+    // Sync to sessionStorage so api-client can read it for subsequent requests.
+    sessionStorage.setItem('uruti_token', response.access_token);
     const currentUser = await apiClient.getCurrentUser();
     localStorage.setItem('uruti_user', JSON.stringify(currentUser));
     set({ token: response.access_token, user: currentUser, isAuthenticated: true });
@@ -76,6 +92,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
   loginWithToken: async (accessToken) => {
     localStorage.setItem('uruti_token', accessToken);
+    sessionStorage.setItem('uruti_token', accessToken);
     const currentUser = await apiClient.getCurrentUser();
     localStorage.setItem('uruti_user', JSON.stringify(currentUser));
     set({ token: accessToken, user: currentUser, isAuthenticated: true });
@@ -94,6 +111,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     } finally {
       localStorage.removeItem('uruti_token');
       localStorage.removeItem('uruti_user');
+      sessionStorage.removeItem('uruti_token');
       set({ user: null, token: null, isAuthenticated: false });
     }
   },
