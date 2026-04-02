@@ -310,7 +310,7 @@ uncorrelated with all financial metrics.
 \begin{tikzpicture}
 \begin{axis}[
     ybar, bar width=18pt,
-    width=\columnwidth, height=3.6cm,
+    width=\columnwidth, height=4.8cm,
     ylabel={count}, ylabel style={font=\small},
     symbolic x coords={not\_ready,mentorship\_needed,investment\_ready},
     xtick=data, xticklabel style={font=\scriptsize, rotate=15, anchor=north east},
@@ -337,7 +337,7 @@ uncorrelated with all financial metrics.
 \begin{tikzpicture}
 \begin{axis}[
     ybar, bar width=14pt,
-    width=\columnwidth, height=3.6cm,
+    width=\columnwidth, height=4.8cm,
     ylabel={count}, ylabel style={font=\small},
     symbolic x coords={50\_startups,startup\_data,investments\_vc},
     xtick=data, xticklabel style={font=\scriptsize, rotate=15, anchor=north east},
@@ -371,7 +371,7 @@ uncorrelated with all financial metrics.
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-    width=\columnwidth, height=3.6cm,
+    width=\columnwidth, height=4.6cm,
     xlabel={Readiness Class}, ylabel={funding\_total\_usd ($\times10^{10}$)},
     xlabel style={font=\scriptsize}, ylabel style={font=\scriptsize},
     symbolic x coords={not\_ready,mentorship\_needed,investment\_ready},
@@ -719,7 +719,7 @@ concentrated near 0.2--0.3; eye-contact scores are sparse in this sample.
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-    width=\columnwidth, height=2.2cm,
+    width=\columnwidth, height=3.5cm,
     ybar interval, bar width=1pt,
     xlabel={Sentiment Score}, ylabel={Count},
     xlabel style={font=\scriptsize}, ylabel style={font=\scriptsize},
@@ -738,7 +738,7 @@ concentrated near 0.2--0.3; eye-contact scores are sparse in this sample.
 \end{tikzpicture}
 \begin{tikzpicture}
 \begin{axis}[
-    width=\columnwidth, height=2.2cm,
+    width=\columnwidth, height=3.5cm,
     ybar interval, bar width=1pt,
     xlabel={Eye-Contact Score}, ylabel={Count},
     xlabel style={font=\scriptsize}, ylabel style={font=\scriptsize},
@@ -757,7 +757,7 @@ concentrated near 0.2--0.3; eye-contact scores are sparse in this sample.
 \end{tikzpicture}
 \begin{tikzpicture}
 \begin{axis}[
-    width=\columnwidth, height=2.2cm,
+    width=\columnwidth, height=3.5cm,
     ybar interval, bar width=1pt,
     xlabel={Vocal Energy (RMS)}, ylabel={Count},
     xlabel style={font=\scriptsize}, ylabel style={font=\scriptsize},
@@ -831,7 +831,7 @@ Figure~\ref{fig:reward_mlp} traces the convergence trajectory.
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-    width=\columnwidth, height=3.2cm,
+    width=\columnwidth, height=4.0cm,
     xlabel={Epoch}, ylabel={Validation $R^2$},
     xmin=0, xmax=140, ymin=-10.5, ymax=1.05,
     grid=major, grid style={dotted, gray!50},
@@ -895,7 +895,7 @@ TRPO, and A2C.
 \begin{axis}[
     ybar,
     bar width=0.55cm,
-    width=0.88\columnwidth, height=3.5cm,
+    width=0.88\columnwidth, height=4.5cm,
     ylabel={Mean Final Score (/100)},
     symbolic x coords={DQN,PPO,TRPO,A2C},
     xtick=data,
@@ -925,7 +925,7 @@ TRPO, and A2C.
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-    width=0.9\columnwidth, height=3.5cm,
+    width=0.9\columnwidth, height=4.2cm,
     xlabel={Participant},
     ylabel={Pitch Score (/100)},
     xtick={1,2,3,4,5,6,7,8},
@@ -973,7 +973,7 @@ Figure~\ref{fig:llm_data} shows the corpus distribution.
 \begin{tikzpicture}
 \begin{axis}[
     xbar, bar width=14pt,
-    width=0.88\columnwidth, height=3.5cm,
+    width=0.88\columnwidth, height=4.6cm,
     xlabel={Sample Count}, xlabel style={font=\small},
     symbolic y coords={Rwanda Q\&A,Global Finance,SlimOrca,Dolly-15k},
     ytick=data,
@@ -1020,7 +1020,7 @@ converges fastest and to the lowest final loss.
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-    width=\columnwidth, height=3.5cm,
+    width=\columnwidth, height=4.4cm,
     xlabel={Training Step}, ylabel={Validation Loss},
     xtick={50,100,150},
     xmin=35, xmax=165,
@@ -1066,7 +1066,7 @@ validation loss (1.1835) and was selected as the production model.
 \begin{tikzpicture}
 \begin{axis}[
     xbar, bar width=14pt,
-    width=0.88\columnwidth, height=3.5cm,
+    width=0.88\columnwidth, height=4.2cm,
     xlabel={Validation Loss (lower is better)},
     xlabel style={font=\small},
     symbolic y coords={Mistral-7B,Llama-3-8B,Gemma-3-12b,Qwen2.5-7B $\star$},
