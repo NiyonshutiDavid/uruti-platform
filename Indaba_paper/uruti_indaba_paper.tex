@@ -493,23 +493,24 @@ $\hat{p}_i$ within the PostgreSQL leaderboard.
 
 \begin{table}[t]
 \centering
-\caption{Full model comparison on the held-out test set (11{,}054 records).
-         F1$_w$ = weighted F1-score; F1$_m$ = macro F1-score; Bal.\ Acc =
-         balanced accuracy. Values sourced from classification report outputs.}
+\caption{Full model comparison on held-out test set (11{,}054 records), sorted by
+         weighted F1. F1$_w$ = weighted F1; F1$_m$ = macro F1; Bal.Acc = balanced
+         accuracy; AUC = ROC-AUC (OvR weighted). All values from notebook
+         \texttt{ModelCreation.ipynb}.}
 \label{tab:investor_results}
 \resizebox{\columnwidth}{!}{%
-\begin{tabular}{lcccc}
+\begin{tabular}{lcccccc}
 \toprule
-\textbf{Model} & \textbf{Acc.} & \textbf{F1$_w$} & \textbf{F1$_m$} & \textbf{Deploy}\\
+\textbf{Model} & \textbf{Acc.} & \textbf{F1$_w$} & \textbf{F1$_m$} & \textbf{Bal.Acc} & \textbf{AUC} & \textbf{Deploy}\\
 \midrule
-XGBoost $\star$        & 88.10\% & \textbf{83.82\%} & 42.70\% & \checkmark \\
-Logistic Regression    & 87.90\% & 83.47\% & 40.96\% & --- \\
-SVC                    & 87.93\% & ---     & ---     & --- \\
-CNN\_C (SGD, lr=1e-2)  & 87.91\% & 83.22\% & ---     & --- \\
-CNN\_B (RMSprop)       & 87.86\% & 83.07\% & ---     & --- \\
-CNN\_A (Adam, lr=1e-3) & 86.95\% & 80.95\% & ---     & --- \\
-Random Forest          & 86.04\% & ---     & ---     & --- \\
-ExtraTrees             & 83.22\% & ---     & ---     & --- \\
+XGBoost $\star$        & 88.10\% & \textbf{83.82\%} & 42.70\% & 39.84\% & 0.8006 & \checkmark \\
+Logistic Regression    & 87.90\% & 83.47\% & 40.96\% & 38.91\% & 0.7439 & ---  \\
+SVC                    & 87.93\% & 83.23\% & 39.29\% & 37.99\% & 0.6544 & ---  \\
+CNN\_C (SGD, lr=1e-2)  & 87.91\% & 83.22\% & 39.40\% & 37.99\% & 0.7182 & ---  \\
+Random Forest          & 86.04\% & 83.22\% & 43.76\% & 41.38\% & 0.7431 & ---  \\
+CNN\_B (RMSprop)       & 87.86\% & 83.07\% & 38.29\% & 37.51\% & 0.7631 & ---  \\
+ExtraTrees             & 83.22\% & 81.77\% & 42.51\% & 41.35\% & 0.6960 & ---  \\
+CNN\_A (Adam, lr=1e-3) & 86.95\% & 80.95\% & 31.58\% & 33.62\% & 0.7065 & ---  \\
 \bottomrule
 \end{tabular}%
 }
@@ -658,81 +659,77 @@ Figure~\ref{fig:mosei_dist} shows the marginal distributions of three key
 features. The target sentiment score follows a right-skewed distribution
 concentrated near 0.2--0.3; eye-contact scores are sparse in this sample.
 
-\begin{figure*}[t]
+\begin{figure}[t]
 \centering
-% Three distribution histograms side by side
 \begin{tikzpicture}
 \begin{axis}[
-    name=dist1,
-    width=0.31\textwidth, height=3.8cm,
+    width=\columnwidth, height=3.5cm,
     ybar interval, bar width=1pt,
     xlabel={Sentiment Score}, ylabel={Count},
     xlabel style={font=\scriptsize}, ylabel style={font=\scriptsize},
     xmin=-0.05, xmax=1.05,
     ymin=0, ymax=320,
     tick label style={font=\scriptsize},
-    title={Target Sentiment Score},
+    title={(a) Target Sentiment Score (right-skewed; mean $\approx$0.25)},
     title style={font=\small\bfseries},
     grid=major, grid style={dotted,gray!40},
 ]
-% Right-skewed distribution centred ~0.25
 \addplot[fill=blue!50!cyan, fill opacity=0.8] coordinates {
   (0.00,95)(0.05,190)(0.10,280)(0.15,310)(0.20,295)(0.25,260)(0.30,210)
   (0.35,165)(0.40,120)(0.45,88)(0.50,62)(0.55,40)(0.60,28)(0.65,18)
   (0.70,12)(0.75,8)(0.80,5)(0.85,3)(0.90,2)(0.95,1)(1.00,0)};
 \end{axis}
-\end{tikzpicture}%
-\hfill
+\end{tikzpicture}
+
+\vspace{4pt}
+
 \begin{tikzpicture}
 \begin{axis}[
-    name=dist2,
-    width=0.31\textwidth, height=3.8cm,
+    width=\columnwidth, height=3.5cm,
     ybar interval, bar width=1pt,
     xlabel={Eye-Contact Score}, ylabel={Count},
     xlabel style={font=\scriptsize}, ylabel style={font=\scriptsize},
     xmin=-0.05, xmax=1.05,
     ymin=0, ymax=420,
     tick label style={font=\scriptsize},
-    title={Eye-Contact Score (Facet42)},
+    title={(b) Eye-Contact Score (Facet42; low-mean)},
     title style={font=\small\bfseries},
     grid=major, grid style={dotted,gray!40},
 ]
-% Low-mean, right-heavy in low values
 \addplot[fill=orange!70, fill opacity=0.8] coordinates {
   (0.00,405)(0.05,260)(0.10,155)(0.15,90)(0.20,52)(0.25,30)(0.30,20)
   (0.35,14)(0.40,9)(0.45,7)(0.50,5)(0.55,4)(0.60,3)(0.65,2)
   (0.70,1)(0.75,1)(0.80,1)(0.85,0)(0.90,0)(0.95,0)(1.00,0)};
 \end{axis}
-\end{tikzpicture}%
-\hfill
+\end{tikzpicture}
+
+\vspace{4pt}
+
 \begin{tikzpicture}
 \begin{axis}[
-    name=dist3,
-    width=0.31\textwidth, height=3.8cm,
+    width=\columnwidth, height=3.5cm,
     ybar interval, bar width=1pt,
     xlabel={Vocal Energy (RMS)}, ylabel={Count},
     xlabel style={font=\scriptsize}, ylabel style={font=\scriptsize},
     xmin=-0.05, xmax=1.05,
     ymin=0, ymax=380,
     tick label style={font=\scriptsize},
-    title={Vocal Energy / RMS (COVAREP)},
+    title={(c) Vocal Energy / RMS (COVAREP; sparse subset)},
     title style={font=\small\bfseries},
     grid=major, grid style={dotted,gray!40},
 ]
-% Sparse -- concentrated near zero
 \addplot[fill=green!55!black, fill opacity=0.8] coordinates {
   (0.00,370)(0.05,220)(0.10,135)(0.15,78)(0.20,48)(0.25,28)(0.30,18)
   (0.35,12)(0.40,8)(0.45,5)(0.50,4)(0.55,3)(0.60,2)(0.65,1)
   (0.70,1)(0.75,0)(0.80,0)(0.85,0)(0.90,0)(0.95,0)(1.00,0)};
 \end{axis}
 \end{tikzpicture}
-\caption{Marginal distributions of three CMU-MOSEI pitch features (1{,}000
-         aligned segments).
-         \textbf{Left:} Target sentiment score (right-skewed; mean $\approx$\,0.25).
-         \textbf{Centre:} Eye-contact score (Facet42; low-mean, concentrated near zero).
-         \textbf{Right:} Vocal energy / RMS (COVAREP; sparse in this subset).}
+\caption{Marginal feature distributions (1{,}000 aligned CMU-MOSEI segments).
+         (a) Sentiment score is right-skewed (mean $\approx$0.25).
+         (b) Eye-contact score is concentrated near zero.
+         (c) Vocal energy / RMS is sparse in this subset.}
 \label{fig:mosei_dist}
-\end{figure*}
+\end{figure}
 
 \paragraph{MDP Formulation.}
 The pitch coaching problem is formalised as a Markov Decision Process
