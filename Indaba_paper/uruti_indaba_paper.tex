@@ -281,28 +281,27 @@ and exposed through a React/Vite SPA and a Flutter mobile application.
 \subsection{Dataset and Exploratory Data Analysis}
 \label{sec:eda}
 
-Figure~\ref{fig:eda} presents four-panel exploratory analysis of the harmonised
-55{,}267-record corpus (Figure~\ref{fig:eda}).
-The class distribution (top-left) confirms severe imbalance:
+Figures~\ref{fig:eda_class}--\ref{fig:eda_corr} present exploratory analysis
+of the harmonised 55{,}267-record corpus.
+The class distribution (Fig.~\ref{fig:eda_class}) confirms severe imbalance:
 \texttt{mentorship\_needed} dominates at 86.88\%, with \texttt{investment\_ready}
 (7.79\%) and \texttt{not\_ready} (5.33\%) as minority classes.
-The data-source breakdown (top-right) reveals that \textit{investments\_VC.csv}
-dominates at 98.3\% of records.
-The funding distribution by class (bottom-left) shows right-skewed spread,
+The data-source breakdown (Fig.~\ref{fig:eda_source}) reveals that
+\textit{investments\_VC.csv} dominates at 98.3\% of records.
+The funding distribution (Fig.~\ref{fig:eda_funding}) shows right-skewed spread,
 with investment-ready firms exhibiting higher median funding.
-The Pearson correlation heatmap (bottom-right) reveals
+The Pearson correlation heatmap (Fig.~\ref{fig:eda_corr}) reveals
 a strong profit--readiness correlation ($r = 0.88$) and a moderate
 funding--profit correlation ($r = 0.87$), with \texttt{founded\_year}
 uncorrelated with all financial metrics.
 
-\begin{figure*}[t]
+% ---- EDA Figure 1/4: Class Distribution ----
+\begin{figure}[ht]
 \centering
-%% Row 1: class distribution (left) + source breakdown (right)
 \begin{tikzpicture}
 \begin{axis}[
-    name=ax1,
     ybar, bar width=18pt,
-    width=0.47\textwidth, height=4.8cm,
+    width=\columnwidth, height=4.8cm,
     ylabel={count}, ylabel style={font=\small},
     symbolic x coords={not\_ready,mentorship\_needed,investment\_ready},
     xtick=data, xticklabel style={font=\scriptsize, rotate=15, anchor=north east},
@@ -312,19 +311,24 @@ uncorrelated with all financial metrics.
     enlarge x limits=0.35,
     grid=major, grid style={dotted, gray!40},
     tick label style={font=\scriptsize},
-    title={Investor Readiness Class Distribution},
-    title style={font=\small\bfseries},
 ]
 \addplot[fill=blue!60, fill opacity=0.85]
   coordinates {(not\_ready,2940)(mentorship\_needed,47958)(investment\_ready,4301)};
 \end{axis}
-\end{tikzpicture}%
-\hfill
+\end{tikzpicture}
+\caption{EDA (1/4): Investor Readiness class distribution (55{,}267 records).
+         \texttt{mentorship\_needed} dominates at 86.88\%, exposing severe
+         class imbalance requiring SMOTE augmentation.}
+\label{fig:eda_class}
+\end{figure}
+
+% ---- EDA Figure 2/4: Data Source Breakdown ----
+\begin{figure}[ht]
+\centering
 \begin{tikzpicture}
 \begin{axis}[
-    name=ax2,
     ybar, bar width=14pt,
-    width=0.47\textwidth, height=4.8cm,
+    width=\columnwidth, height=4.8cm,
     ylabel={count}, ylabel style={font=\small},
     symbolic x coords={50\_startups,startup\_data,investments\_vc},
     xtick=data, xticklabel style={font=\scriptsize, rotate=15, anchor=north east},
@@ -334,8 +338,6 @@ uncorrelated with all financial metrics.
     enlarge x limits=0.35,
     grid=major, grid style={dotted, gray!40},
     tick label style={font=\scriptsize},
-    title={Readiness Class by Data Source},
-    title style={font=\small\bfseries},
     legend style={font=\tiny, at={(0.98,0.98)}, anchor=north east},
 ]
 \addplot[fill=blue!60, fill opacity=0.85]
@@ -349,14 +351,18 @@ uncorrelated with all financial metrics.
 \addlegendentry{investment\_ready}
 \end{axis}
 \end{tikzpicture}
+\caption{EDA (2/4): Readiness class by data source.
+         \textit{investments\_VC.csv} provides 98.3\% of all records
+         (47{,}958 mentorship-needed + 4{,}301 investment-ready).}
+\label{fig:eda_source}
+\end{figure}
 
-\vspace{4pt}
-
-%% Row 2: funding boxplot (left, approximated as scatter) + correlation heatmap (right)
+% ---- EDA Figure 3/4: Funding Distribution ----
+\begin{figure}[ht]
+\centering
 \begin{tikzpicture}
 \begin{axis}[
-    name=ax3,
-    width=0.47\textwidth, height=4.6cm,
+    width=\columnwidth, height=4.6cm,
     xlabel={Readiness Class}, ylabel={funding\_total\_usd ($\times10^{10}$)},
     xlabel style={font=\scriptsize}, ylabel style={font=\scriptsize},
     symbolic x coords={not\_ready,mentorship\_needed,investment\_ready},
@@ -364,77 +370,67 @@ uncorrelated with all financial metrics.
     ymin=-0.1, ymax=3.2,
     grid=major, grid style={dotted, gray!40},
     tick label style={font=\scriptsize},
-    title={Funding Distribution by Readiness Class},
-    title style={font=\small\bfseries},
 ]
-%% Median markers
 \addplot[only marks, mark=*, mark size=2.5pt, color=blue!70]
   coordinates {(not\_ready,0.05)(mentorship\_needed,0.12)(investment\_ready,0.38)};
-%% IQR bars (error bars approximating boxes)
 \addplot[only marks, mark=-, mark size=6pt, very thick, color=blue!70]
   coordinates {(not\_ready,0.0)(mentorship\_needed,0.0)(investment\_ready,0.0)};
 \addplot[only marks, mark=-, mark size=6pt, very thick, color=blue!70]
   coordinates {(not\_ready,0.18)(mentorship\_needed,0.32)(investment\_ready,1.10)};
-%% Outliers
 \addplot[only marks, mark=o, mark size=1.8pt, color=gray!60]
   coordinates {(mentorship\_needed,3.0)(not\_ready,0.55)(investment\_ready,2.80)};
 \end{axis}
-\end{tikzpicture}%
-\hfill
-%% Correlation heatmap via matrix plot
+\end{tikzpicture}
+\caption{EDA (3/4): Funding distribution by readiness class (dots = median,
+         bars = IQR, circles = outliers). Investment-ready firms show higher
+         median funding and heavier right-skewed spread.}
+\label{fig:eda_funding}
+\end{figure}
+
+% ---- EDA Figure 4/4: Pearson Correlation Heatmap ----
+\begin{figure}[ht]
+\centering
 \begin{tikzpicture}[
     every node/.style={font=\tiny},
     hcell/.style={minimum size=0.92cm, inner sep=0pt, font=\tiny, text=white}
 ]
-\def\labels{{"funding","rounds","founded","profit","readiness"}}
-% Row 0: funding_total_usd
 \node[hcell,fill=red!85]    at (0*0.93, 4*0.93) {1.00};
 \node[hcell,fill=red!22]    at (1*0.93, 4*0.93) {0.11};
 \node[hcell,fill=blue!15]   at (2*0.93, 4*0.93) {\textcolor{black}{-0.07}};
 \node[hcell,fill=red!75]    at (3*0.93, 4*0.93) {0.87};
 \node[hcell,fill=red!10]    at (4*0.93, 4*0.93) {\textcolor{black}{0.02}};
-% Row 1: funding_rounds
 \node[hcell,fill=red!22]    at (0*0.93, 3*0.93) {0.11};
 \node[hcell,fill=red!85]    at (1*0.93, 3*0.93) {1.00};
 \node[hcell,fill=blue!10]   at (2*0.93, 3*0.93) {\textcolor{black}{-0.06}};
 \node[hcell,fill=red!12]    at (3*0.93, 3*0.93) {\textcolor{black}{0.06}};
 \node[hcell,fill=red!18]    at (4*0.93, 3*0.93) {0.09};
-% Row 2: founded_year
 \node[hcell,fill=blue!15]   at (0*0.93, 2*0.93) {\textcolor{black}{-0.07}};
 \node[hcell,fill=blue!10]   at (1*0.93, 2*0.93) {\textcolor{black}{-0.06}};
 \node[hcell,fill=red!85]    at (2*0.93, 2*0.93) {1.00};
 \node[hcell,fill=blue!20]   at (3*0.93, 2*0.93) {\textcolor{black}{-0.10}};
 \node[hcell,fill=blue!20]   at (4*0.93, 2*0.93) {\textcolor{black}{-0.10}};
-% Row 3: profit
 \node[hcell,fill=red!75]    at (0*0.93, 1*0.93) {0.87};
 \node[hcell,fill=red!12]    at (1*0.93, 1*0.93) {\textcolor{black}{0.06}};
 \node[hcell,fill=blue!20]   at (2*0.93, 1*0.93) {\textcolor{black}{-0.10}};
 \node[hcell,fill=red!85]    at (3*0.93, 1*0.93) {1.00};
 \node[hcell,fill=red!78]    at (4*0.93, 1*0.93) {0.88};
-% Row 4: readiness_class_id
 \node[hcell,fill=red!10]    at (0*0.93, 0*0.93) {\textcolor{black}{0.02}};
 \node[hcell,fill=red!18]    at (1*0.93, 0*0.93) {0.09};
 \node[hcell,fill=blue!20]   at (2*0.93, 0*0.93) {\textcolor{black}{-0.10}};
 \node[hcell,fill=red!78]    at (3*0.93, 0*0.93) {0.88};
 \node[hcell,fill=red!85]    at (4*0.93, 0*0.93) {1.00};
-% X-axis labels
 \foreach \x/\lbl in {0/funding,1/rounds,2/founded,3/profit,4/readiness}
   \node[rotate=40, anchor=north east, font=\tiny] at (\x*0.93, -0.55) {\lbl};
-% Y-axis labels
 \foreach \y/\lbl in {0/readiness,1/profit,2/founded,3/rounds,4/funding}
   \node[anchor=east, font=\tiny] at (-0.5, \y*0.93) {\lbl};
 \node[font=\small\bfseries, anchor=south] at (1.86, 4.8) {Numeric Correlations};
 \end{tikzpicture}
-\caption{Investor Readiness Corpus EDA (55{,}267 records).
-         \textbf{Top-left:} Class distribution --- 86.88\% is
-         \texttt{mentorship\_needed}, exposing severe imbalance requiring SMOTE.
-         \textbf{Top-right:} Contribution by data source; \textit{investments\_VC.csv}
-         provides 98.3\% of records.
-         \textbf{Bottom-left:} Funding distribution by readiness class.
-         \textbf{Bottom-right:} Pearson correlation heatmap; profit--readiness
-         ($r$=0.88) and funding--profit ($r$=0.87) are the dominant predictive signals.}
-\label{fig:eda}
-\end{figure*}
+\caption{EDA (4/4): Pearson correlation heatmap of numeric features.
+         Profit--readiness ($r$=0.88) and funding--profit ($r$=0.87)
+         are the dominant predictive signals; \texttt{founded\_year} is
+         uncorrelated with all financial metrics.}
+\label{fig:eda_corr}
+\end{figure}
 
 \subsection{Investor Readiness Engine}
 \label{sec:investor}
@@ -517,40 +513,55 @@ CNN\_A (Adam, lr=1e-3) & 86.95\% & 80.95\% & 31.58\% & 33.62\% & 0.7065 & ---  \
 \end{table}
 
 \paragraph{Confusion Matrix Analysis (Classical Models).}
-Figure~\ref{fig:cm_classical} shows confusion matrices for the five classical
-classifiers on the held-out test set (11{,}054 records; class counts:
-\texttt{not\_ready} 589, \texttt{mentorship\_needed} 9{,}604,
+Figures~\ref{fig:cm_lr}--\ref{fig:cm_xgb} show confusion matrices for the
+five classical classifiers on the held-out test set (11{,}054 records; class
+counts: \texttt{not\_ready} 589, \texttt{mentorship\_needed} 9{,}604,
 \texttt{investment\_ready} 861).
-XGBoost (bottom-right) achieves the most balanced diagonal, correctly
+XGBoost (Fig.~\ref{fig:cm_xgb}) achieves the most balanced diagonal, correctly
 classifying 9{,}586/9{,}604 mentorship-needed and 117/861 investment-ready cases.
 All models over-predict \texttt{mentorship\_needed} due to the overwhelming
 prior established in Section~\ref{sec:eda}, even after SMOTE augmentation.
 
-\begin{figure*}[t]
+\begin{figure}[ht]
 \centering
-% 5 matrices in two rows: 3 top, 2 bottom centred (macro defined in preamble)
-\onesinglecm{Confusion Matrix: Logistic Regression}{22}{544}{23}{0}{9581}{23}{2}{745}{114}%
-\hspace{4pt}%
-\onesinglecm{Confusion Matrix: Random Forest}{50}{496}{43}{127}{9299}{178}{31}{668}{162}%
-\hspace{4pt}%
-\onesinglecm{Confusion Matrix: SVC}{25}{526}{38}{0}{9604}{0}{2}{752}{107}%
+\onesinglecm{Confusion Matrix: Logistic Regression}{22}{544}{23}{0}{9581}{23}{2}{745}{114}
+\caption{Logistic Regression confusion matrix (held-out, 11{,}054 records).
+         Correctly classifies 114/861 investment-ready cases.}
+\label{fig:cm_lr}
+\end{figure}
 
-\vspace{6pt}
+\begin{figure}[ht]
+\centering
+\onesinglecm{Confusion Matrix: Random Forest}{50}{496}{43}{127}{9299}{178}{31}{668}{162}
+\caption{Random Forest confusion matrix. Captures 162/861 investment-ready
+         and 50/589 not-ready; best minority recall among classical tree methods.}
+\label{fig:cm_rf}
+\end{figure}
 
-\hspace{0.18\textwidth}%
-\onesinglecm{Confusion Matrix: Decision Forest (ExtraTrees)}{54}{477}{58}{243}{8959}{392}{90}{616}{156}%
-\hspace{4pt}%
-\onesinglecm{Confusion Matrix: XGBoost}{36}{528}{25}{5}{9586}{13}{9}{735}{117}%
-\hspace{0.18\textwidth}%
-\caption{Confusion matrices for the five classical models on the 11{,}054-record
-         held-out set.
-         Classes shown on axes: \texttt{not\_ready} (NR, 589 instances),
-         \texttt{mentorship\_needed} (MN, 9{,}604), \texttt{investment\_ready}
-         (IR, 861).
-         XGBoost (bottom-right) achieves the highest minority recall.
-         All models are dominated by the 86.9\% majority class prior.}
-\label{fig:cm_classical}
-\end{figure*}
+\begin{figure}[ht]
+\centering
+\onesinglecm{Confusion Matrix: SVC}{25}{526}{38}{0}{9604}{0}{2}{752}{107}
+\caption{SVC confusion matrix. Predicts zero instances as not-ready via
+         MN; captures 107/861 investment-ready.}
+\label{fig:cm_svc}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\onesinglecm{Confusion Matrix: Decision Forest (ExtraTrees)}{54}{477}{58}{243}{8959}{392}{90}{616}{156}
+\caption{ExtraTrees confusion matrix. Higher minority recall (156/861 IR,
+         54/589 NR) at the cost of more MN mis-predictions.}
+\label{fig:cm_et}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\onesinglecm{Confusion Matrix: XGBoost}{36}{528}{25}{5}{9586}{13}{9}{735}{117}
+\caption{XGBoost confusion matrix --- best overall model. Achieves
+         9{,}586/9{,}604 MN recall and 117/861 IR recall, with the most
+         balanced diagonal across all three classes.}
+\label{fig:cm_xgb}
+\end{figure}
 
 \subsection{Reinforcement Learning Pitch Coach}
 \label{sec:pitchcoach}
@@ -1091,36 +1102,40 @@ XGBoost achieved the highest production-relevant weighted F1-score of
 variants (Table~\ref{tab:investor_results}).
 The corrected accuracy from notebook output is 88.10\%, reconciling earlier
 reported figures.
-Figure~\ref{fig:cm_cnn} compared CNN confusion matrices confirm that all three
-CNN variants collapse minority-class predictions into \texttt{mentorship\_needed}:
+Figures~\ref{fig:cm_cnn_a}--\ref{fig:cm_cnn_c} compare CNN confusion matrices
+and confirm that all three CNN variants collapse minority-class predictions into
+\texttt{mentorship\_needed}:
 CNN\_A classifies only 6/861 investment-ready startups correctly (recall 0.7\%),
 while XGBoost achieves 117/861 (recall 13.6\%).
 The What-If simulation interface, which allows founders to observe real-time
 re-ranking via Eq.~\eqref{eq:rank_score}, received the highest usability ratings
 during UAT.
 
-\begin{figure*}[t]
+\begin{figure}[ht]
 \centering
-% --- CNN confusion matrices: 3 side-by-side ---
-% Reuse \onesinglecm defined above
-\onesinglecm{CNN\_A (Adam, lr=1e-3, 20 ep)}{10}{566}{13}{0}{9604}{0}{0}{855}{6}%
-\hspace{10pt}%
-\onesinglecm{CNN\_B (RMSprop, lr=5e-4, 30 ep)}{8}{538}{43}{0}{9604}{0}{0}{753}{108}%
-\hspace{10pt}%
-\onesinglecm{CNN\_C (SGD, lr=1e-2, 40 ep)}{12}{539}{38}{0}{9603}{1}{0}{758}{103}%
-\caption{Confusion matrices for three 1D-CNN variants on the 11{,}054-record
-         held-out set.
-         \textbf{Left} CNN\_A (Adam, lr=1e-3, 20~ep): only 6/861 investment-ready
-         correctly classified --- total majority-class collapse.
-         \textbf{Centre} CNN\_B (RMSprop, lr=5e-4, 30~ep): marginally improved
-         minority recall ($\sim$108/861 investment-ready).
-         \textbf{Right} CNN\_C (SGD, lr=1e-2, 40~ep): best CNN, 103/861
-         investment-ready and 12/589 not-ready correct.
-         All three CNNs are dominated by the 86.9\% majority class despite SMOTE;
-         XGBoost (Fig.~\ref{fig:cm_classical}) provides vastly superior minority
-         recall.}
-\label{fig:cm_cnn}
-\end{figure*}
+\onesinglecm{CNN\_A (Adam, lr=1e-3, 20 ep)}{10}{566}{13}{0}{9604}{0}{0}{855}{6}
+\caption{CNN\_A confusion matrix (Adam, lr=1e-3, 20~ep). Only 6/861
+         investment-ready correctly classified --- near-total majority-class
+         collapse despite SMOTE.}
+\label{fig:cm_cnn_a}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\onesinglecm{CNN\_B (RMSprop, lr=5e-4, 30 ep)}{8}{538}{43}{0}{9604}{0}{0}{753}{108}
+\caption{CNN\_B confusion matrix (RMSprop, lr=5e-4, 30~ep). Marginally
+         improved minority recall: 108/861 investment-ready correctly classified.}
+\label{fig:cm_cnn_b}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\onesinglecm{CNN\_C (SGD, lr=1e-2, 40 ep)}{12}{539}{38}{0}{9603}{1}{0}{758}{103}
+\caption{CNN\_C confusion matrix (SGD, lr=1e-2, 40~ep) --- best CNN variant.
+         103/861 investment-ready and 12/589 not-ready correctly classified.
+         All three CNNs are outperformed by XGBoost (Fig.~\ref{fig:cm_xgb}).}
+\label{fig:cm_cnn_c}
+\end{figure}
 
 \subsection{RL Pitch Coach}
 
