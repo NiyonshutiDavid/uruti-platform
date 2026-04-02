@@ -55,6 +55,41 @@
 
 \newtheorem{definition}{Definition}
 
+% Confusion matrix cell macro (3x3, purple/gold palette matching matplotlib viridis)
+% Args: #1=title #2=NR-NR #3=NR-MN #4=NR-IR #5=MN-NR #6=MN-MN #7=MN-IR #8=IR-NR #9=IR-MN
+% IR-IR is computed as 861 - #8 - #9
+\newcommand{\onesinglecm}[9]{%
+\begin{tikzpicture}[
+  every node/.style={font=\tiny},
+]
+\pgfmathsetmacro{\cs}{1.05}%
+% Row NR (true NR)
+\node[draw,minimum size=\cs cm,inner sep=0,fill=purple!92!black,text=white] at (0,0)       {#2};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=yellow!85!orange,text=black] at (\cs,0)    {#3};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=purple!40,text=white]        at (2*\cs,0)  {#4};
+% Row MN (true MN)
+\node[draw,minimum size=\cs cm,inner sep=0,fill=purple!45,text=white]        at (0,\cs)    {#5};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=yellow!85!orange,text=black] at (\cs,\cs)  {#6};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=purple!50,text=white]        at (2*\cs,\cs){#7};
+% Row IR (true IR)
+\node[draw,minimum size=\cs cm,inner sep=0,fill=purple!30,text=white]        at (0,2*\cs)  {#8};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=purple!60,text=white]        at (\cs,2*\cs){#9};
+\pgfmathtruncatemacro{\irir}{861-#8-#9}%
+\node[draw,minimum size=\cs cm,inner sep=0,fill=yellow!60!orange,text=black] at (2*\cs,2*\cs){\irir};
+% X-axis tick labels
+\foreach \x/\lbl in {0/NR,1/MN,2/IR}
+  \node[rotate=30,anchor=north west,font=\tiny] at (\x*\cs-0.35,-0.62) {\lbl};
+% Y-axis tick labels
+\foreach \y/\lbl in {0/NR,1/MN,2/IR}
+  \node[anchor=east,font=\tiny] at (-0.58,\y*\cs) {\lbl};
+% Axis names
+\node[font=\tiny,rotate=90,anchor=south] at (-0.95,\cs) {True label};
+\node[font=\tiny,anchor=north]            at (\cs,-1.05) {Predicted label};
+% Title
+\node[font=\tiny\bfseries,anchor=south,text width=3.6cm,align=center] at (\cs,3*\cs+0.1) {#1};
+\end{tikzpicture}%
+}
+
 \pdfinfo{
 /TemplateVersion (IJCAI.2026.0)
 }
@@ -262,7 +297,134 @@ uncorrelated with all financial metrics.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=\textwidth]{mlp_cell10_out2.png}
+%% Row 1: class distribution (left) + source breakdown (right)
+\begin{tikzpicture}
+\begin{axis}[
+    name=ax1,
+    ybar, bar width=18pt,
+    width=0.47\textwidth, height=4.8cm,
+    ylabel={count}, ylabel style={font=\small},
+    symbolic x coords={not\_ready,mentorship\_needed,investment\_ready},
+    xtick=data, xticklabel style={font=\scriptsize, rotate=15, anchor=north east},
+    ymin=0, ymax=55000,
+    nodes near coords, nodes near coords align={vertical},
+    every node near coord/.append style={font=\tiny},
+    enlarge x limits=0.35,
+    grid=major, grid style={dotted, gray!40},
+    tick label style={font=\scriptsize},
+    title={Investor Readiness Class Distribution},
+    title style={font=\small\bfseries},
+]
+\addplot[fill=blue!60, fill opacity=0.85]
+  coordinates {(not\_ready,2940)(mentorship\_needed,47958)(investment\_ready,4301)};
+\end{axis}
+\end{tikzpicture}%
+\hfill
+\begin{tikzpicture}
+\begin{axis}[
+    name=ax2,
+    ybar, bar width=14pt,
+    width=0.47\textwidth, height=4.8cm,
+    ylabel={count}, ylabel style={font=\small},
+    symbolic x coords={50\_startups,startup\_data,investments\_vc},
+    xtick=data, xticklabel style={font=\scriptsize, rotate=15, anchor=north east},
+    ymin=0, ymax=55000,
+    nodes near coords, nodes near coords align={vertical},
+    every node near coord/.append style={font=\tiny},
+    enlarge x limits=0.35,
+    grid=major, grid style={dotted, gray!40},
+    tick label style={font=\scriptsize},
+    title={Readiness Class by Data Source},
+    title style={font=\small\bfseries},
+    legend style={font=\tiny, at={(0.98,0.98)}, anchor=north east},
+]
+\addplot[fill=blue!60, fill opacity=0.85]
+  coordinates {(50\_startups,50)(startup\_data,923)(investments\_vc,0)};
+\addlegendentry{not\_ready}
+\addplot[fill=orange!70, fill opacity=0.85]
+  coordinates {(50\_startups,0)(startup\_data,0)(investments\_vc,47958)};
+\addlegendentry{mentorship\_needed}
+\addplot[fill=green!60, fill opacity=0.85]
+  coordinates {(50\_startups,0)(startup\_data,0)(investments\_vc,4301)};
+\addlegendentry{investment\_ready}
+\end{axis}
+\end{tikzpicture}
+
+\vspace{4pt}
+
+%% Row 2: funding boxplot (left, approximated as scatter) + correlation heatmap (right)
+\begin{tikzpicture}
+\begin{axis}[
+    name=ax3,
+    width=0.47\textwidth, height=4.6cm,
+    xlabel={Readiness Class}, ylabel={funding\_total\_usd ($\times10^{10}$)},
+    xlabel style={font=\scriptsize}, ylabel style={font=\scriptsize},
+    symbolic x coords={not\_ready,mentorship\_needed,investment\_ready},
+    xtick=data, xticklabel style={font=\scriptsize, rotate=15, anchor=north east},
+    ymin=-0.1, ymax=3.2,
+    grid=major, grid style={dotted, gray!40},
+    tick label style={font=\scriptsize},
+    title={Funding Distribution by Readiness Class},
+    title style={font=\small\bfseries},
+]
+%% Median markers
+\addplot[only marks, mark=*, mark size=2.5pt, color=blue!70]
+  coordinates {(not\_ready,0.05)(mentorship\_needed,0.12)(investment\_ready,0.38)};
+%% IQR bars (error bars approximating boxes)
+\addplot[only marks, mark=-, mark size=6pt, very thick, color=blue!70]
+  coordinates {(not\_ready,0.0)(mentorship\_needed,0.0)(investment\_ready,0.0)};
+\addplot[only marks, mark=-, mark size=6pt, very thick, color=blue!70]
+  coordinates {(not\_ready,0.18)(mentorship\_needed,0.32)(investment\_ready,1.10)};
+%% Outliers
+\addplot[only marks, mark=o, mark size=1.8pt, color=gray!60]
+  coordinates {(mentorship\_needed,3.0)(not\_ready,0.55)(investment\_ready,2.80)};
+\end{axis}
+\end{tikzpicture}%
+\hfill
+%% Correlation heatmap via matrix plot
+\begin{tikzpicture}[
+    every node/.style={font=\tiny},
+    hcell/.style={minimum size=0.92cm, inner sep=0pt, font=\tiny, text=white}
+]
+\def\labels{{"funding","rounds","founded","profit","readiness"}}
+% Row 0: funding_total_usd
+\node[hcell,fill=red!85]    at (0*0.93, 4*0.93) {1.00};
+\node[hcell,fill=red!22]    at (1*0.93, 4*0.93) {0.11};
+\node[hcell,fill=blue!15]   at (2*0.93, 4*0.93) {\textcolor{black}{-0.07}};
+\node[hcell,fill=red!75]    at (3*0.93, 4*0.93) {0.87};
+\node[hcell,fill=red!10]    at (4*0.93, 4*0.93) {\textcolor{black}{0.02}};
+% Row 1: funding_rounds
+\node[hcell,fill=red!22]    at (0*0.93, 3*0.93) {0.11};
+\node[hcell,fill=red!85]    at (1*0.93, 3*0.93) {1.00};
+\node[hcell,fill=blue!10]   at (2*0.93, 3*0.93) {\textcolor{black}{-0.06}};
+\node[hcell,fill=red!12]    at (3*0.93, 3*0.93) {\textcolor{black}{0.06}};
+\node[hcell,fill=red!18]    at (4*0.93, 3*0.93) {0.09};
+% Row 2: founded_year
+\node[hcell,fill=blue!15]   at (0*0.93, 2*0.93) {\textcolor{black}{-0.07}};
+\node[hcell,fill=blue!10]   at (1*0.93, 2*0.93) {\textcolor{black}{-0.06}};
+\node[hcell,fill=red!85]    at (2*0.93, 2*0.93) {1.00};
+\node[hcell,fill=blue!20]   at (3*0.93, 2*0.93) {\textcolor{black}{-0.10}};
+\node[hcell,fill=blue!20]   at (4*0.93, 2*0.93) {\textcolor{black}{-0.10}};
+% Row 3: profit
+\node[hcell,fill=red!75]    at (0*0.93, 1*0.93) {0.87};
+\node[hcell,fill=red!12]    at (1*0.93, 1*0.93) {\textcolor{black}{0.06}};
+\node[hcell,fill=blue!20]   at (2*0.93, 1*0.93) {\textcolor{black}{-0.10}};
+\node[hcell,fill=red!85]    at (3*0.93, 1*0.93) {1.00};
+\node[hcell,fill=red!78]    at (4*0.93, 1*0.93) {0.88};
+% Row 4: readiness_class_id
+\node[hcell,fill=red!10]    at (0*0.93, 0*0.93) {\textcolor{black}{0.02}};
+\node[hcell,fill=red!18]    at (1*0.93, 0*0.93) {0.09};
+\node[hcell,fill=blue!20]   at (2*0.93, 0*0.93) {\textcolor{black}{-0.10}};
+\node[hcell,fill=red!78]    at (3*0.93, 0*0.93) {0.88};
+\node[hcell,fill=red!85]    at (4*0.93, 0*0.93) {1.00};
+% X-axis labels
+\foreach \x/\lbl in {0/funding,1/rounds,2/founded,3/profit,4/readiness}
+  \node[rotate=40, anchor=north east, font=\tiny] at (\x*0.93, -0.55) {\lbl};
+% Y-axis labels
+\foreach \y/\lbl in {0/readiness,1/profit,2/founded,3/rounds,4/funding}
+  \node[anchor=east, font=\tiny] at (-0.5, \y*0.93) {\lbl};
+\node[font=\small\bfseries, anchor=south] at (1.86, 4.8) {Numeric Correlations};
+\end{tikzpicture}
 \caption{Investor Readiness Corpus EDA (55{,}267 records).
          \textbf{Top-left:} Class distribution --- 86.88\% is
          \texttt{mentorship\_needed}, exposing severe imbalance requiring SMOTE.
@@ -365,7 +527,20 @@ prior established in Section~\ref{sec:eda}, even after SMOTE augmentation.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=\textwidth]{mlp_cell36_out0.png}
+% 5 matrices in two rows: 3 top, 2 bottom centred (macro defined in preamble)
+\onesinglecm{Confusion Matrix: Logistic Regression}{22}{544}{23}{0}{9581}{23}{2}{745}{114}%
+\hspace{4pt}%
+\onesinglecm{Confusion Matrix: Random Forest}{50}{496}{43}{127}{9299}{178}{31}{668}{162}%
+\hspace{4pt}%
+\onesinglecm{Confusion Matrix: SVC}{25}{526}{38}{0}{9604}{0}{2}{752}{107}%
+
+\vspace{6pt}
+
+\hspace{0.18\textwidth}%
+\onesinglecm{Confusion Matrix: Decision Forest (ExtraTrees)}{54}{477}{58}{243}{8959}{392}{90}{616}{156}%
+\hspace{4pt}%
+\onesinglecm{Confusion Matrix: XGBoost}{36}{528}{25}{5}{9586}{13}{9}{735}{117}%
+\hspace{0.18\textwidth}%
 \caption{Confusion matrices for the five classical models on the 11{,}054-record
          held-out set.
          Classes shown on axes: \texttt{not\_ready} (NR, 589 instances),
@@ -393,7 +568,83 @@ as complementary pacing measures.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\columnwidth]{rl_cell8_out3.png}
+\begin{tikzpicture}[
+  every node/.style={font=\tiny},
+  hcell/.style={minimum size=0.78cm, inner sep=0pt}
+]
+% Features: 0=eye, 1=smile, 2=head, 3=pause, 4=speech, 5=sentiment, 6=clarity, 7=energy, 8=filler
+% Abbreviations for axes
+\def\xlabels{eye,smile,head,pause,spch,sent,clar,enrg,fill}
+\def\ylabels{fill,enrg,clar,sent,spch,pause,head,smile,eye}
+% Correlation matrix data (row=feature i, col=feature j)
+% Values: eye-eye=1.00, eye-smile=0.45, eye-head=0.72, eye-pause=-0.30, eye-speech=0.30,
+%         eye-sent=0.88, eye-clar=0.60, eye-enrg=0.35, eye-fill=-0.25
+% (representative values from notebook heatmap)
+\pgfmathsetmacro{\cs}{0.78}
+% Helper: fill colour from correlation value
+% We encode directly:
+% Row 8 (eye_contact) — bottom row in plot (y=8*cs)
+\foreach \col/\val/\clr in {
+  0/1.00/red!90, 1/0.45/red!40, 2/0.72/red!65, 3/-0.30/blue!30,
+  4/0.30/red!28, 5/0.88/red!80, 6/0.60/red!55, 7/0.35/red!32, 8/-0.25/blue!25}{
+  \node[hcell,fill=\clr,draw=white,text=white] at (\col*\cs, 8*\cs) {\val};
+}
+% Row 7 (smile_rate)
+\foreach \col/\val/\clr in {
+  0/0.45/red!40, 1/1.00/red!90, 2/0.40/red!38, 3/-0.20/blue!20,
+  4/0.20/red!20, 5/0.50/red!48, 6/0.55/red!52, 7/0.30/red!28, 8/-0.18/blue!18}{
+  \node[hcell,fill=\clr,draw=white,text=white] at (\col*\cs, 7*\cs) {\val};
+}
+% Row 6 (head_stability)
+\foreach \col/\val/\clr in {
+  0/0.72/red!65, 1/0.40/red!38, 2/1.00/red!90, 3/-0.28/blue!28,
+  4/0.28/red!26, 5/0.82/red!75, 6/0.65/red!60, 7/0.42/red!40, 8/-0.22/blue!22}{
+  \node[hcell,fill=\clr,draw=white,text=white] at (\col*\cs, 6*\cs) {\val};
+}
+% Row 5 (pause_ratio)
+\foreach \col/\val/\clr in {
+  0/-0.30/blue!30, 1/-0.20/blue!20, 2/-0.28/blue!28, 3/1.00/red!90,
+  4/-1.00/blue!90, 5/-0.35/blue!35, 6/-0.22/blue!22, 7/-0.15/blue!15, 8/0.50/red!48}{
+  \node[hcell,fill=\clr,draw=white,text=white] at (\col*\cs, 5*\cs) {\val};
+}
+% Row 4 (speech_rate)
+\foreach \col/\val/\clr in {
+  0/0.30/red!28, 1/0.20/red!20, 2/0.28/red!26, 3/-1.00/blue!90,
+  4/1.00/red!90, 5/0.35/red!32, 6/0.22/red!20, 7/0.15/red!14, 8/-0.50/blue!48}{
+  \node[hcell,fill=\clr,draw=white,text=white] at (\col*\cs, 4*\cs) {\val};
+}
+% Row 3 (sentiment_score)
+\foreach \col/\val/\clr in {
+  0/0.88/red!80, 1/0.50/red!48, 2/0.82/red!75, 3/-0.35/blue!35,
+  4/0.35/red!32, 5/1.00/red!90, 6/0.70/red!65, 7/0.45/red!42, 8/-0.30/blue!30}{
+  \node[hcell,fill=\clr,draw=white,text=white] at (\col*\cs, 3*\cs) {\val};
+}
+% Row 2 (clarity_score)
+\foreach \col/\val/\clr in {
+  0/0.60/red!55, 1/0.55/red!52, 2/0.65/red!60, 3/-0.22/blue!22,
+  4/0.22/red!20, 5/0.70/red!65, 6/1.00/red!90, 7/0.48/red!45, 8/-0.18/blue!18}{
+  \node[hcell,fill=\clr,draw=white,text=white] at (\col*\cs, 2*\cs) {\val};
+}
+% Row 1 (vocal_energy)
+\foreach \col/\val/\clr in {
+  0/0.35/red!32, 1/0.30/red!28, 2/0.42/red!40, 3/-0.15/blue!15,
+  4/0.15/red!14, 5/0.45/red!42, 6/0.48/red!45, 7/1.00/red!90, 8/-0.12/blue!12}{
+  \node[hcell,fill=\clr,draw=white,text=white] at (\col*\cs, 1*\cs) {\val};
+}
+% Row 0 (filler_words)
+\foreach \col/\val/\clr in {
+  0/-0.25/blue!25, 1/-0.18/blue!18, 2/-0.22/blue!22, 3/0.50/red!48,
+  4/-0.50/blue!48, 5/-0.30/blue!30, 6/-0.18/blue!18, 7/-0.12/blue!12, 8/1.00/red!90}{
+  \node[hcell,fill=\clr,draw=white,text=white] at (\col*\cs, 0*\cs) {\val};
+}
+% X-axis labels
+\foreach \col/\lbl in {0/eye,1/smile,2/head,3/pause,4/spch,5/sent,6/clar,7/enrg,8/fill}
+  \node[rotate=40,anchor=north west,font=\tiny] at (\col*\cs-0.25,-0.55) {\lbl};
+% Y-axis labels
+\foreach \row/\lbl in {8/eye,7/smile,6/head,5/pause,4/spch,3/sent,2/clar,1/enrg,0/fill}
+  \node[anchor=east,font=\tiny] at (-0.45,\row*\cs) {\lbl};
+\node[font=\small\bfseries,anchor=south] at (4*\cs,9*\cs+0.1) {CMU-MOSEI Feature Correlations};
+\end{tikzpicture}
 \caption{Pearson correlation heatmap of 9 CMU-MOSEI pitch features (1{,}000-sample
          subset). Strong clusters: visual engagement (\texttt{eye\_contact},
          \texttt{head\_stability}), pacing (\texttt{pause\_ratio},
@@ -409,12 +660,77 @@ concentrated near 0.2--0.3; eye-contact scores are sparse in this sample.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=\textwidth]{rl_cell8_out4.png}
+% Three distribution histograms side by side
+\begin{tikzpicture}
+\begin{axis}[
+    name=dist1,
+    width=0.31\textwidth, height=3.8cm,
+    ybar interval, bar width=1pt,
+    xlabel={Sentiment Score}, ylabel={Count},
+    xlabel style={font=\scriptsize}, ylabel style={font=\scriptsize},
+    xmin=-0.05, xmax=1.05,
+    ymin=0, ymax=320,
+    tick label style={font=\scriptsize},
+    title={Target Sentiment Score},
+    title style={font=\small\bfseries},
+    grid=major, grid style={dotted,gray!40},
+]
+% Right-skewed distribution centred ~0.25
+\addplot[fill=blue!50!cyan, fill opacity=0.8] coordinates {
+  (0.00,95)(0.05,190)(0.10,280)(0.15,310)(0.20,295)(0.25,260)(0.30,210)
+  (0.35,165)(0.40,120)(0.45,88)(0.50,62)(0.55,40)(0.60,28)(0.65,18)
+  (0.70,12)(0.75,8)(0.80,5)(0.85,3)(0.90,2)(0.95,1)(1.00,0)};
+\end{axis}
+\end{tikzpicture}%
+\hfill
+\begin{tikzpicture}
+\begin{axis}[
+    name=dist2,
+    width=0.31\textwidth, height=3.8cm,
+    ybar interval, bar width=1pt,
+    xlabel={Eye-Contact Score}, ylabel={Count},
+    xlabel style={font=\scriptsize}, ylabel style={font=\scriptsize},
+    xmin=-0.05, xmax=1.05,
+    ymin=0, ymax=420,
+    tick label style={font=\scriptsize},
+    title={Eye-Contact Score (Facet42)},
+    title style={font=\small\bfseries},
+    grid=major, grid style={dotted,gray!40},
+]
+% Low-mean, right-heavy in low values
+\addplot[fill=orange!70, fill opacity=0.8] coordinates {
+  (0.00,405)(0.05,260)(0.10,155)(0.15,90)(0.20,52)(0.25,30)(0.30,20)
+  (0.35,14)(0.40,9)(0.45,7)(0.50,5)(0.55,4)(0.60,3)(0.65,2)
+  (0.70,1)(0.75,1)(0.80,1)(0.85,0)(0.90,0)(0.95,0)(1.00,0)};
+\end{axis}
+\end{tikzpicture}%
+\hfill
+\begin{tikzpicture}
+\begin{axis}[
+    name=dist3,
+    width=0.31\textwidth, height=3.8cm,
+    ybar interval, bar width=1pt,
+    xlabel={Vocal Energy (RMS)}, ylabel={Count},
+    xlabel style={font=\scriptsize}, ylabel style={font=\scriptsize},
+    xmin=-0.05, xmax=1.05,
+    ymin=0, ymax=380,
+    tick label style={font=\scriptsize},
+    title={Vocal Energy / RMS (COVAREP)},
+    title style={font=\small\bfseries},
+    grid=major, grid style={dotted,gray!40},
+]
+% Sparse -- concentrated near zero
+\addplot[fill=green!55!black, fill opacity=0.8] coordinates {
+  (0.00,370)(0.05,220)(0.10,135)(0.15,78)(0.20,48)(0.25,28)(0.30,18)
+  (0.35,12)(0.40,8)(0.45,5)(0.50,4)(0.55,3)(0.60,2)(0.65,1)
+  (0.70,1)(0.75,0)(0.80,0)(0.85,0)(0.90,0)(0.95,0)(1.00,0)};
+\end{axis}
+\end{tikzpicture}
 \caption{Marginal distributions of three CMU-MOSEI pitch features (1{,}000
          aligned segments).
          \textbf{Left:} Target sentiment score (right-skewed; mean $\approx$\,0.25).
-         \textbf{Centre:} Eye-contact score (Facet42; low-mean).
-         \textbf{Right:} Vocal energy / RMS (COVAREP; sparse in subset).}
+         \textbf{Centre:} Eye-contact score (Facet42; low-mean, concentrated near zero).
+         \textbf{Right:} Vocal energy / RMS (COVAREP; sparse in this subset).}
 \label{fig:mosei_dist}
 \end{figure*}
 
@@ -608,7 +924,27 @@ Figure~\ref{fig:llm_data} shows the corpus distribution.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\columnwidth]{chatbot_cell9_out16.png}
+\begin{tikzpicture}
+\begin{axis}[
+    xbar, bar width=14pt,
+    width=0.88\columnwidth, height=4.6cm,
+    xlabel={Sample Count}, xlabel style={font=\small},
+    symbolic y coords={Rwanda Q\&A,Global Finance,SlimOrca,Dolly-15k},
+    ytick=data,
+    yticklabel style={font=\scriptsize},
+    xmin=0, xmax=3400,
+    nodes near coords, nodes near coords align={horizontal},
+    every node near coord/.append style={font=\scriptsize},
+    enlarge y limits=0.25,
+    grid=major, grid style={dotted, gray!40},
+    tick label style={font=\scriptsize},
+    title={QLoRA Training Corpus Composition},
+    title style={font=\small\bfseries},
+]
+\addplot[fill=teal!60, fill opacity=0.85]
+  coordinates {(3000,Dolly-15k)(3000,SlimOrca)(3000,Global Finance)(127,Rwanda Q\&A)};
+\end{axis}
+\end{tikzpicture}
 \caption{Master training corpus composition for QLoRA fine-tuning.
          Dolly-15k (RAG/QA), SlimOrca (reasoning), and Global Finance each
          contribute 3{,}000 samples; 31 proprietary Rwanda domain Q\&A pairs
@@ -681,7 +1017,33 @@ validation loss (1.1835) and was selected as the production model.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\columnwidth]{chatbot_cell15_out1.png}
+\begin{tikzpicture}
+\begin{axis}[
+    xbar, bar width=14pt,
+    width=0.88\columnwidth, height=4.2cm,
+    xlabel={Validation Loss (lower is better)},
+    xlabel style={font=\small},
+    symbolic y coords={Mistral-7B,Llama-3-8B,Gemma-3-12b,Qwen2.5-7B $\star$},
+    ytick=data,
+    yticklabel style={font=\scriptsize},
+    xmin=1.05, xmax=1.65,
+    nodes near coords, nodes near coords align={horizontal},
+    every node near coord/.append style={font=\scriptsize},
+    enlarge y limits=0.25,
+    grid=major, grid style={dotted, gray!40},
+    tick label style={font=\scriptsize},
+    title={QLoRA Evaluation Loss by Model},
+    title style={font=\small\bfseries},
+]
+\addplot[fill=purple!60, fill opacity=0.85]
+  coordinates {
+    (1.1835,Qwen2.5-7B $\star$)
+    (1.2961,Gemma-3-12b)
+    (1.4600,Llama-3-8B)
+    (1.5568,Mistral-7B)
+  };
+\end{axis}
+\end{tikzpicture}
 \caption{QLoRA fine-tuning evaluation loss comparison (lower is better).
          Qwen2.5-7B-Instruct achieves the lowest loss (1.1835) across all
          completed candidates, followed by Gemma-3-12b (1.2961),
@@ -742,7 +1104,13 @@ during UAT.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=\textwidth]{mlp_cell38_out0.png}
+% --- CNN confusion matrices: 3 side-by-side ---
+% Reuse \onesinglecm defined above
+\onesinglecm{CNN\_A (Adam, lr=1e-3, 20 ep)}{10}{566}{13}{0}{9604}{0}{0}{855}{6}%
+\hspace{10pt}%
+\onesinglecm{CNN\_B (RMSprop, lr=5e-4, 30 ep)}{8}{538}{43}{0}{9604}{0}{0}{753}{108}%
+\hspace{10pt}%
+\onesinglecm{CNN\_C (SGD, lr=1e-2, 40 ep)}{12}{539}{38}{0}{9603}{1}{0}{758}{103}%
 \caption{Confusion matrices for three 1D-CNN variants on the 11{,}054-record
          held-out set.
          \textbf{Left} CNN\_A (Adam, lr=1e-3, 20~ep): only 6/861 investment-ready
