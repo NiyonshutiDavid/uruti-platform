@@ -29,6 +29,7 @@
 \usepackage{algorithm}
 \usepackage{algorithmic}
 \usepackage{multirow}
+\usepackage{float}   % [H] — exact figure placement (no cross-section drift)
 \usepackage{xcolor}
 \usepackage{tikz}
 \usepackage{pgfplots}
@@ -244,7 +245,7 @@ Figure~\ref{fig:architecture} presents the high-level architecture of Uruti,
 comprising three AI subsystems orchestrated behind a unified FastAPI gateway
 and exposed through a React/Vite SPA and a Flutter mobile application.
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}[
     box/.style={draw, rounded corners=4pt, minimum width=2.2cm,
@@ -296,7 +297,7 @@ funding--profit correlation ($r = 0.87$), with \texttt{founded\_year}
 uncorrelated with all financial metrics.
 
 % ---- EDA Figure 1/4: Class Distribution ----
-\begin{figure}[ht]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}
 \begin{axis}[
@@ -323,7 +324,7 @@ uncorrelated with all financial metrics.
 \end{figure}
 
 % ---- EDA Figure 2/4: Data Source Breakdown ----
-\begin{figure}[ht]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}
 \begin{axis}[
@@ -358,7 +359,7 @@ uncorrelated with all financial metrics.
 \end{figure}
 
 % ---- EDA Figure 3/4: Funding Distribution ----
-\begin{figure}[ht]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}
 \begin{axis}[
@@ -388,7 +389,7 @@ uncorrelated with all financial metrics.
 \end{figure}
 
 % ---- EDA Figure 4/4: Pearson Correlation Heatmap ----
-\begin{figure}[ht]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}[
     every node/.style={font=\tiny},
@@ -522,7 +523,7 @@ classifying 9{,}586/9{,}604 mentorship-needed and 117/861 investment-ready cases
 All models over-predict \texttt{mentorship\_needed} due to the overwhelming
 prior established in Section~\ref{sec:eda}, even after SMOTE augmentation.
 
-\begin{figure}[ht]
+\begin{figure}[H]
 \centering
 \onesinglecm{Confusion Matrix: Logistic Regression}{22}{544}{23}{0}{9581}{23}{2}{745}{114}
 \caption{Logistic Regression confusion matrix (held-out, 11{,}054 records).
@@ -530,7 +531,7 @@ prior established in Section~\ref{sec:eda}, even after SMOTE augmentation.
 \label{fig:cm_lr}
 \end{figure}
 
-\begin{figure}[ht]
+\begin{figure}[H]
 \centering
 \onesinglecm{Confusion Matrix: Random Forest}{50}{496}{43}{127}{9299}{178}{31}{668}{162}
 \caption{Random Forest confusion matrix. Captures 162/861 investment-ready
@@ -538,7 +539,7 @@ prior established in Section~\ref{sec:eda}, even after SMOTE augmentation.
 \label{fig:cm_rf}
 \end{figure}
 
-\begin{figure}[ht]
+\begin{figure}[H]
 \centering
 \onesinglecm{Confusion Matrix: SVC}{25}{526}{38}{0}{9604}{0}{2}{752}{107}
 \caption{SVC confusion matrix. Predicts zero instances as not-ready via
@@ -546,7 +547,7 @@ prior established in Section~\ref{sec:eda}, even after SMOTE augmentation.
 \label{fig:cm_svc}
 \end{figure}
 
-\begin{figure}[ht]
+\begin{figure}[H]
 \centering
 \onesinglecm{Confusion Matrix: Decision Forest (ExtraTrees)}{54}{477}{58}{243}{8959}{392}{90}{616}{156}
 \caption{ExtraTrees confusion matrix. Higher minority recall (156/861 IR,
@@ -554,7 +555,7 @@ prior established in Section~\ref{sec:eda}, even after SMOTE augmentation.
 \label{fig:cm_et}
 \end{figure}
 
-\begin{figure}[ht]
+\begin{figure}[H]
 \centering
 \onesinglecm{Confusion Matrix: XGBoost}{36}{528}{25}{5}{9586}{13}{9}{735}{117}
 \caption{XGBoost confusion matrix --- best overall model. Achieves
@@ -578,7 +579,7 @@ correlates with \texttt{eye\_contact} ($r = 0.88$) and \texttt{head\_stability}
 \texttt{pause\_ratio} and \texttt{speech\_rate} anti-correlate ($r = -1.00$)
 as complementary pacing measures.
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}[
   every node/.style={font=\tiny},
@@ -670,7 +671,7 @@ Figure~\ref{fig:mosei_dist} shows the marginal distributions of three key
 features. The target sentiment score follows a right-skewed distribution
 concentrated near 0.2--0.3; eye-contact scores are sparse in this sample.
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}
 \begin{axis}[
@@ -788,7 +789,7 @@ Training halted at epoch 135 having surpassed the target threshold
 of $R^2 \geq 0.95$, achieving \textbf{Val $R^2 = 0.9512$}.
 Figure~\ref{fig:reward_mlp} traces the convergence trajectory.
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}
 \begin{axis}[
@@ -852,7 +853,7 @@ DQN (exploration\_fraction\,=\,0.6, batch\_size\,=\,128),
 PPO (lr\,=\,3e-4, ent\_coef\,=\,0.02, clip\_range\,=\,0.3),
 TRPO, and A2C.
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}
 \begin{axis}[
@@ -884,7 +885,7 @@ TRPO, and A2C.
 \label{fig:rl_comparison}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}
 \begin{axis}[
@@ -930,7 +931,7 @@ knowledge); (ii) Databricks Dolly-15k information-extraction subset (3{,}000);
 evaluation examples.
 Figure~\ref{fig:llm_data} shows the corpus distribution.
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}
 \begin{axis}[
@@ -978,7 +979,7 @@ Figure~\ref{fig:llm_curves} shows validation loss curves for all four
 completed candidates at training steps 50, 100, and 150. Qwen2.5-7B-Instruct
 converges fastest and to the lowest final loss.
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}
 \begin{axis}[
@@ -1023,7 +1024,7 @@ Figure~\ref{fig:llm_eval}).
 \texttt{Qwen/Qwen2.5-7B-Instruct} achieved the lowest terminal training
 validation loss (1.1835) and was selected as the production model.
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}
 \begin{axis}[
@@ -1111,7 +1112,7 @@ The What-If simulation interface, which allows founders to observe real-time
 re-ranking via Eq.~\eqref{eq:rank_score}, received the highest usability ratings
 during UAT.
 
-\begin{figure}[ht]
+\begin{figure}[H]
 \centering
 \onesinglecm{CNN\_A (Adam, lr=1e-3, 20 ep)}{10}{566}{13}{0}{9604}{0}{0}{855}{6}
 \caption{CNN\_A confusion matrix (Adam, lr=1e-3, 20~ep). Only 6/861
@@ -1120,7 +1121,7 @@ during UAT.
 \label{fig:cm_cnn_a}
 \end{figure}
 
-\begin{figure}[ht]
+\begin{figure}[H]
 \centering
 \onesinglecm{CNN\_B (RMSprop, lr=5e-4, 30 ep)}{8}{538}{43}{0}{9604}{0}{0}{753}{108}
 \caption{CNN\_B confusion matrix (RMSprop, lr=5e-4, 30~ep). Marginally
@@ -1128,7 +1129,7 @@ during UAT.
 \label{fig:cm_cnn_b}
 \end{figure}
 
-\begin{figure}[ht]
+\begin{figure}[H]
 \centering
 \onesinglecm{CNN\_C (SGD, lr=1e-2, 40 ep)}{12}{539}{38}{0}{9603}{1}{0}{758}{103}
 \caption{CNN\_C confusion matrix (SGD, lr=1e-2, 40~ep) --- best CNN variant.
