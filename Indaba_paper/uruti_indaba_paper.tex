@@ -62,7 +62,7 @@
 % IR-IR = 861-#8-#9
 \newcommand{\onesinglecm}[9]{%
 \begin{tikzpicture}[every node/.style={font=\tiny}]
-\def\cs{1.15}%
+\def\cs{1.0}%  % cell size — smaller so labels have room outside
 % IR-IR count
 \pgfmathtruncatemacro{\irir}{861-#8-#9}%
 % Row totals for per-row normalisation
@@ -77,29 +77,30 @@
 \pgfmathtruncatemacro{\Taa}{\Iaa>45?1:0}\pgfmathtruncatemacro{\Tab}{\Iab>45?1:0}\pgfmathtruncatemacro{\Tac}{\Iac>45?1:0}%
 \pgfmathtruncatemacro{\Tba}{\Iba>45?1:0}\pgfmathtruncatemacro{\Tbb}{\Ibb>45?1:0}\pgfmathtruncatemacro{\Tbc}{\Ibc>45?1:0}%
 \pgfmathtruncatemacro{\Tca}{\Ica>45?1:0}\pgfmathtruncatemacro{\Tcb}{\Icb>45?1:0}\pgfmathtruncatemacro{\Tcc}{\Icc>45?1:0}%
-% ─── Cells: row 0 = true not_ready (bottom), 1 = mentorship_needed, 2 = investment_ready (top)
-\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Iaa!white] at (0,0)       {\ifnum\Taa=1\textcolor{white}{#2}\else#2\fi};
-\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Iab!white] at (\cs,0)     {\ifnum\Tab=1\textcolor{white}{#3}\else#3\fi};
-\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Iac!white] at (2*\cs,0)   {\ifnum\Tac=1\textcolor{white}{#4}\else#4\fi};
-\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Iba!white] at (0,\cs)     {\ifnum\Tba=1\textcolor{white}{#5}\else#5\fi};
-\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Ibb!white] at (\cs,\cs)   {\ifnum\Tbb=1\textcolor{white}{#6}\else#6\fi};
-\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Ibc!white] at (2*\cs,\cs) {\ifnum\Tbc=1\textcolor{white}{#7}\else#7\fi};
-\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Ica!white] at (0,2*\cs)   {\ifnum\Tca=1\textcolor{white}{#8}\else#8\fi};
-\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Icb!white] at (\cs,2*\cs) {\ifnum\Tcb=1\textcolor{white}{#9}\else#9\fi};
+% ─── Cells: row 0=not_ready (bottom), 1=mentorship_needed, 2=investment_ready (top)
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Iaa!white] at (0,0)        {\ifnum\Taa=1\textcolor{white}{#2}\else#2\fi};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Iab!white] at (\cs,0)      {\ifnum\Tab=1\textcolor{white}{#3}\else#3\fi};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Iac!white] at (2*\cs,0)    {\ifnum\Tac=1\textcolor{white}{#4}\else#4\fi};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Iba!white] at (0,\cs)      {\ifnum\Tba=1\textcolor{white}{#5}\else#5\fi};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Ibb!white] at (\cs,\cs)    {\ifnum\Tbb=1\textcolor{white}{#6}\else#6\fi};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Ibc!white] at (2*\cs,\cs)  {\ifnum\Tbc=1\textcolor{white}{#7}\else#7\fi};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Ica!white] at (0,2*\cs)    {\ifnum\Tca=1\textcolor{white}{#8}\else#8\fi};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Icb!white] at (\cs,2*\cs)  {\ifnum\Tcb=1\textcolor{white}{#9}\else#9\fi};
 \node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Icc!white] at (2*\cs,2*\cs){\ifnum\Tcc=1\textcolor{white}{\irir}\else\irir\fi};
-% ─── X-axis labels (Predicted) ─ rotated 40°
-\node[rotate=40,anchor=north west,font=\tiny] at (0*\cs-0.25,-0.65) {not\_ready};
-\node[rotate=40,anchor=north west,font=\tiny] at (1*\cs-0.25,-0.65) {mentorship\_needed};
-\node[rotate=40,anchor=north west,font=\tiny] at (2*\cs-0.25,-0.65) {investment\_ready};
-% ─── Y-axis labels (True)
-\node[anchor=east,font=\tiny] at (-0.65,0)       {not\_ready};
-\node[anchor=east,font=\tiny] at (-0.65,\cs)     {mentorship\_needed};
-\node[anchor=east,font=\tiny] at (-0.65,2*\cs)   {investment\_ready};
+% ─── X-axis labels (Predicted): anchor=north east, rotate=45
+%     Placed 0.45cm below cell bottom (cell bottom at y=-cs/2=-0.5)
+\node[rotate=45,anchor=north east,font=\tiny] at (0*\cs+0.05,-0.95)    {not\_ready};
+\node[rotate=45,anchor=north east,font=\tiny] at (1*\cs+0.05,-0.95)    {mentorship\_needed};
+\node[rotate=45,anchor=north east,font=\tiny] at (2*\cs+0.05,-0.95)    {investment\_ready};
+% ─── Y-axis labels (True): anchor=east, 0.25cm left of cell edge (cell left at x=-0.5)
+\node[anchor=east,font=\tiny] at (-0.75,0)       {not\_ready};
+\node[anchor=east,font=\tiny] at (-0.75,\cs)     {mentorship\_needed};
+\node[anchor=east,font=\tiny] at (-0.75,2*\cs)   {investment\_ready};
 % ─── Axis name labels
-\node[font=\tiny,rotate=90,anchor=south] at (-2.5,\cs)  {True label};
-\node[font=\tiny,anchor=north]           at (\cs,-2.1)   {Predicted label};
+\node[font=\tiny,rotate=90,anchor=south] at (-2.4,\cs)  {True label};
+\node[font=\tiny,anchor=north]           at (\cs,-2.2)   {Predicted label};
 % ─── Figure title
-\node[font=\scriptsize\bfseries,anchor=south,text width=4.2cm,align=center]
+\node[font=\scriptsize\bfseries,anchor=south,text width=4.0cm,align=center]
   at (\cs,3*\cs+0.2) {#1};
 \end{tikzpicture}%
 }
