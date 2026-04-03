@@ -57,37 +57,50 @@
 \newtheorem{definition}{Definition}
 
 % Confusion matrix cell macro (3x3, purple/gold palette matching matplotlib viridis)
-% Args: #1=title #2=NR-NR #3=NR-MN #4=NR-IR #5=MN-NR #6=MN-MN #7=MN-IR #8=IR-NR #9=IR-MN
-% IR-IR is computed as 861 - #8 - #9
+% Args: #1=title #2=NR-NR #3=NR-MN #4=NR-IR
+%       #5=MN-NR #6=MN-MN #7=MN-IR #8=IR-NR #9=IR-MN
+% IR-IR = 861-#8-#9
 \newcommand{\onesinglecm}[9]{%
-\begin{tikzpicture}[
-  every node/.style={font=\tiny},
-]
-\pgfmathsetmacro{\cs}{0.88}%
-% Row NR (true NR)
-\node[draw,minimum size=\cs cm,inner sep=0,fill=purple!92!black,text=white] at (0,0)       {#2};
-\node[draw,minimum size=\cs cm,inner sep=0,fill=yellow!85!orange,text=black] at (\cs,0)    {#3};
-\node[draw,minimum size=\cs cm,inner sep=0,fill=purple!40,text=white]        at (2*\cs,0)  {#4};
-% Row MN (true MN)
-\node[draw,minimum size=\cs cm,inner sep=0,fill=purple!45,text=white]        at (0,\cs)    {#5};
-\node[draw,minimum size=\cs cm,inner sep=0,fill=yellow!85!orange,text=black] at (\cs,\cs)  {#6};
-\node[draw,minimum size=\cs cm,inner sep=0,fill=purple!50,text=white]        at (2*\cs,\cs){#7};
-% Row IR (true IR)
-\node[draw,minimum size=\cs cm,inner sep=0,fill=purple!30,text=white]        at (0,2*\cs)  {#8};
-\node[draw,minimum size=\cs cm,inner sep=0,fill=purple!60,text=white]        at (\cs,2*\cs){#9};
+\begin{tikzpicture}[every node/.style={font=\tiny}]
+\def\cs{1.15}%
+% IR-IR count
 \pgfmathtruncatemacro{\irir}{861-#8-#9}%
-\node[draw,minimum size=\cs cm,inner sep=0,fill=yellow!60!orange,text=black] at (2*\cs,2*\cs){\irir};
-% X-axis tick labels
-\foreach \x/\lbl in {0/not\_ready,1/mentorship\\needed,2/investment\_ready}
-  \node[rotate=30,anchor=north west,font=\tiny,text width=1.8cm,align=left] at (\x*\cs-0.35,-0.62) {\lbl};
-% Y-axis tick labels
-\foreach \y/\lbl in {0/not\_ready,1/mentorship\\needed,2/investment\_ready}
-  \node[anchor=east,font=\tiny,text width=1.6cm,align=right] at (-0.58,\y*\cs) {\lbl};
-% Axis names
-\node[font=\tiny,rotate=90,anchor=south] at (-1.6,\cs) {True label};
-\node[font=\tiny,anchor=north]            at (\cs,-1.7) {Predicted label};
-% Title
-\node[font=\tiny\bfseries,anchor=south,text width=3.6cm,align=center] at (\cs,3*\cs+0.1) {#1};
+% Row totals for per-row normalisation
+\pgfmathsetmacro{\Rnr}{max(1,#2+#3+#4)}%
+\pgfmathsetmacro{\Rmn}{max(1,#5+#6+#7)}%
+\pgfmathsetmacro{\Rir}{max(1,#8+#9+\irir)}%
+% Per-cell intensity 0-100
+\pgfmathsetmacro{\Iaa}{100*#2/\Rnr}\pgfmathsetmacro{\Iab}{100*#3/\Rnr}\pgfmathsetmacro{\Iac}{100*#4/\Rnr}%
+\pgfmathsetmacro{\Iba}{100*#5/\Rmn}\pgfmathsetmacro{\Ibb}{100*#6/\Rmn}\pgfmathsetmacro{\Ibc}{100*#7/\Rmn}%
+\pgfmathsetmacro{\Ica}{100*#8/\Rir}\pgfmathsetmacro{\Icb}{100*#9/\Rir}\pgfmathsetmacro{\Icc}{100*\irir/\Rir}%
+% Text-colour flags: 1=white (dark cell) 0=black (light cell)
+\pgfmathtruncatemacro{\Taa}{\Iaa>45?1:0}\pgfmathtruncatemacro{\Tab}{\Iab>45?1:0}\pgfmathtruncatemacro{\Tac}{\Iac>45?1:0}%
+\pgfmathtruncatemacro{\Tba}{\Iba>45?1:0}\pgfmathtruncatemacro{\Tbb}{\Ibb>45?1:0}\pgfmathtruncatemacro{\Tbc}{\Ibc>45?1:0}%
+\pgfmathtruncatemacro{\Tca}{\Ica>45?1:0}\pgfmathtruncatemacro{\Tcb}{\Icb>45?1:0}\pgfmathtruncatemacro{\Tcc}{\Icc>45?1:0}%
+% ─── Cells: row 0 = true not_ready (bottom), 1 = mentorship_needed, 2 = investment_ready (top)
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Iaa!white] at (0,0)       {\ifnum\Taa=1\textcolor{white}{#2}\else#2\fi};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Iab!white] at (\cs,0)     {\ifnum\Tab=1\textcolor{white}{#3}\else#3\fi};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Iac!white] at (2*\cs,0)   {\ifnum\Tac=1\textcolor{white}{#4}\else#4\fi};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Iba!white] at (0,\cs)     {\ifnum\Tba=1\textcolor{white}{#5}\else#5\fi};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Ibb!white] at (\cs,\cs)   {\ifnum\Tbb=1\textcolor{white}{#6}\else#6\fi};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Ibc!white] at (2*\cs,\cs) {\ifnum\Tbc=1\textcolor{white}{#7}\else#7\fi};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Ica!white] at (0,2*\cs)   {\ifnum\Tca=1\textcolor{white}{#8}\else#8\fi};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Icb!white] at (\cs,2*\cs) {\ifnum\Tcb=1\textcolor{white}{#9}\else#9\fi};
+\node[draw,minimum size=\cs cm,inner sep=0,fill=blue!\Icc!white] at (2*\cs,2*\cs){\ifnum\Tcc=1\textcolor{white}{\irir}\else\irir\fi};
+% ─── X-axis labels (Predicted) ─ rotated 40°
+\node[rotate=40,anchor=north west,font=\tiny] at (0*\cs-0.25,-0.65) {not\_ready};
+\node[rotate=40,anchor=north west,font=\tiny] at (1*\cs-0.25,-0.65) {mentorship\_needed};
+\node[rotate=40,anchor=north west,font=\tiny] at (2*\cs-0.25,-0.65) {investment\_ready};
+% ─── Y-axis labels (True)
+\node[anchor=east,font=\tiny] at (-0.65,0)       {not\_ready};
+\node[anchor=east,font=\tiny] at (-0.65,\cs)     {mentorship\_needed};
+\node[anchor=east,font=\tiny] at (-0.65,2*\cs)   {investment\_ready};
+% ─── Axis name labels
+\node[font=\tiny,rotate=90,anchor=south] at (-2.5,\cs)  {True label};
+\node[font=\tiny,anchor=north]           at (\cs,-2.1)   {Predicted label};
+% ─── Figure title
+\node[font=\scriptsize\bfseries,anchor=south,text width=4.2cm,align=center]
+  at (\cs,3*\cs+0.2) {#1};
 \end{tikzpicture}%
 }
 
@@ -526,47 +539,40 @@ CNN\_A (Adam, lr=1e-3) & 86.95\% & 80.95\% & 31.58\% & 33.62\% & 0.7065 & ---  \
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-    ybar,
-    bar width=14pt,
+    ybar, bar width=12pt,
     width=\columnwidth, height=7.0cm,
     ylabel={F1-Weighted Score}, ylabel style={font=\small},
     xlabel={Model Names}, xlabel style={font=\small},
-    symbolic x coords={
+    xtick={1,2,3,4,5,6,7,8},
+    xticklabels={
       XGBoost,
-      {Logistic\\Regression},
-      {CNN\_C\\SGD lr1e-2\\ep40},
+      {Log.\ Regression},
+      {CNN\_C (SGD)},
       SVC,
-      {Random\\Forest},
-      {CNN\_B\\RMSprop\\lr5e-4\\ep30},
-      {Decision\\Forest\\(ExtraTrees)},
-      {CNN\_A\\Adam\\lr1e-3\\ep20}},
-    xtick=data,
-    xticklabel style={font=\tiny, align=center, text width=1.5cm},
+      {Random Forest},
+      {CNN\_B (RMSprop)},
+      ExtraTrees,
+      {CNN\_A (Adam)}},
+    xticklabel style={font=\tiny, rotate=30, anchor=north east},
+    xmin=0.5, xmax=8.5,
     ymin=0.0, ymax=0.92,
     ytick={0,0.25,0.50,0.75},
     nodes near coords,
     nodes near coords align={vertical},
-    every node near coord/.append style={font=\tiny, /pgf/number format/.cd, fixed, precision=4},
-    enlarge x limits=0.08,
+    every node near coord/.append style={font=\tiny,
+      /pgf/number format/.cd, fixed, precision=4},
+    enlarge x limits=0.06,
     grid=major, grid style={dashed, gray!30},
     tick label style={font=\scriptsize},
     title={Model Performance Comparison (F1-Weighted Score)},
     title style={font=\small\bfseries},
-    legend style={font=\tiny, at={(0.98,0.05)}, anchor=south east},
+    legend style={font=\tiny, at={(0.98,0.98)}, anchor=north east},
 ]
-% XGBoost — top performer in red
-\addplot[fill=red!75, fill opacity=0.9] coordinates {(XGBoost, 0.8382)};
+\addplot[fill=red!80, fill opacity=0.9]
+  coordinates {(1,0.8382)};
 \addlegendentry{Top Performer}
-% All other models in navy blue
-\addplot[fill=blue!70!black, fill opacity=0.85] coordinates {
-  ({Logistic\\Regression},         0.7625)
-  ({CNN\_C\\SGD lr1e-2\\ep40},     0.7999)
-  (SVC,                             0.7532)
-  ({Random\\Forest},                0.7827)
-  ({CNN\_B\\RMSprop\\lr5e-4\\ep30}, 0.7800)
-  ({Decision\\Forest\\(ExtraTrees)},0.7801)
-  ({CNN\_A\\Adam\\lr1e-3\\ep20},    0.7993)
-};
+\addplot[fill=blue!70!black, fill opacity=0.9]
+  coordinates {(2,0.7625)(3,0.7999)(4,0.7532)(5,0.7827)(6,0.7800)(7,0.7801)(8,0.7993)};
 \addlegendentry{Other Models}
 \end{axis}
 \end{tikzpicture}
