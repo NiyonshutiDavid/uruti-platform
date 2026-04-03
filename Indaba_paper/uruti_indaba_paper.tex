@@ -522,6 +522,56 @@ CNN\_A (Adam, lr=1e-3) & 86.95\% & 80.95\% & 31.58\% & 33.62\% & 0.7065 & ---  \
 }
 \end{table}
 
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    xbar, bar width=9pt,
+    width=0.92\columnwidth, height=6.2cm,
+    xlabel={Weighted F1 (\%)}, xlabel style={font=\small},
+    symbolic y coords={
+      CNN\_A,
+      ExtraTrees,
+      CNN\_B,
+      Random Forest,
+      CNN\_C,
+      SVC,
+      LR,
+      XGBoost$\star$},
+    ytick=data,
+    yticklabel style={font=\scriptsize},
+    xmin=78, xmax=86,
+    nodes near coords,
+    nodes near coords align={horizontal},
+    every node near coord/.append style={font=\scriptsize},
+    enlarge y limits=0.08,
+    grid=major, grid style={dotted, gray!40},
+    tick label style={font=\scriptsize},
+    title={Investor Readiness Engine — Model F1 Comparison},
+    title style={font=\small\bfseries},
+]
+\addplot[
+    fill=blue!55, fill opacity=0.85,
+    postaction={pattern=none},
+] coordinates {
+    (80.95, CNN\_A)
+    (81.77, ExtraTrees)
+    (83.07, CNN\_B)
+    (83.22, Random Forest)
+    (83.22, CNN\_C)
+    (83.23, SVC)
+    (83.47, LR)
+    (83.82, XGBoost$\star$)
+};
+\end{axis}
+\end{tikzpicture}
+\caption{Weighted F1 comparison of all 8 models on the held-out test set
+         (11{,}054 records). XGBoost (83.82\%) leads marginally but all models
+         cluster tightly between 81--84\%, revealing that the dominant challenge
+         is minority-class recall rather than overall accuracy.}
+\label{fig:investor_f1}
+\end{figure}
+
 \paragraph{Confusion Matrix Analysis (Classical Models).}
 Figures~\ref{fig:cm_lr}--\ref{fig:cm_xgb} show confusion matrices for the
 five classical classifiers on the held-out test set (11{,}054 records; class
@@ -1139,7 +1189,7 @@ necessity of the hybrid architecture for production viability.
 
 XGBoost achieved the highest production-relevant weighted F1-score of
 \textbf{83.82\%} on 11{,}054 held-out records (Table~\ref{tab:investor_results},
-Figs.~\ref{fig:cm_lr}--\ref{fig:cm_cnn_c}).
+Fig.~\ref{fig:investor_f1}, Figs.~\ref{fig:cm_lr}--\ref{fig:cm_cnn_c}).
 The What-If simulation interface, which allows founders to observe real-time
 re-ranking via Eq.~\eqref{eq:rank_score}, received the highest usability ratings
 during UAT.
