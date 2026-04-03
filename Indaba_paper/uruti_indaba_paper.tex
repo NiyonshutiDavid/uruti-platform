@@ -164,20 +164,20 @@ startup incubation in resource-constrained emerging markets.
 Africa's technology startup landscape is characterised by a pronounced asymmetry
 between the density of entrepreneurial talent and the availability of
 institutional support structures. Rwanda exemplifies this tension acutely:
-its startup ecosystem reached a valuation of approximately \$394 million in 2024
-and generated close to 10{,}000 jobs~\citep{africa2025}, yet the pathways from
+its startup ecosystem has attracted growing venture capital inflows and generated
+substantial employment opportunities~\citep{partechafrica2024}, yet the pathways from
 ideation to early investment remain structurally under-resourced.
 Traditional incubators and accelerators — the natural infrastructure for bridging
-this gap — serve fewer than 3\% of applicants, leaving the overwhelming majority
+this gap — remain severely under-resourced relative to demand, leaving the overwhelming majority
 of promising founders without mentorship, pitch preparation, or objective
-evaluation~\citep{otis2024}.
+evaluation~\citep{gem2022africa}.
 
 Generic commercial AI tools (GPT-4, Gemini) partially address the mentorship
 vacuum, but they lack the local regulatory and cultural grounding required to
 give legally valid guidance under the Rwanda Startup Act, the Rwanda
 Innovation Fund (RIF) eligibility criteria, or BNR monetary policy frameworks.
 The result is a ``hallucination problem'' that makes generic LLMs actively
-harmful in high-stakes advisory contexts~\citep{murekatete2026}.
+harmful in high-stakes advisory contexts~\citep{ji2023hallucination}.
 
 This paper presents \textbf{Uruti} (Kinyarwanda: \emph{to plant/nurture}),
 an end-to-end AI pre-acceleration ecosystem that addresses these structural
@@ -214,12 +214,12 @@ contributions are:
 \subsection{AI in Entrepreneurship Support}
 
 Recent work has explored the potential of AI to democratise access to venture
-capital support. \citet{wangentrep2025} showed
-that RLHF-trained coaching models produce measurably better pedagogical feedback
-than non-fine-tuned baselines for structured communication tasks. Similarly,
-\citet{fourati2025} demonstrated that transformer-based
-advisory agents can reduce informational asymmetry in startup-investor
-relationships. However, neither system was grounded in an African regulatory
+capital support. \citet{ouyang2022instructgpt} showed
+that RLHF-trained models produce measurably better goal-aligned outputs
+than non-fine-tuned baselines across structured feedback tasks. Similarly,
+\citet{lewis2020rag} demonstrated that retrieval-augmented transformer-based
+systems can substantially reduce knowledge gaps in advisory interactions.
+However, neither approach was grounded in an African regulatory
 context or evaluated on African founder populations.
 
 \FloatBarrier
@@ -227,10 +227,10 @@ context or evaluated on African founder populations.
 
 Machine learning approaches to predicting startup success have been studied
 extensively on Western VC datasets (Crunchbase, CrunchBase Africa).
-\citet{shanmug2024} found that gradient-boosting ensembles
-(XGBoost, LightGBM) consistently outperform logistic regression and SVMs on
-tabular startup data, while deep MLP architectures offer superior performance
-when non-linear feature interactions dominate — precisely the pattern we observe
+\citet{grinsztajn2022tabular} showed that gradient-boosting ensembles
+(XGBoost, LightGBM) consistently outperform deep learning on medium-scale
+tabular data, while deep MLP architectures can be competitive when
+non-linear feature interactions dominate --- precisely the pattern we observe
 with marketing spend, team composition, and long-term startup viability.
 
 \FloatBarrier
@@ -248,12 +248,11 @@ real presentation recordings.
 \FloatBarrier
 \subsection{LLM Fine-Tuning for Low-Resource Domains}
 
-\citet{murekatete2026} demonstrated that QLoRA-tuned
-open-source models significantly outperform generic commercial APIs for legal
-and regulatory advisory in the African context. The Low-Rank Adaptation
-(LoRA)~\citep{hu2022lora} technique reduces the trainable parameter
-footprint by 99\%, enabling fine-tuning on limited GPU budgets while preserving
-the base model's general reasoning capabilities.
+\citet{dettmers2023qlora} demonstrated that QLoRA-tuned
+open-source models can match or exceed much larger generic models at a fraction
+of the compute cost, enabling practical fine-tuning on single-GPU budgets.
+The Low-Rank Adaptation (LoRA)~\citep{hu2022lora} technique reduces the trainable parameter
+footprint by 99\%, preserving the base model's general reasoning capabilities.
 
 %% -----------------------------------------------------------------------
 %%  3. The Uruti Platform
