@@ -78,14 +78,14 @@
 \pgfmathtruncatemacro{\irir}{861-#8-#9}%
 \node[draw,minimum size=\cs cm,inner sep=0,fill=yellow!60!orange,text=black] at (2*\cs,2*\cs){\irir};
 % X-axis tick labels
-\foreach \x/\lbl in {0/NR,1/MN,2/IR}
-  \node[rotate=30,anchor=north west,font=\tiny] at (\x*\cs-0.35,-0.62) {\lbl};
+\foreach \x/\lbl in {0/not\_ready,1/mentorship\\needed,2/investment\_ready}
+  \node[rotate=30,anchor=north west,font=\tiny,text width=1.8cm,align=left] at (\x*\cs-0.35,-0.62) {\lbl};
 % Y-axis tick labels
-\foreach \y/\lbl in {0/NR,1/MN,2/IR}
-  \node[anchor=east,font=\tiny] at (-0.58,\y*\cs) {\lbl};
+\foreach \y/\lbl in {0/not\_ready,1/mentorship\\needed,2/investment\_ready}
+  \node[anchor=east,font=\tiny,text width=1.6cm,align=right] at (-0.58,\y*\cs) {\lbl};
 % Axis names
-\node[font=\tiny,rotate=90,anchor=south] at (-0.95,\cs) {True label};
-\node[font=\tiny,anchor=north]            at (\cs,-1.05) {Predicted label};
+\node[font=\tiny,rotate=90,anchor=south] at (-1.6,\cs) {True label};
+\node[font=\tiny,anchor=north]            at (\cs,-1.7) {Predicted label};
 % Title
 \node[font=\tiny\bfseries,anchor=south,text width=3.6cm,align=center] at (\cs,3*\cs+0.1) {#1};
 \end{tikzpicture}%
@@ -337,7 +337,7 @@ uncorrelated with all financial metrics.
 \begin{tikzpicture}
 \begin{axis}[
     ybar, bar width=14pt,
-    width=\columnwidth, height=5.5cm,
+    width=\columnwidth, height=7.0cm,
     ylabel={count}, ylabel style={font=\small},
     symbolic x coords={50\_startups,startup\_data,investments\_vc},
     xtick=data, xticklabel style={font=\scriptsize, rotate=15, anchor=north east},
@@ -526,49 +526,55 @@ CNN\_A (Adam, lr=1e-3) & 86.95\% & 80.95\% & 31.58\% & 33.62\% & 0.7065 & ---  \
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-    xbar, bar width=9pt,
-    width=0.92\columnwidth, height=7.0cm,
-    xlabel={Weighted F1 (\%)}, xlabel style={font=\small},
-    symbolic y coords={
-      CNN\_A,
-      ExtraTrees,
-      CNN\_B,
-      Random Forest,
-      CNN\_C,
+    ybar,
+    bar width=14pt,
+    width=\columnwidth, height=7.0cm,
+    ylabel={F1-Weighted Score}, ylabel style={font=\small},
+    xlabel={Model Names}, xlabel style={font=\small},
+    symbolic x coords={
+      XGBoost,
+      {Logistic\\Regression},
+      {CNN\_C\\SGD lr1e-2\\ep40},
       SVC,
-      LR,
-      XGBoost$\star$},
-    ytick=data,
-    yticklabel style={font=\scriptsize},
-    xmin=78, xmax=86,
+      {Random\\Forest},
+      {CNN\_B\\RMSprop\\lr5e-4\\ep30},
+      {Decision\\Forest\\(ExtraTrees)},
+      {CNN\_A\\Adam\\lr1e-3\\ep20}},
+    xtick=data,
+    xticklabel style={font=\tiny, align=center, text width=1.5cm},
+    ymin=0.0, ymax=0.92,
+    ytick={0,0.25,0.50,0.75},
     nodes near coords,
-    nodes near coords align={horizontal},
-    every node near coord/.append style={font=\scriptsize},
-    enlarge y limits=0.08,
-    grid=major, grid style={dotted, gray!40},
+    nodes near coords align={vertical},
+    every node near coord/.append style={font=\tiny, /pgf/number format/.cd, fixed, precision=4},
+    enlarge x limits=0.08,
+    grid=major, grid style={dashed, gray!30},
     tick label style={font=\scriptsize},
-    title={Investor Readiness Engine — Model F1 Comparison},
+    title={Model Performance Comparison (F1-Weighted Score)},
     title style={font=\small\bfseries},
+    legend style={font=\tiny, at={(0.98,0.05)}, anchor=south east},
 ]
-\addplot[
-    fill=blue!55, fill opacity=0.85,
-    postaction={pattern=none},
-] coordinates {
-    (80.95, CNN\_A)
-    (81.77, ExtraTrees)
-    (83.07, CNN\_B)
-    (83.22, Random Forest)
-    (83.22, CNN\_C)
-    (83.23, SVC)
-    (83.47, LR)
-    (83.82, XGBoost$\star$)
+% XGBoost — top performer in red
+\addplot[fill=red!75, fill opacity=0.9] coordinates {(XGBoost, 0.8382)};
+\addlegendentry{Top Performer}
+% All other models in navy blue
+\addplot[fill=blue!70!black, fill opacity=0.85] coordinates {
+  ({Logistic\\Regression},         0.7625)
+  ({CNN\_C\\SGD lr1e-2\\ep40},     0.7999)
+  (SVC,                             0.7532)
+  ({Random\\Forest},                0.7827)
+  ({CNN\_B\\RMSprop\\lr5e-4\\ep30}, 0.7800)
+  ({Decision\\Forest\\(ExtraTrees)},0.7801)
+  ({CNN\_A\\Adam\\lr1e-3\\ep20},    0.7993)
 };
+\addlegendentry{Other Models}
 \end{axis}
 \end{tikzpicture}
-\caption{Weighted F1 comparison of all 8 models on the held-out test set
-         (11{,}054 records). XGBoost (83.82\%) leads marginally but all models
-         cluster tightly between 81--84\%, revealing that the dominant challenge
-         is minority-class recall rather than overall accuracy.}
+\caption{Model Performance Comparison (F1-Weighted Score) for all 8 models
+         on the held-out test set (11{,}054 records). XGBoost (0.8382) is
+         highlighted as top performer (red); all other models shown in blue.
+         Models cluster tightly between 0.75--0.84, revealing that the dominant
+         challenge is minority-class recall rather than overall accuracy.}
 \label{fig:investor_f1}
 \end{figure}
 
@@ -881,7 +887,7 @@ Figure~\ref{fig:reward_mlp} traces the convergence trajectory.
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-    width=\columnwidth, height=5.0cm,
+    width=\columnwidth, height=6.5cm,
     xlabel={Epoch}, ylabel={Validation $R^2$},
     xmin=0, xmax=140, ymin=-10.5, ymax=1.05,
     grid=major, grid style={dotted, gray!50},
@@ -975,7 +981,7 @@ TRPO, and A2C.
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-    width=0.9\columnwidth, height=5.0cm,
+    width=0.9\columnwidth, height=6.5cm,
     xlabel={Participant},
     ylabel={Pitch Score (/100)},
     xtick={1,2,3,4,5,6,7,8},
@@ -1070,7 +1076,7 @@ converges fastest and to the lowest final loss.
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-    width=\columnwidth, height=5.2cm,
+    width=\columnwidth, height=6.5cm,
     xlabel={Training Step}, ylabel={Validation Loss},
     xtick={50,100,150},
     xmin=35, xmax=165,
