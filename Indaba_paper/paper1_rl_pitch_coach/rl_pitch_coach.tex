@@ -119,25 +119,21 @@ Prior work has applied RL to educational settings~\citep{mnih2015,schulman2017},
 but no prior system has grounded this formalism in multimodal
 pitch-performance features from real presentation recordings.
 
-This paper makes four primary contributions:
-\begin{enumerate}
-    \item \textbf{PitchEnv-v1}: a reproducible OpenAI Gymnasium environment
-    that models pitch coaching as a fully-specified MDP, including a precise
-    definition of the state space, action space, transition dynamics, and
-    reward function.
-
-    \item \textbf{Reward MLP}: a pre-trained MLP that maps nine CMU-MOSEI
-    pitch features~\citep{zadeh2018} to a coaching score, achieving
-    $R^2 = 0.9512$ on the held-out validation set.
-
-    \item \textbf{Hyperparameter ablation}: a systematic grid search over
-    the four most impactful DQN hyperparameters ($\gamma$, $\varepsilon$-schedule,
-    batch size, episode length) identifying the optimal configuration.
-
-    \item \textbf{Empirical evaluation}: reward convergence curves, per-algorithm
-    success counts, and a user acceptance trial (UAT) with eight Rwandan founders
-    showing a mean improvement of $+12.4$ points.
-\end{enumerate}
+This paper makes four primary contributions.
+First, we introduce \textbf{PitchEnv-v1}, a reproducible OpenAI Gymnasium
+environment that models pitch coaching as a fully-specified MDP, including a
+precise definition of the state space, action space, transition dynamics, and
+reward function.
+Second, we design and train a \textbf{Reward MLP} that maps nine CMU-MOSEI
+pitch features~\citep{zadeh2018} to a coaching score, achieving $R^2 = 0.9512$
+on the held-out validation set.
+Third, we conduct a \textbf{hyperparameter ablation} via a systematic grid
+search over the four most impactful DQN hyperparameters ($\gamma$,
+$\varepsilon$-schedule, batch size, episode length), identifying the
+optimal configuration for this coaching domain.
+Fourth, we provide a full \textbf{empirical evaluation} comprising reward
+convergence curves, per-algorithm success counts, and a user acceptance trial
+(UAT) with eight Rwandan founders showing a mean improvement of $+12.4$ points.
 
 %% -----------------------------------------------------------------------
 %%  2. Background and Related Work
@@ -151,34 +147,102 @@ This paper makes four primary contributions:
 
 Deep Q-Networks~\citep{mnih2015} combine Q-learning with a neural function
 approximator to handle high-dimensional state spaces. The agent maintains
-a replay buffer $\mathcal{D}$ of transitions
-$(s_t, a_t, r_t, s_{t+1})$ and minimises:
+a replay buffer $\mathcal{D}$ of transitions $(s_t, a_t, r_t, s_{t+1})$
+and minimises the temporal-difference loss:
 \begin{equation}
 \mathcal{L}(\theta) = \mathbb{E}_{(s,a,r,s') \sim \mathcal{D}}
   \!\left[\!\left(r + \gamma \max_{a'} Q_{\hat\theta}(s',a') - Q_\theta(s,a)\right)^{\!2}\right]
 \label{eq:dqn_loss}
 \end{equation}
 where $Q_{\hat\theta}$ is a periodically-updated target network that prevents
-oscillation. Proximal Policy Optimisation~\citep{schulman2017} is a policy-gradient
-alternative that uses a clipped surrogate objective to limit policy updates.
+oscillation. Proximal Policy Optimisation~\citep{schulman2017} constrains
+policy updates via a clipped surrogate objective, trading off sample
+efficiency for stability. Both algorithms are benchmarked in
+Section~\ref{sec:results} alongside TRPO and A2C.
+
+In PitchEnv-v1, Deep RL is applied directly to the pitch coaching problem.
+The environment's 12-dimensional state encodes the founder's current
+acoustic, visual, and linguistic performance metrics; the agent selects
+one of six targeted coaching interventions at each 15-second step; and the
+reward signal is computed by a pre-trained MLP that translates those
+behavioural signals into a holistic coaching score. This formulation
+means the DQN policy learns \emph{which aspect of the pitch to coach next}
+given the founder's current state --- a decision that is too context-sensitive
+for rule-based heuristics and too high-frequency for human coaches to handle
+in real time. The DQN architecture is chosen over continuous-action methods
+because the coaching interventions are inherently discrete (e.g.~``slow down
+pace'' or ``improve eye contact''), and the compact action space of six
+allows efficient Q-value estimation with a two-hidden-layer MLP.
 
 \FloatBarrier
 \subsection{Multimodal Coaching and CMU-MOSEI}
 
-The CMU-MOSEI corpus~\citep{zadeh2018} provides 23,453 annotated sentence-level
-video segments from YouTube, each paired with acoustic features, visual facial
-action units, and sentiment labels. For PitchEnv-v1, we extract nine
-pitch-relevant feature channels from a 1{,}000-segment aligned subset
-(Section~\ref{sec:features}).
+The CMU-MOSEI corpus~\citep{zadeh2018} provides 23{,}453 annotated
+sentence-level video segments from YouTube, each paired with acoustic
+features, visual facial action units, and sentiment labels in a unified
+multimodal alignment framework. Its richness of modalities makes it the
+canonical benchmark for audio-visual coaching tasks: acoustic energy,
+pause ratios, and facial stability are all directly observable signals of
+presentation quality. For PitchEnv-v1, we extract nine pitch-relevant
+feature channels from a 1{,}000-segment aligned subset
+(Section~\ref{sec:features}), treating CMU-MOSEI annotations as a
+proxy for expert coaching scores.
 
 \FloatBarrier
-\subsection{RL for Pedagogical Feedback}
+\subsection{RLHF and Reward Engineering for Coaching}
 
-\citet{ouyang2022instructgpt} demonstrated that reinforcement learning from
-human feedback (RLHF) produces models whose outputs are more aligned with
-expert intent. We adapt this insight to the pitch coaching domain: instead
-of human preference labels, we use a pre-trained MLP reward model whose
-targets encode expert-designed coaching criteria (eye contact, pacing, sentiment).
+\citet{ouyang2022instructgpt} demonstrated that reinforcement learning
+from human feedback (RLHF) produces models whose outputs are more aligned
+with expert intent: a learned reward model replaces brittle
+handcrafted objectives and adapts to nuanced human preference.
+\citet{wang2025rlhf} extended this paradigm specifically to speech and
+language tasks, showing that preference-based feedback yields measurably
+more helpful and grammatically coherent outputs, while simultaneously
+warning that insufficiently constrained reward functions invite
+\emph{reward hacking} -- artificially inflating proxy metrics without
+genuine skill improvement. PitchEnv-v1 addresses this risk directly by
+pairing the MLP reward model (Section~\ref{sec:reward_mlp}) with an
+explicit pacing penalty and a maintenance bonus, making it costly for
+the agent to game a single feature dimension at the expense of others.
+
+\FloatBarrier
+\subsection{AI-Assisted Public Speaking and Pitch Coaching}
+
+\citet{fourati2025public} surveyed domain experts on AI-augmented
+public-speaking training, concluding that AI excels at delivering
+consistent, repeatable feedback on objectively measurable dimensions
+(eye contact, speech rate, filler-word ratio) but falls short on
+high-order qualities such as narrative coherence and charisma.
+Their participants recommended deploying AI to automate repetitive
+pre-acceleration practice, freeing human coaches for strategic
+guidance -- precisely the role PitchEnv-v1 is designed to fill.
+Complementarily, \citet{nagaram2024rlaif} introduced reinforcement
+learning with AI feedback (RLAIF) for emotional expression in
+text-to-speech synthesis, demonstrating that an AI teacher model can
+generate nuanced preference labels at a fraction of the cost of human
+annotation. This motivates PitchEnv-v1's use of a data-driven MLP
+reward proxy in place of costly expert labelling.
+
+\FloatBarrier
+\subsection{AI Coaching Effectiveness in the African Context}
+
+\citet{gem2022africa} documented that fewer than 12\,\% of Sub-Saharan
+African entrepreneurs access structured mentorship, a scarcity that
+systematically depresses startup survival rates.
+\citet{otis2024ai} investigated this gap through a large-scale field
+experiment with 640 Kenyan entrepreneurs, finding that high-performing
+founders improved by over 15\,\% when given AI coaching tools, while
+low-performers deteriorated by 8\,\% due to plausible but contextually
+flawed advice from generic models. This asymmetry motivates
+PitchEnv-v1's contextualised reward: rather than routing all founders
+through a one-size-fits-all chatbot, the environment adapts action
+selection to each founder's current pitch-feature profile, reducing
+the risk of misdirected feedback for weaker participants.
+\citet{rambe2026africa} reinforce this argument, noting that
+infrastructural shortfalls and talent scarcity in Sub-Saharan Africa
+necessitate AI tools that are both contextually grounded and
+computationally lightweight -- design requirements that shaped every
+architectural decision in PitchEnv-v1.
 
 %% -----------------------------------------------------------------------
 %%  3. The PitchEnv-v1 Environment
@@ -199,17 +263,13 @@ A single \textbf{episode} represents one complete pitch presentation.
 The presentation is divided into $L = 20$ discrete \textbf{steps}
 (one step $\approx$ 15 seconds of real-time speech), corresponding to
 a 5-minute startup pitch.
-At each step, the environment:
-\begin{enumerate}
-    \item Returns the current 12-dimensional observation vector $s_t$.
-    \item Accepts a discrete coaching action $a_t \in \{0,\ldots,5\}$.
-    \item Applies the coaching intervention by perturbing the relevant
-    feature channels (stochastically, modelling imperfect uptake).
-    \item Queries the reward MLP to compute the new coaching score
-    $\text{score}_{t+1}$.
-    \item Returns reward $r_t$ (Eq.~\ref{eq:reward}) and the updated
-    observation $s_{t+1}$.
-\end{enumerate}
+At each step the environment returns the current 12-dimensional observation
+vector $s_t$, accepts a discrete coaching action $a_t \in \{0,\ldots,5\}$,
+and applies the coaching intervention by perturbing the relevant feature
+channels stochastically to model imperfect uptake by the founder.
+It then queries the reward MLP to compute the updated coaching score
+$\text{score}_{t+1}$, and returns reward $r_t$ (Eq.~\ref{eq:reward}) together
+with the updated observation $s_{t+1}$.
 An episode terminates after $L = 20$ steps. The terminal bonus
 (Eq.~\ref{eq:terminal_bonus}) is applied if
 $\text{score}_{20} \geq 85$~--- the ``expert delivery'' threshold.
@@ -318,30 +378,25 @@ r_{\text{terminal}} = 50.0 \cdot \mathbf{1}\!\left[\text{score}_{20} \geq 85\rig
 \label{eq:terminal_bonus}
 \end{equation}
 
-\noindent\textbf{Component explanations:}
-\begin{itemize}
-  \item \textbf{Delta reward (×4.0):} The most important signal. Rewards any
-  measurable per-step improvement in the coaching score, regardless of
-  absolute level. The coefficient 4.0 ensures this term dominates over
-  noise in early training.
-
-  \item \textbf{Maintenance bonus (×2.0):} Once a founder's score exceeds 85,
-  the agent receives a step-level bonus for \emph{holding} that quality level.
-  This prevents the policy from reverting to lower states after briefly
-  achieving elite delivery.
-
-  \item \textbf{Pacing penalty ($\lambda_p = 0.5$):} $\Delta t$ is the
-  time the founder has spent on the current slide; $\bar{t}_s$ is the
-  expected time budget per slide. Penalises over-dwelling on a single slide,
-  encoding the pitch coaching heuristic that ``no slide should take more than
-  40 seconds on average.''
-
-  \item \textbf{Terminal bonus (×50.0):} A high-magnitude sparse signal at the
-  end of the episode if the final score meets the expert delivery threshold.
-  Its large magnitude (50 vs.\ typical per-step $r \approx 1$--$5$) ensures
-  the agent prioritises achieving elite delivery trajectories rather than
-  merely accumulating incremental improvements.
-\end{itemize}
+The four components serve distinct coaching objectives.
+The \textbf{delta reward} (coefficient $4.0$) is the primary learning signal:
+it rewards any measurable per-step improvement in the coaching score,
+regardless of absolute level, and its large coefficient ensures this term
+dominates over noise in early training.
+The \textbf{maintenance bonus} (coefficient $2.0$) activates once the
+founder's score exceeds 85, awarding a step-level bonus for \emph{holding}
+that quality level and preventing the policy from reverting after briefly
+achieving elite delivery.
+The \textbf{pacing penalty} ($\lambda_p = 0.5$) encodes the coaching
+heuristic that no slide should take more than 40 seconds on average:
+$\Delta t$ is the time spent on the current slide and $\bar{t}_s$ is
+the expected time budget per slide, so over-dwelling incurs a fractional
+penalty proportional to the excess.
+Finally, the \textbf{terminal bonus} ($50.0$) provides a high-magnitude
+sparse signal at episode end if the final score meets the expert delivery
+threshold. Its large magnitude (50 vs.\ typical per-step $r \approx 1$--$5$)
+ensures the agent prioritises achieving elite delivery trajectories rather
+than merely accumulating incremental improvements.
 
 The expected per-episode return $G$ without the terminal bonus is bounded by:
 \begin{equation}
@@ -376,21 +431,18 @@ and language features (\texttt{clarity\_score}, \texttt{filler\_words},
 vocabulary-level filler-word detector.
 
 Figure~\ref{fig:mosei_corr} shows the Pearson correlation structure of these
-nine features. Key structural patterns are:
-\begin{itemize}
-    \item \textbf{Visual cluster:} \texttt{eye\_contact} and
-    \texttt{head\_stability} co-vary strongly ($r=0.72$),
-    as both capture physical attentiveness.
-
-    \item \textbf{Affective cluster:} \texttt{sentiment\_score} correlates
-    with \texttt{eye\_contact} ($r=0.88$) and \texttt{head\_stability}
-    ($r=0.82$), confirming that confident affect co-occurs with stable
-    visual engagement.
-
-    \item \textbf{Pacing anti-correlation:} \texttt{pause\_ratio} and
-    \texttt{speech\_rate} are perfectly anti-correlated ($r=-1.00$),
-    as they are complementary measures of the same underlying pace signal.
-\end{itemize}
+nine features. Three structural patterns are notable.
+The \textbf{visual cluster} shows that \texttt{eye\_contact} and
+\texttt{head\_stability} co-vary strongly ($r=0.72$), as both capture
+physical attentiveness and tend to improve or degrade together.
+The \textbf{affective cluster} reveals that \texttt{sentiment\_score}
+correlates with both \texttt{eye\_contact} ($r=0.88$) and
+\texttt{head\_stability} ($r=0.82$), confirming that confident affect
+co-occurs with stable visual engagement.
+Finally, a \textbf{pacing anti-correlation} of $r=-1.00$ between
+\texttt{pause\_ratio} and \texttt{speech\_rate} reflects that they are
+complementary measures of the same underlying pace signal, so the DQN
+need only act on one to affect both.
 
 \begin{figure}[htbp]
 \centering
@@ -533,18 +585,14 @@ Training halted at epoch~135, achieving \textbf{Val $R^2 = 0.9512$}
 The DQN policy network is a two-hidden-layer MLP:
 $[12 \!\to\! 256_{\text{ReLU}} \!\to\! 128_{\text{ReLU}} \!\to\! 6]$,
 mapping the 12-dimensional state to Q-values for each of the six coaching
-actions. Key design choices:
-\begin{itemize}
-    \item The input dimension of 12 matches the full state vector
-    (9 pitch features + 3 session scalars).
-    \item The output dimension of 6 matches the action space
-    $|\mathcal{A}| = 6$.
-    \item A target network is updated every 1{,}000 steps to stabilise
-    the bootstrapped TD targets in Eq.~\eqref{eq:dqn_loss}.
-    \item A replay buffer of capacity 100{,}000 transitions is maintained.
-    \item 8 parallel environment instances (Stable-Baselines3
-    \texttt{SubprocVecEnv}) accelerate sample collection.
-\end{itemize}
+actions. The input dimension of 12 matches the full state vector (9 pitch features
+plus 3 session scalars), and the output dimension of 6 matches the action
+space $|\mathcal{A}|=6$, producing one Q-value per coaching intervention.
+A target network is updated every 1{,}000 steps to stabilise the bootstrapped
+TD targets in Eq.~\eqref{eq:dqn_loss}, and a replay buffer of capacity
+100{,}000 transitions decorrelates successive updates. Training uses 8
+parallel environment instances (Stable-Baselines3 \texttt{SubprocVecEnv})
+to accelerate sample collection across the 500{,}000-step training run.
 
 \FloatBarrier
 \subsection{Hyperparameter Tuning}
@@ -648,23 +696,19 @@ PitchEnv-v1 instances using Stable-Baselines3.
 
 Figure~\ref{fig:reward_curve} shows the DQN mean episode reward (100-episode
 rolling average) over the full 500{,}000-step training run.
-Three training phases are evident:
-\begin{enumerate}
-    \item \textbf{Exploration phase (0--150k):} Reward rises steeply from
-    $\approx\!2$ to $\approx\!22$ as the agent, exploring with high
-    $\varepsilon$, discovers that all six actions produce positive delta rewards
-    when applied to a random initial state.
-
-    \item \textbf{Refinement phase (150k--350k):} Reward plateaus and shows
-    moderate variance as the agent learns to select contextually appropriate
-    actions (e.g.\ not applying ``Slow Down Pace'' when \texttt{pause\_ratio}
-    is already high). Occasional reward spikes correspond to episodes where
-    the terminal bonus is earned.
-
-    \item \textbf{Exploitation phase (350k--500k):} $\varepsilon$ has
-    stabilised at 0.05; the agent consistently applies the highest-value
-    action per state. Mean reward stabilises near 34--35.
-\end{enumerate}
+Three training phases are evident in the curve.
+During the \textbf{exploration phase} (0--150k steps), reward rises steeply
+from $\approx\!2$ to $\approx\!22$ as the agent, exploring with high
+$\varepsilon$, discovers that all six actions produce positive delta rewards
+when applied to a random initial state.
+In the \textbf{refinement phase} (150k--350k steps), reward plateaus and shows
+moderate variance as the agent learns to select contextually appropriate
+actions --- for example, not applying ``Slow Down Pace'' when
+\texttt{pause\_ratio} is already high. Occasional reward spikes
+correspond to episodes where the terminal bonus is earned.
+In the final \textbf{exploitation phase} (350k--500k steps), $\varepsilon$
+has stabilised at 0.05 and the agent consistently applies the highest-value
+action per state, causing mean reward to converge near 34--35.
 
 \begin{figure}[htbp]
 \centering

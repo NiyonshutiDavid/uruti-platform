@@ -26,6 +26,7 @@
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{placeins}
+\usepackage{float}
 \usepackage{xcolor}
 \usepackage{tikz}
 \usepackage{pgfplots}
@@ -51,7 +52,7 @@
 %% -----------------------------------------------------------------------
 \newcommand{\onesinglecm}[9]{%
 \begin{tikzpicture}[every node/.style={font=\tiny}]
-\def\cs{1.0}%
+\def\cs{0.85}%
 \pgfmathtruncatemacro{\irir}{861-#8-#9}%
 \pgfmathsetmacro{\Rnr}{max(1,#2+#3+#4)}%
 \pgfmathsetmacro{\Rmn}{max(1,#5+#6+#7)}%
@@ -101,8 +102,7 @@
 %%  Title and Authors
 %% -----------------------------------------------------------------------
 
-\title{Locally-Grounded AI for Startup Investment Readiness:\\
-       QLoRA Fine-Tuning and Ensemble Classification for Rwandan Founders}
+\title{Startup Investment Readiness Classification and Local Advisory for Tech Founders}
 
 \author{
     Anonymous Submission
@@ -159,7 +159,7 @@ promising founders without mentorship, pitch preparation, or objective
 readiness evaluation.
 
 \paragraph{The LLM Gap.}
-Generic commercial AI tools (GPT-4, Gemini) partially address the mentorship
+Generic commercial AI tools partially address the mentorship
 vacuum, but they lack local regulatory and cultural grounding.
 When queried on Rwanda Startup Act compliance, Rwanda Innovation Fund (RIF)
 eligibility criteria, or BNR monetary policy frameworks, these models produce
@@ -190,8 +190,6 @@ This paper makes four contributions:
     prioritising Rwanda regulatory Q\&A; Qwen2.5-7B-Instruct identified as
     the optimal base (validation loss 1.1835, +62\% regulatory accuracy).
 
-    \item A hybrid deployment architecture that resolves the cost barrier of
-    serving 7B-parameter models in a pre-seed startup context.
 \end{enumerate}
 
 %% -----------------------------------------------------------------------
@@ -546,8 +544,8 @@ CNN\_A (Adam, lr=1e-3) & 86.95\% & 80.95\% & 31.58\% & 33.62\% & 0.7065 & --- \\
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-    ybar, bar width=12pt,
-    width=\columnwidth, height=7.0cm,
+    ybar, bar width=9pt,
+    width=\columnwidth, height=5.0cm,
     ylabel={Weighted F1 Score},
     ylabel style={font=\small},
     xlabel={Model},
@@ -591,86 +589,26 @@ CNN\_A (Adam, lr=1e-3) & 86.95\% & 80.95\% & 31.58\% & 33.62\% & 0.7065 & --- \\
 \label{fig:investor_f1}
 \end{figure}
 
-\paragraph{Confusion Matrix Analysis: Classical Models.}
-Figures~\ref{fig:cm_lr}--\ref{fig:cm_xgb} show per-class prediction
-breakdowns for the five classical classifiers.
-XGBoost (Figure~\ref{fig:cm_xgb}) achieves the most balanced diagonal:
-9{,}586/9{,}604 \texttt{mentorship\_needed} and 117/861
-\texttt{investment\_ready} correctly classified.
-All models over-predict \texttt{mentorship\_needed} due to the dominant
-prior (86.88\%), even after SMOTE augmentation.
+\FloatBarrier
+\paragraph{Confusion Matrix Analysis.}
+Figure~\ref{fig:cm_xgb} shows the per-class prediction breakdown for the
+deployed XGBoost classifier. It correctly classifies 9{,}586/9{,}604
+\texttt{mentorship\_needed} instances and 117/861
+\texttt{investment\_ready} instances, yielding the most balanced diagonal
+among all eight models. Classical alternatives achieve substantially lower
+\texttt{investment\_ready} recall (Random Forest 162/861, Logistic
+Regression 114/861, SVC 107/861), while all three 1D-CNN variants
+near-totally collapse the minority class (best: CNN\_C 103/861), confirming
+XGBoost as the production model for this severely imbalanced tabular task.
 
-\begin{figure}[htbp]
-\centering
-\onesinglecm{Logistic Regression}{22}{544}{23}{0}{9581}{23}{2}{745}{114}
-\caption{Logistic Regression: 114/861 \texttt{investment\_ready} correctly
-         classified; collapses nearly all \texttt{not\_ready} to
-         \texttt{mentorship\_needed}.}
-\label{fig:cm_lr}
-\end{figure}
-
-\begin{figure}[htbp]
-\centering
-\onesinglecm{Random Forest}{50}{496}{43}{127}{9299}{178}{31}{668}{162}
-\caption{Random Forest: best minority recall among classical tree methods
-         (162/861 IR, 50/589 NR).}
-\label{fig:cm_rf}
-\end{figure}
-
-\begin{figure}[htbp]
-\centering
-\onesinglecm{SVC}{25}{526}{38}{0}{9604}{0}{2}{752}{107}
-\caption{SVC: predicts zero instances as \texttt{not\_ready} via
-         \texttt{mentorship\_needed}; captures 107/861 investment-ready.}
-\label{fig:cm_svc}
-\end{figure}
-
-\begin{figure}[htbp]
-\centering
-\onesinglecm{ExtraTrees}{54}{477}{58}{243}{8959}{392}{90}{616}{156}
-\caption{ExtraTrees: higher minority recall (156/861 IR, 54/589 NR) at
-         the cost of more \texttt{mentorship\_needed} mis-predictions.}
-\label{fig:cm_et}
-\end{figure}
-
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
 \onesinglecm{XGBoost (Deployed)}{36}{528}{25}{5}{9586}{13}{9}{735}{117}
-\caption{XGBoost: best overall classifier. Achieves 9{,}586/9{,}604 MN recall
-         and 117/861 IR recall, with the most balanced diagonal.
+\caption{XGBoost confusion matrix on the 11{,}054-record held-out set.
+         Achieves 9{,}586/9{,}604 \texttt{mentorship\_needed} and
+         117/861 \texttt{investment\_ready} correctly classified.
          Selected as the production-deployed model.}
 \label{fig:cm_xgb}
-\end{figure}
-
-\paragraph{Confusion Matrix Analysis: CNN Variants.}
-Figures~\ref{fig:cm_cnn_a}--\ref{fig:cm_cnn_c} show that all three 1D-CNN
-variants collapse minority-class predictions into \texttt{mentorship\_needed}:
-CNN\_A classifies only 6/861 \texttt{investment\_ready} correctly (recall 0.7\%),
-versus XGBoost's 117/861 (13.6\%), confirming XGBoost's suitability for this
-severely imbalanced tabular task.
-
-\begin{figure}[htbp]
-\centering
-\onesinglecm{CNN\_A (Adam, lr=1e-3, 20 ep)}{10}{566}{13}{0}{9604}{0}{0}{855}{6}
-\caption{CNN\_A: near-total majority-class collapse; only 6/861
-         \texttt{investment\_ready} correctly classified (recall 0.7\%).}
-\label{fig:cm_cnn_a}
-\end{figure}
-
-\begin{figure}[htbp]
-\centering
-\onesinglecm{CNN\_B (RMSprop, lr=5e-4, 30 ep)}{8}{538}{43}{0}{9604}{0}{0}{753}{108}
-\caption{CNN\_B: marginally improved minority recall (108/861 IR) vs.\
-         CNN\_A, but still substantially below XGBoost.}
-\label{fig:cm_cnn_b}
-\end{figure}
-
-\begin{figure}[htbp]
-\centering
-\onesinglecm{CNN\_C (SGD, lr=1e-2, 40 ep)}{12}{539}{38}{0}{9603}{1}{0}{758}{103}
-\caption{CNN\_C: best CNN variant (103/861 IR, 12/589 NR correctly classified),
-         but all three CNNs are outperformed by XGBoost (Figure~\ref{fig:cm_xgb}).}
-\label{fig:cm_cnn_c}
 \end{figure}
 
 %% -----------------------------------------------------------------------
@@ -855,15 +793,6 @@ responses to official legal documents including the Rwanda Startup Act and
 Rwanda Company Law. At inference time, the top-$k$ retrieved passages ($k=3$)
 are prepended to the system prompt, grounding generation to verifiable sources
 and reducing the hallucination rate on regulatory queries.
-
-\paragraph{Hybrid Deployment Architecture.}
-Persistent hosting of 7B-parameter models on GPU infrastructure costs
-approximately \$\,1{,}200--2{,}400 per month --- an order of magnitude beyond a
-typical pre-seed startup budget. A hybrid strategy resolves this constraint:
-the Gemini API handles real-time conversational load ($<$400\,ms latency),
-while the fine-tuned Qwen model is triggered asynchronously for high-stakes
-regulatory analysis. CPU-based RAG inference is measured at 78.24\,s per query,
-confirming the necessity of the hybrid design for production viability.
 
 %% -----------------------------------------------------------------------
 %%  6. Experimental Results
