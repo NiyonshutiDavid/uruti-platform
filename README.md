@@ -361,21 +361,6 @@ Future improvement plan (including hardware constraints):
 - MLOps and deployment maturity:
     Add automated model registry, staged rollout (canary), and drift monitoring in production.
 
-## Demo Screenshots
-
-- Core dashboard demo image:
-    Admin
-  
-    Founder
-  `[INSERT IMAGE OR LINK HERE]`
-    Investor
-`[INSERT IMAGE OR LINK HERE]`
-
-- Startup creation and startup discovery
-    Founder startups hub
-  `[INSERT IMAGE OR LINK HERE]`
-    Investor Startup discovery
-  `[INSERT IMAGE OR LINK HERE]`
 
 - Advisory/chatbot demo image:
     `[INSERT IMAGE OR LINK HERE]`
